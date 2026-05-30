@@ -53,6 +53,8 @@ void MultiProviderLlmAdapter::streamChat(
 
     if (it != m_provider_adapters.end()) {
         it->second->streamChat(chat_id, messages, std::move(on_chunk), real_model);
+    } else {
+        spdlog::error("No adapters available -- streamChat aborted");
     }
 }
 
@@ -66,6 +68,15 @@ void MultiProviderLlmAdapter::addProvider(const ports::LlmProviderConfig& provid
     m_providers.push_back(prov);
 
     auto concrete = createConcreteAdapter(prov);
+    concrete->configure(ports::LlmConfig{
+        .provider = prov.type,
+        .model = prov.default_model,
+        .api_key = prov.api_key,
+        .base_url = prov.base_url,
+        .max_tokens = 4096,
+        .temperature = 0.7f,
+        .system_prompt = "You are Rook, a helpful AI assistant.",
+    });
     m_provider_adapters[prov.id] = std::move(concrete);
 }
 
@@ -75,8 +86,17 @@ void MultiProviderLlmAdapter::updateProvider(const ports::LlmProviderConfig& pro
 
     if (it != m_providers.end()) {
         *it = provider;
-        m_provider_adapters.erase(provider.id);
-        m_provider_adapters[provider.id] = createConcreteAdapter(provider);
+        auto concrete = createConcreteAdapter(provider);
+        concrete->configure(ports::LlmConfig{
+            .provider = provider.type,
+            .model = provider.default_model,
+            .api_key = provider.api_key,
+            .base_url = provider.base_url,
+            .max_tokens = 4096,
+            .temperature = 0.7f,
+            .system_prompt = "You are Rook, a helpful AI assistant.",
+        });
+        m_provider_adapters[provider.id] = std::move(concrete);
     }
 }
 
