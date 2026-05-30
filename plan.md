@@ -1185,30 +1185,13 @@ message HlcTimestamp {
 }
 ```
 
-### gRPC-Gateway → REST (automatisch generiert)
+### Multi-Client-Protokoll: natives gRPC + gRPC-Web
 
-```yaml
-# proto/rook/v1/service_gateway.yaml
-type: google.api.Service
-config_version: 3
+- **C++ Frontends** (rook-gui, rook-tui): natives gRPC (HTTP/2, binary protobuf)
+- **Web Frontend** (rook-web/React): gRPC-Web (HTTP/1.1, binary + base64)
+- **Server**: `grpc::Server` mit nativem gRPC-Web Support (seit gRPC C++ 1.30)
 
-http:
-  rules:
-    - selector: rook.v1.RookService.ListExtensions
-      get: /api/v1/extensions
-    - selector: rook.v1.RookService.InstallExtension
-      post: /api/v1/extensions
-    - selector: rook.v1.RookService.RemoveExtension
-      delete: /api/v1/extensions/{id}
-    - selector: rook.v1.RookService.GetConfig
-      get: /api/v1/config
-    - selector: rook.v1.RookService.UpdateConfig
-      put: /api/v1/config
-    - selector: rook.v1.RookService.ListClients
-      get: /api/v1/clients
-```
-
-REST ist ein generated reverse-proxy. Kein handgeschriebener REST-Code. gRPC ist die Source-of-Truth.
+Der gleiche `grpc::Service`-Handler bedient beide Protokolle. Kein Envoy-Proxy, kein Go-Sidecar, kein REST-Gateway. Kein handgeschriebener REST-Code. gRPC ist das einzige Wire-Protokoll. Alle drei Frontends sprechen die gleichen typed contracts aus `service.proto`.
 
 ---
 
@@ -1738,7 +1721,6 @@ rook/
 │   ├── rook/
 │   │   └── v1/
 │   │       ├── service.proto              # gRPC Service-Definition
-│   │       ├── service_gateway.yaml       # gRPC-Gateway → REST Mapping
 │   │       └── types.proto                # Shared message types
 │   └── buf.yaml                           # Buf-Konfiguration (Lint + Breaking Change Detection)
 ├── libs/
@@ -1794,8 +1776,7 @@ rook/
 │               ├── telemetry/
 │               │   └── otlp_exporter.cpp
 │               └── server/
-│                   ├── grpc_service.cpp   # gRPC Service-Implementierung
-│                   └── gateway.cpp        # gRPC-Gateway REST-Proxy
+│                   └── grpc_service.cpp   # gRPC Service + natives gRPC-Web
 ├── src/
 │   ├── rook-gui/                           # GTK4 Desktop App
 │   │   ├── main.cpp                       # Entry Point
@@ -1814,7 +1795,7 @@ rook/
 │   │   └── tui_frontend.hpp / .cpp        # Implementiert Frontend-Interface
 │   └── rookd/                              # Headless Daemon
 │       ├── main.cpp                       # Server Entry Point
-│       ├── server.hpp / .cpp              # gRPC-Server + REST-Gateway
+│       ├── server.hpp / .cpp              # gRPC-Server (nativ + gRPC-Web)
 │       └── config.hpp / .cpp              # Server-Konfiguration
 ├── web/
 │   └── rook-web/                           # React Web-Frontend
@@ -2586,12 +2567,11 @@ repos:
 
 ### Phase 5: gRPC-Server + Multi-Frontend
 
-**Ziel:** `rookd` Daemon, gRPC-API, rook-tui, rook-web
+**Ziel:** `rookd` Daemon, natives gRPC + gRPC-Web, rook-tui, rook-web
 
-- [ ] `libs/rook-core/src/adapters/server/grpc_service.cpp`: gRPC-Service (Chat, Delegate, Sync)
-- [ ] `libs/rook-core/src/adapters/server/gateway.cpp`: gRPC-Gateway → REST
+- [ ] `libs/rook-core/src/adapters/server/grpc_service.cpp`: gRPC-Service (Chat, Delegate, Sync) mit eingebautem gRPC-Web Support
 - [ ] `src/rookd/main.cpp`: Server Entry-Point, Config, systemd-Unit
-- [ ] `src/rookd/server.cpp`: gRPC-Server + REST-Gateway starten
+- [ ] `src/rookd/server.cpp`: gRPC-Server (nativ + gRPC-Web auf gleichem Port) starten
 - [ ] `src/rook-tui/main.cpp`: FTXUI App, implementiert UserOutputPort + UserInputPort
 - [ ] `src/rook-tui/tui_frontend.cpp`: EventBus → Terminal-Rendering
 - [ ] `web/rook-web/`: React-App mit gRPC-Web Client
@@ -2599,7 +2579,7 @@ repos:
 - [ ] Unit-Tests: gRPC-Service (Mock-LLM, Mock-MCP)
 - [ ] Integrationstests: rook-gui connected to rookd
 
-**Erwartetes Ergebnis:** rookd läuft als Daemon. rook-gui, rook-tui, rook-web connecten via gRPC. Alle drei Frontends funktionieren.
+**Erwartetes Ergebnis:** rookd läuft als Daemon mit nativem gRPC + gRPC-Web auf einem Port. rook-gui (natives gRPC), rook-tui (natives gRPC), rook-web (gRPC-Web) connecten. Alle drei Frontends funktionieren.
 
 ---
 
@@ -2663,7 +2643,7 @@ meson ninja pkg-config gettext desktop-file-utils
 gcc14 clang-tools gdb valgrind
 
 # gRPC + Protobuf
-grpc protobuf grpc-gateway buf
+grpc protobuf buf
 
 # OpenTelemetry
 cpp-otel-sdk opentelemetry-cpp
@@ -2734,7 +2714,6 @@ vendor/
 | FTXUI | https://github.com/ArthurSonzogni/FTXUI |
 | gRPC C++ | https://grpc.io/docs/languages/cpp/ |
 | Protobuf | https://protobuf.dev/ |
-| gRPC-Gateway | https://github.com/grpc-ecosystem/grpc-gateway |
 | Buf | https://buf.build |
 | OpenTelemetry C++ | https://opentelemetry.io/docs/languages/cpp/ |
 | MCP Specification | https://spec.modelcontextprotocol.io/ |
