@@ -153,6 +153,30 @@ void ConversationManager::setActive(std::string_view id) {
     m_active_id = id;
 }
 
+void ConversationManager::start(EventBus& bus) {
+    m_bus = &bus;
+
+    m_chat_created_handler = bus.subscribe<ChatCreated>(
+        [this](const ChatCreated& event) { onChatCreated(event); });
+
+    m_chat_deleted_handler = bus.subscribe<ChatDeleted>(
+        [this](const ChatDeleted& event) { onChatDeleted(event); });
+}
+
+void ConversationManager::onChatCreated(const ChatCreated& /*event*/) {
+    auto conv = create("New Chat", "default");
+
+    if (m_bus) {
+        m_bus->publish(ChatSelected{
+            .chat_id = conv.id
+        });
+    }
+}
+
+void ConversationManager::onChatDeleted(const ChatDeleted& event) {
+    remove(event.chat_id);
+}
+
 std::string ConversationManager::generateTitle(const Conversation& conv) const {
     if (!conv.messages.empty()) {
         auto& msg = conv.messages[0];

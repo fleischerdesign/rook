@@ -37,20 +37,22 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
 
     m_bus.publish(LlmRequested{event.chat_id, ""});
 
+    std::string chat_id = event.chat_id;
+
     m_llm.streamChat(
         event.chat_id,
         messages,
-        [this](std::string_view chunk, bool is_final) {
+        [this, chat_id](std::string_view chunk, bool is_final) {
             if (!chunk.empty()) {
                 m_bus.publish(LlmStreamChunk{
-                    .chat_id = "",
+                    .chat_id = chat_id,
                     .content = std::string(chunk),
                     .is_final = is_final,
                 });
             }
 
             if (is_final) {
-                m_bus.publish(LlmCompleted{"", 0});
+                m_bus.publish(LlmCompleted{chat_id, 0});
             }
         }
     );

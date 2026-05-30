@@ -16,11 +16,17 @@ ChatView::ChatView(rook::domain::EventBus& bus)
             onStreamChunk(event);
         });
 
-    spdlog::info("ChatView subscribed to LlmStreamChunk");
+    m_chat_selected_handler = m_bus.subscribe<rook::domain::ChatSelected>(
+        [this](const rook::domain::ChatSelected& event) {
+            onChatSelected(event);
+        });
+
+    spdlog::info("ChatView subscribed to LlmStreamChunk and ChatSelected");
 }
 
 ChatView::~ChatView() {
     m_bus.unsubscribe(m_chunk_handler);
+    m_bus.unsubscribe(m_chat_selected_handler);
 }
 
 void ChatView::setChatId(std::string_view id) {
@@ -90,6 +96,17 @@ void ChatView::onStreamChunk(const rook::domain::LlmStreamChunk& event) {
 
         auto adj = m_scrolled.get_vadjustment();
         if (adj) adj->set_value(adj->get_upper());
+    });
+}
+
+void ChatView::onChatSelected(const rook::domain::ChatSelected& event) {
+    Glib::signal_idle().connect_once([this, id = event.chat_id]() {
+        m_chat_id = id;
+
+        while (auto* row = m_message_list.get_row_at_index(0)) {
+            m_message_list.remove(*row);
+        }
+        m_pending_assistant = nullptr;
     });
 }
 

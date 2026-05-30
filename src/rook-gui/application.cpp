@@ -20,6 +20,8 @@ RookApplication::RookApplication()
         .system_prompt = "",
     });
 
+    m_conversations.start(m_bus);
+
     m_engine = std::make_unique<rook::domain::AgentEngine>(
         m_bus, *m_llm, m_conversations);
 
