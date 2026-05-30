@@ -1,0 +1,12 @@
+/result
+/.direnv/
+/build/
+/builddir/
+*.o
+*.lo
+*.la
+*.so
+*.so.*
+*.dylib
+*.dll
+.pkgconfig/
