@@ -42,6 +42,8 @@ void PreferencesWindow::setupUi() {
     paned->set_start_child(*sidebar_box);
 
     m_llm_page = Gtk::make_managed<LlmSettingsPage>(m_llm);
+    m_llm_page->signal_changed().connect(
+        [this]() { m_signal_changed.emit(); });
     m_stack.add(*m_llm_page, "llm");
 
     m_voice_page = Gtk::make_managed<VoiceSettingsPage>();

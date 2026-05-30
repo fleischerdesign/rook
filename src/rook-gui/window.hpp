@@ -14,7 +14,8 @@ class MessageWidget;
 
 class RookWindow : public Gtk::Window {
 public:
-    explicit RookWindow(rook::domain::EventBus& bus, rook::ports::LlmPort& llm);
+    explicit RookWindow(rook::domain::EventBus& bus, rook::ports::LlmPort& llm,
+                        sigc::slot<void()> on_settings_changed = {});
     ~RookWindow() override = default;
 
 private:
@@ -26,6 +27,7 @@ private:
 
     rook::domain::EventBus& m_bus;
     rook::ports::LlmPort& m_llm;
+    sigc::slot<void()> m_on_settings_changed;
     Glib::RefPtr<Gio::SimpleActionGroup> m_action_group;
     Gtk::HeaderBar m_header_bar;
     Gtk::Paned m_paned;

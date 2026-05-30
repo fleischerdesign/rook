@@ -6,9 +6,11 @@
 
 namespace rook::gui {
 
-RookWindow::RookWindow(rook::domain::EventBus& bus, rook::ports::LlmPort& llm)
+RookWindow::RookWindow(rook::domain::EventBus& bus, rook::ports::LlmPort& llm,
+                       sigc::slot<void()> on_settings_changed)
     : m_bus(bus)
     , m_llm(llm)
+    , m_on_settings_changed(on_settings_changed)
 {
     set_title("Rook");
     set_default_size(900, 600);
@@ -49,6 +51,9 @@ void RookWindow::setupActions() {
 
 void RookWindow::onSettings() {
     auto* dialog = new PreferencesWindow(*this, m_llm, "");
+    if (m_on_settings_changed) {
+        dialog->signal_changed().connect(m_on_settings_changed);
+    }
     dialog->signal_hide().connect([dialog]() { delete dialog; });
     dialog->present();
 }

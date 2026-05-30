@@ -131,6 +131,7 @@ void LlmSettingsPage::onAddClicked() {
             if (response == Gtk::ResponseType::OK) {
                 m_llm.addProvider(dialog->getProvider());
                 refreshList();
+                m_signal_changed.emit();
             }
             delete dialog;
         });
@@ -151,6 +152,7 @@ void LlmSettingsPage::onEditClicked(const std::string& provider_id) {
                     if (response == Gtk::ResponseType::OK) {
                         m_llm.updateProvider(dialog->getProvider());
                         refreshList();
+                        m_signal_changed.emit();
                     }
                     delete dialog;
                 });
@@ -163,6 +165,7 @@ void LlmSettingsPage::onEditClicked(const std::string& provider_id) {
 void LlmSettingsPage::onDeleteClicked(const std::string& provider_id) {
     m_llm.removeProvider(provider_id);
     refreshList();
+    m_signal_changed.emit();
 }
 
 void LlmSettingsPage::onSetDefault(const std::string& provider_id) {

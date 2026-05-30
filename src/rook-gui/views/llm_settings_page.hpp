@@ -10,6 +10,8 @@ public:
     explicit LlmSettingsPage(rook::ports::LlmPort& llm);
     ~LlmSettingsPage() override = default;
 
+    sigc::signal<void()>& signal_changed() { return m_signal_changed; }
+
 private:
     void setupUi();
     void refreshList();
@@ -21,6 +23,7 @@ private:
     void onToggleEnabled(const std::string& provider_id, bool enabled);
 
     rook::ports::LlmPort& m_llm;
+    sigc::signal<void()> m_signal_changed;
     Gtk::ListBox m_list;
     Gtk::Button m_add_button;
 };

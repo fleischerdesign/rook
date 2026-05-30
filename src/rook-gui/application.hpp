@@ -8,6 +8,8 @@
 #include "rook/domain/agent.hpp"
 #include "rook/ports/llm_port.hpp"
 #include "rook/ports/store_port.hpp"
+#include "rook/adapters/secret_store.hpp"
+#include "rook/core/settings.hpp"
 
 namespace rook::gui {
 
@@ -23,10 +25,18 @@ public:
 protected:
     RookApplication();
     void on_activate() override;
+    void on_startup() override;
 
 private:
+    void loadConfig();
+    void saveConfig();
+
+    std::string m_data_dir;
     rook::domain::EventBus m_bus;
     std::unique_ptr<rook::ports::LlmPort> m_llm;
+    std::unique_ptr<rook::ports::StorePort> m_store;
+    std::unique_ptr<rook::adapters::SecretStore> m_secrets;
+    rook::core::SettingsLoader m_settings;
     rook::domain::ConversationManager m_conversations;
     std::unique_ptr<rook::domain::AgentEngine> m_engine;
 };

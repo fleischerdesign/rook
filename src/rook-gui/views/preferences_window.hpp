@@ -15,12 +15,15 @@ public:
                       const std::string& config_path);
     ~PreferencesWindow() override = default;
 
+    sigc::signal<void()>& signal_changed() { return m_signal_changed; }
+
 private:
     void setupUi();
     void onSidebarRowActivated(Gtk::ListBoxRow* row);
 
     rook::ports::LlmPort& m_llm;
     std::string m_config_path;
+    sigc::signal<void()> m_signal_changed;
 
     Gtk::ListBox m_sidebar;
     Gtk::Stack m_stack;
