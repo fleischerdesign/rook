@@ -170,7 +170,9 @@ void ConversationManager::start(EventBus& bus, ports::StorePort* store) {
         [this](const ChatDeleted& event) { onChatDeleted(event); });
 }
 
-void ConversationManager::onChatCreated(const ChatCreated& /*event*/) {
+void ConversationManager::onChatCreated(const ChatCreated& event) {
+    if (!event.chat_id.empty()) return;
+
     auto conv = create("New Chat", "default");
 
     if (m_store) {
