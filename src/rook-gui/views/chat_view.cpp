@@ -187,6 +187,10 @@ void ChatView::loadMessages(std::string_view chat_id) {
         m_message_list.append(*widget);
     }
 
+    if (!conv.model.empty()) {
+        m_model_dropdown.set_active_id(conv.model);
+    }
+
     auto adj = m_scrolled.get_vadjustment();
     if (adj) adj->set_value(adj->get_upper());
 }
