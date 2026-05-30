@@ -5,9 +5,10 @@
 
 namespace rook::gui {
 
-ChatView::ChatView(rook::domain::EventBus& bus)
+ChatView::ChatView(rook::domain::EventBus& bus, rook::domain::ConversationManager& conv)
     : Gtk::Box(Gtk::Orientation::VERTICAL, 6)
     , m_bus(bus)
+    , m_conv(conv)
 {
     setupUi();
 
@@ -16,16 +17,20 @@ ChatView::ChatView(rook::domain::EventBus& bus)
             onStreamChunk(event);
         });
 
+    m_completed_handler = m_bus.subscribe<rook::domain::LlmCompleted>(
+        [this](const rook::domain::LlmCompleted& event) {
+            onLlmCompleted(event);
+        });
+
     m_chat_selected_handler = m_bus.subscribe<rook::domain::ChatSelected>(
         [this](const rook::domain::ChatSelected& event) {
             onChatSelected(event);
         });
-
-    spdlog::info("ChatView subscribed to LlmStreamChunk and ChatSelected");
 }
 
 ChatView::~ChatView() {
     m_bus.unsubscribe(m_chunk_handler);
+    m_bus.unsubscribe(m_completed_handler);
     m_bus.unsubscribe(m_chat_selected_handler);
 }
 
@@ -61,7 +66,7 @@ void ChatView::setupUi() {
 
 void ChatView::onSendClicked() {
     auto text = m_input_entry.get_text();
-    if (text.empty()) return;
+    if (text.empty() || m_chat_id.empty()) return;
 
     m_input_entry.set_text("");
 
@@ -80,34 +85,52 @@ void ChatView::onMessageEntryActivated() {
 }
 
 void ChatView::onStreamChunk(const rook::domain::LlmStreamChunk& event) {
-    Glib::signal_idle().connect_once([this, event]() {
-        if (event.is_final) {
-            m_pending_assistant = nullptr;
-            return;
-        }
+    if (event.chat_id != m_chat_id) return;
 
+    Glib::signal_idle().connect_once([this, content = std::string(event.content)]() {
         if (!m_pending_assistant) {
             m_pending_assistant = Gtk::make_managed<MessageWidget>(
                 "assistant", "");
             m_message_list.append(*m_pending_assistant);
         }
 
-        m_pending_assistant->appendChunk(event.content);
+        if (!content.empty()) {
+            m_pending_assistant->appendChunk(content);
+        }
 
         auto adj = m_scrolled.get_vadjustment();
         if (adj) adj->set_value(adj->get_upper());
     });
 }
 
+void ChatView::onLlmCompleted(const rook::domain::LlmCompleted& /*event*/) {
+    Glib::signal_idle().connect_once([this]() {
+        m_pending_assistant = nullptr;
+    });
+}
+
 void ChatView::onChatSelected(const rook::domain::ChatSelected& event) {
     Glib::signal_idle().connect_once([this, id = event.chat_id]() {
         m_chat_id = id;
-
-        while (auto* row = m_message_list.get_row_at_index(0)) {
-            m_message_list.remove(*row);
-        }
-        m_pending_assistant = nullptr;
+        loadMessages(id);
     });
+}
+
+void ChatView::loadMessages(std::string_view chat_id) {
+    while (auto* row = m_message_list.get_row_at_index(0)) {
+        m_message_list.remove(*row);
+    }
+    m_pending_assistant = nullptr;
+
+    auto conv = m_conv.open(chat_id);
+    for (const auto& msg : conv.messages) {
+        if (msg.role == "tool") continue;
+        auto* widget = Gtk::make_managed<MessageWidget>(msg.role, msg.content);
+        m_message_list.append(*widget);
+    }
+
+    auto adj = m_scrolled.get_vadjustment();
+    if (adj) adj->set_value(adj->get_upper());
 }
 
 } // namespace rook::gui

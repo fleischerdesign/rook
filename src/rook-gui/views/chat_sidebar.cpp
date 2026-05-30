@@ -3,25 +3,16 @@
 
 namespace rook::gui {
 
-ChatSidebar::ChatSidebar(rook::domain::EventBus& bus)
+ChatSidebar::ChatSidebar(rook::domain::EventBus& bus, rook::domain::ConversationManager& conv)
     : Gtk::Box(Gtk::Orientation::VERTICAL, 0)
     , m_bus(bus)
+    , m_conv(conv)
 {
     setupUi();
 
-    m_created_handler = m_bus.subscribe<rook::domain::ChatSelected>(
-        [this](const rook::domain::ChatSelected& event) {
-            Glib::signal_idle().connect_once([this, id = event.chat_id]() {
-                auto* row = Gtk::make_managed<Gtk::ListBoxRow>();
-                auto* label = Gtk::make_managed<Gtk::Label>(id);
-                label->set_xalign(0.0f);
-                label->set_margin(6);
-                label->set_max_width_chars(20);
-                label->set_ellipsize(Pango::EllipsizeMode::END);
-                row->set_child(*label);
-                row->set_name(id);
-                m_list.append(*row);
-            });
+    m_created_handler = m_bus.subscribe<rook::domain::ChatCreated>(
+        [this](const rook::domain::ChatCreated& event) {
+            onChatCreated(event);
         });
 
     m_deleted_handler = m_bus.subscribe<rook::domain::ChatDeleted>(
@@ -71,25 +62,59 @@ void ChatSidebar::onNewChat() {
 
 void ChatSidebar::onRowActivated(Gtk::ListBoxRow* row) {
     if (!row) return;
-    auto chat_id = row->get_name();
+    std::string chat_id(row->get_name());
     if (chat_id.empty()) return;
+
+    m_conv.setActive(chat_id);
 
     m_bus.publish(rook::domain::ChatSelected{
         .chat_id = chat_id
     });
 }
 
+void ChatSidebar::onChatCreated(const rook::domain::ChatCreated& event) {
+    if (event.chat_id.empty()) return;
+
+    auto conv = m_conv.open(event.chat_id);
+    std::string title = event.chat_id;
+    if (!conv.title.empty()) title = conv.title;
+    std::string cid = event.chat_id;
+
+    Glib::signal_idle().connect_once([this, id = std::move(cid), title = std::move(title)]() {
+        addChatRow(id, title);
+    });
+}
+
 void ChatSidebar::onChatDeleted(const rook::domain::ChatDeleted& event) {
-    Glib::signal_idle().connect_once([this, id = event.chat_id]() {
+    Glib::signal_idle().connect_once([this, id = std::string(event.chat_id)]() {
         auto* row = m_list.get_row_at_index(0);
         for (int i = 0; row; ++i) {
-            if (row->get_name() == id) {
+            if (std::string(row->get_name()) == id) {
                 m_list.remove(*row);
                 return;
             }
             row = m_list.get_row_at_index(i + 1);
         }
     });
+}
+
+void ChatSidebar::addChatRow(std::string_view id, std::string_view title) {
+    for (int i = 0; auto* existing = m_list.get_row_at_index(i); ++i) {
+        if (std::string(existing->get_name()) == id) return;
+    }
+
+    auto display = std::string(title);
+    if (display.size() > 25) display = display.substr(0, 25) + "...";
+
+    auto* row = Gtk::make_managed<Gtk::ListBoxRow>();
+    auto* label = Gtk::make_managed<Gtk::Label>(display);
+    label->set_xalign(0.0f);
+    label->set_margin(6);
+    label->set_max_width_chars(20);
+    label->set_ellipsize(Pango::EllipsizeMode::END);
+    row->set_child(*label);
+    row->set_name(std::string(id));
+    m_list.append(*row);
 }
 
 void ChatSidebar::loadConversations(const std::vector<rook::domain::Conversation>& chats) {
@@ -99,17 +124,7 @@ void ChatSidebar::loadConversations(const std::vector<rook::domain::Conversation
 
     for (const auto& conv : chats) {
         auto display = conv.title.empty() ? conv.id : conv.title;
-        if (display.size() > 25) display = display.substr(0, 25) + "...";
-
-        auto* row = Gtk::make_managed<Gtk::ListBoxRow>();
-        auto* label = Gtk::make_managed<Gtk::Label>(display);
-        label->set_xalign(0.0f);
-        label->set_margin(6);
-        label->set_max_width_chars(20);
-        label->set_ellipsize(Pango::EllipsizeMode::END);
-        row->set_child(*label);
-        row->set_name(conv.id);
-        m_list.append(*row);
+        addChatRow(conv.id, display);
     }
 }
 

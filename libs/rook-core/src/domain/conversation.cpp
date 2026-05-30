@@ -178,6 +178,9 @@ void ConversationManager::onChatCreated(const ChatCreated& /*event*/) {
     }
 
     if (m_bus) {
+        m_bus->publish(ChatCreated{
+            .chat_id = conv.id
+        });
         m_bus->publish(ChatSelected{
             .chat_id = conv.id
         });
