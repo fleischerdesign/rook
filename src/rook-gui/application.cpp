@@ -2,6 +2,7 @@
 #include "window.hpp"
 #include "views/chat_view.hpp"
 #include "views/chat_sidebar.hpp"
+#include "rook/adapters/llm/multi_provider_adapter.hpp"
 #include "rook/adapters/llm/llm_factory.hpp"
 
 namespace rook::gui {
@@ -9,7 +10,7 @@ namespace rook::gui {
 RookApplication::RookApplication()
     : Gtk::Application("io.github.fleischerdesign.Rook")
 {
-    m_llm = rook::adapters::llm::makeOllamaAdapter();
+    m_llm = rook::adapters::llm::makeMultiProviderAdapter();
     m_llm->configure(rook::ports::LlmConfig{
         .provider = "ollama",
         .model = "llama3.1",
@@ -17,7 +18,7 @@ RookApplication::RookApplication()
         .base_url = "",
         .max_tokens = 4096,
         .temperature = 0.7f,
-        .system_prompt = "",
+        .system_prompt = "You are Rook, a helpful AI assistant.",
     });
 
     m_conversations.start(m_bus);

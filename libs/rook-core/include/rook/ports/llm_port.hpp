@@ -6,8 +6,20 @@
 #include <functional>
 #include <chrono>
 #include <optional>
+#include <memory>
 
 namespace rook::ports {
+
+struct LlmProviderConfig {
+    std::string id;
+    std::string display_name;
+    std::string type;          // "ollama" | "openai" | "deepseek" | "anthropic"
+    std::string base_url;
+    std::string api_key;       // empty = read from libsecret
+    std::string default_model;
+    bool enabled = true;
+    bool is_default = false;
+};
 
 struct LlmMessage {
     std::string role;
@@ -35,6 +47,13 @@ public:
         const std::vector<LlmMessage>& messages,
         std::function<void(std::string_view chunk, bool is_final)> on_chunk
     ) = 0;
+
+    virtual std::vector<LlmProviderConfig> listProviders() const { return {}; }
+    virtual void addProvider(const LlmProviderConfig&) {}
+    virtual void updateProvider(const LlmProviderConfig&) {}
+    virtual void removeProvider(std::string_view) {}
+    virtual void setDefaultProvider(std::string_view) {}
+    virtual std::optional<LlmProviderConfig> activeProvider() const { return std::nullopt; }
 };
 
 } // namespace rook::ports

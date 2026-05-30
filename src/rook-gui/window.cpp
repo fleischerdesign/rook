@@ -1,7 +1,7 @@
 #include "window.hpp"
 #include "views/chat_view.hpp"
 #include "views/chat_sidebar.hpp"
-#include "views/settings_dialog.hpp"
+#include "views/preferences_window.hpp"
 #include <spdlog/spdlog.h>
 
 namespace rook::gui {
@@ -48,15 +48,8 @@ void RookWindow::setupActions() {
 }
 
 void RookWindow::onSettings() {
-    auto* dialog = new SettingsDialog(*this);
-    dialog->signal_response().connect(
-        [dialog, this](int response) {
-            if (response == Gtk::ResponseType::OK) {
-                auto config = dialog->getConfig();
-                m_llm.configure(config);
-            }
-            delete dialog;
-        });
+    auto* dialog = new PreferencesWindow(*this, m_llm, "");
+    dialog->signal_hide().connect([dialog]() { delete dialog; });
     dialog->present();
 }
 

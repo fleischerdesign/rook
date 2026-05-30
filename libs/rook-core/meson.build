@@ -8,13 +8,16 @@ librook_core_sources = files(
   'src/adapters/llm/deepseek_adapter.cpp',
   'src/adapters/llm/ollama_adapter.cpp',
   'src/adapters/llm/anthropic_adapter.cpp',
+  'src/adapters/llm/multi_provider_adapter.cpp',
   'src/adapters/store/json_store.cpp',
+  'src/adapters/secret_store.cpp',
 )
 
 librook_core_deps = [
   dependency('nlohmann_json'),
   dependency('spdlog'),
   dependency('libcurl'),
+  dependency('libsecret-1'),
 ]
 
 librook_core_inc = include_directories('include')
