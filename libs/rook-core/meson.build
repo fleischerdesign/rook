@@ -1,11 +1,14 @@
 librook_core_sources = files(
   'src/domain/event_bus.cpp',
+  'src/domain/conversation.cpp',
+  'src/domain/agent.cpp',
   'src/adapters/llm/llm_http_client.cpp',
   'src/adapters/llm/openai_compatible_adapter.cpp',
   'src/adapters/llm/openai_adapter.cpp',
   'src/adapters/llm/deepseek_adapter.cpp',
   'src/adapters/llm/ollama_adapter.cpp',
   'src/adapters/llm/anthropic_adapter.cpp',
+  'src/adapters/store/json_store.cpp',
 )
 
 librook_core_deps = [
