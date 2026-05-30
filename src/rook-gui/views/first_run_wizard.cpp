@@ -34,10 +34,12 @@ void FirstRunWizard::setupUi() {
     subtitle->add_css_class("dim-label");
     content->append(*subtitle);
 
-    m_provider.append("ollama", "Ollama (local, free)");
-    m_provider.append("openai", "OpenAI (cloud, API key required)");
-    m_provider.append("deepseek", "DeepSeek (cloud, API key required)");
-    m_provider.append("anthropic", "Anthropic (cloud, API key required)");
+    for (const auto& p : rook::ports::ProviderRegistry::instance().all()) {
+        auto label = p.display_name;
+        if (p.id != "ollama") label += " (API key required)";
+        else label += " (local, free)";
+        m_provider.append(p.id, label);
+    }
     m_provider.set_active_id("ollama");
     m_provider.signal_changed().connect(
         sigc::mem_fun(*this, &FirstRunWizard::onProviderChanged));
@@ -65,19 +67,16 @@ void FirstRunWizard::setupUi() {
 }
 
 void FirstRunWizard::onProviderChanged() {
-    auto provider = m_provider.get_active_id();
+    auto provider = std::string(m_provider.get_active_id());
     bool needs_key = (provider != "ollama");
     m_api_key.set_sensitive(needs_key);
 
+    auto info = rook::ports::ProviderRegistry::instance().find(provider);
+    if (info) {
+        m_model.set_text(info->default_model);
+    }
     if (provider == "ollama") {
-        m_model.set_text("llama3.1");
         m_api_key.set_text("");
-    } else if (provider == "openai") {
-        m_model.set_text("gpt-4o");
-    } else if (provider == "deepseek") {
-        m_model.set_text("deepseek-chat");
-    } else if (provider == "anthropic") {
-        m_model.set_text("claude-sonnet-4-20250514");
     }
 }
 

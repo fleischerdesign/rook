@@ -60,16 +60,16 @@ void RookApplication::on_activate() {
         auto* wizard = new FirstRunWizard();
         wizard->signal_done().connect([this, wizard, save_fn]() {
             auto cfg = wizard->getConfig();
+            auto info = rook::ports::ProviderRegistry::instance().find(cfg.provider);
 
             auto new_provider = rook::ports::LlmProviderConfig{
                 .id = "",
-                .display_name = rook::ports::ProviderDefaults::displayName(cfg.provider),
+                .display_name = info ? info->display_name : cfg.provider,
                 .type = cfg.provider,
-                .base_url = rook::ports::ProviderDefaults::baseUrl(cfg.provider),
+                .base_url = info ? info->base_url : "",
                 .api_key = cfg.api_key,
-                .default_model = cfg.model.empty()
-                    ? rook::ports::ProviderDefaults::defaultModel(cfg.provider)
-                    : cfg.model,
+                .default_model = !cfg.model.empty() ? cfg.model
+                    : (info ? info->default_model : ""),
                 .enabled = true,
                 .is_default = true,
             };

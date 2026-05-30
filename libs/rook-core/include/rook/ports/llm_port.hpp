@@ -56,10 +56,27 @@ public:
     virtual std::optional<LlmProviderConfig> activeProvider() const { return std::nullopt; }
 };
 
-struct ProviderDefaults {
-    static std::string displayName(std::string_view type);
-    static std::string baseUrl(std::string_view type);
-    static std::string defaultModel(std::string_view type);
+struct ProviderTypeInfo {
+    std::string id;
+    std::string display_name;
+    std::string base_url;
+    std::string default_model;
+    bool builtin = true;
+};
+
+class ProviderRegistry {
+public:
+    static ProviderRegistry& instance();
+
+    void registerType(ProviderTypeInfo info);
+    std::vector<ProviderTypeInfo> all() const;
+    std::optional<ProviderTypeInfo> find(std::string_view id) const;
+
+private:
+    ProviderRegistry();
+    void registerBuiltins();
+
+    std::vector<ProviderTypeInfo> m_types;
 };
 
 } // namespace rook::ports

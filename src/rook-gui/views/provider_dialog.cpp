@@ -30,10 +30,9 @@ void ProviderDialog::setupUi() {
     m_display_name.set_text("My Provider");
     content->append(*makeRow("Name", m_display_name));
 
-    m_type.append("ollama", "Ollama (local)");
-    m_type.append("openai", "OpenAI");
-    m_type.append("deepseek", "DeepSeek");
-    m_type.append("anthropic", "Anthropic");
+    for (const auto& p : rook::ports::ProviderRegistry::instance().all()) {
+        m_type.append(p.id, p.display_name);
+    }
     m_type.set_active_id("ollama");
     m_type.signal_changed().connect(
         sigc::mem_fun(*this, &ProviderDialog::onTypeChanged));
@@ -86,8 +85,11 @@ void ProviderDialog::onTypeChanged() {
     auto type = std::string(m_type.get_active_id());
     m_api_key.set_sensitive(type != "ollama");
 
-    m_base_url.set_text(rook::ports::ProviderDefaults::baseUrl(type));
-    m_model.set_text(rook::ports::ProviderDefaults::defaultModel(type));
+    auto info = rook::ports::ProviderRegistry::instance().find(type);
+    if (info) {
+        m_base_url.set_text(info->base_url);
+        m_model.set_text(info->default_model);
+    }
 }
 
 void ProviderDialog::onTestConnection() {
