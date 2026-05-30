@@ -19,11 +19,17 @@ ChatSidebar::ChatSidebar(rook::domain::EventBus& bus, rook::domain::Conversation
         [this](const rook::domain::ChatDeleted& event) {
             onChatDeleted(event);
         });
+
+    m_updated_handler = m_bus.subscribe<rook::domain::ChatUpdated>(
+        [this](const rook::domain::ChatUpdated& event) {
+            onChatUpdated(event);
+        });
 }
 
 ChatSidebar::~ChatSidebar() {
     m_bus.unsubscribe(m_created_handler);
     m_bus.unsubscribe(m_deleted_handler);
+    m_bus.unsubscribe(m_updated_handler);
 }
 
 void ChatSidebar::setupUi() {
@@ -94,6 +100,22 @@ void ChatSidebar::onChatDeleted(const rook::domain::ChatDeleted& event) {
                 return;
             }
             row = m_list.get_row_at_index(i + 1);
+        }
+    });
+}
+
+void ChatSidebar::onChatUpdated(const rook::domain::ChatUpdated& event) {
+    Glib::signal_idle().connect_once([this, id = event.chat_id, title = event.title]() {
+        for (int i = 0; auto* row = m_list.get_row_at_index(i); ++i) {
+            if (std::string(row->get_name()) == id) {
+                auto* label = dynamic_cast<Gtk::Label*>(row->get_child());
+                if (label) {
+                    auto display = title;
+                    if (display.size() > 25) display = display.substr(0, 25) + "...";
+                    label->set_text(display);
+                }
+                return;
+            }
         }
     });
 }

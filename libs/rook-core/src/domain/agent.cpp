@@ -64,8 +64,53 @@ void AgentEngine::onLlmChunk(const LlmStreamChunk& chunk) {
     }
 }
 
-void AgentEngine::onLlmCompleted(const LlmCompleted& /*event*/) {
-    spdlog::info("LLM response complete");
+void AgentEngine::onLlmCompleted(const LlmCompleted& event) {
+    spdlog::info("LLM response complete for chat {}", event.chat_id);
+
+    auto conv = m_conv.open(event.chat_id);
+    if (conv.title != "New Chat") return;
+
+    int user_count = 0;
+    int assistant_count = 0;
+    std::string last_user;
+    std::string last_assistant;
+
+    for (const auto& msg : conv.messages) {
+        if (msg.role == "user") { user_count++; last_user = msg.content; }
+        if (msg.role == "assistant") { assistant_count++; last_assistant = msg.content; }
+    }
+
+    if (user_count != 1 || assistant_count != 1) return;
+
+    spdlog::info("Generating title for chat {}", event.chat_id);
+
+    ports::LlmMessage title_msg;
+    title_msg.role = "user";
+    title_msg.content = "Generate a short title in the same language (max 5 words) for this chat.\n"
+                        "User: " + last_user + "\n"
+                        "Assistant: " + last_assistant + "\n"
+                        "Title:";
+
+    std::string accumulated;
+    std::string chat_id = event.chat_id;
+
+    m_llm.streamChat(
+        chat_id,
+        {title_msg},
+        [this, chat_id, &accumulated](std::string_view chunk, bool is_final) {
+            accumulated += std::string(chunk);
+            if (is_final && !accumulated.empty()) {
+                std::string title = accumulated;
+                while (!title.empty() && (title.front() == '"' || title.front() == '\n' || title.front() == ' '))
+                    title.erase(0, 1);
+                while (!title.empty() && (title.back() == '"' || title.back() == '\n' || title.back() == ' '))
+                    title.pop_back();
+                if (!title.empty()) {
+                    m_conv.setTitle(chat_id, title);
+                }
+            }
+        }
+    );
 }
 
 void AgentEngine::onLlmError(const LlmError& event) {

@@ -21,6 +21,7 @@ private:
     void onRowActivated(Gtk::ListBoxRow* row);
     void onChatCreated(const rook::domain::ChatCreated& event);
     void onChatDeleted(const rook::domain::ChatDeleted& event);
+    void onChatUpdated(const rook::domain::ChatUpdated& event);
     void addChatRow(std::string_view id, std::string_view title);
 
     rook::domain::EventBus& m_bus;
@@ -30,6 +31,7 @@ private:
 
     rook::domain::EventBus::HandlerId m_created_handler;
     rook::domain::EventBus::HandlerId m_deleted_handler;
+    rook::domain::EventBus::HandlerId m_updated_handler;
 };
 
 } // namespace rook::gui

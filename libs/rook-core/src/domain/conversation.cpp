@@ -82,13 +82,8 @@ void ConversationManager::addMessage(std::string_view conv_id, ChatMessage messa
     message.id = generateId();
     message.timestamp = std::chrono::system_clock::now();
 
-    bool was_empty = it->messages.empty();
     it->messages.push_back(std::move(message));
     it->updated_at = std::chrono::system_clock::now();
-
-    if (was_empty && it->messages[0].role == "user") {
-        it->title = generateTitle(*it);
-    }
 
     if (m_store) {
         saveActiveConversation(*m_store);
@@ -204,6 +199,26 @@ std::string ConversationManager::generateTitle(const Conversation& conv) const {
         return title;
     }
     return "New Chat";
+}
+
+void ConversationManager::setTitle(std::string_view conv_id, std::string_view title) {
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](auto& c) { return c.id == conv_id; });
+
+    if (it == m_conversations.end()) return;
+
+    it->title = title;
+
+    if (m_bus) {
+        m_bus->publish(ChatUpdated{
+            .chat_id = std::string(conv_id),
+            .title = std::string(title),
+        });
+    }
+
+    if (m_store) {
+        saveActiveConversation(*m_store);
+    }
 }
 
 void ConversationManager::loadFromStore(ports::StorePort& store) {

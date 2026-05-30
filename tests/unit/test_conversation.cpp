@@ -73,7 +73,7 @@ TEST(ConversationManagerTest, ActiveConversation) {
     EXPECT_FALSE(none.has_value());
 }
 
-TEST(ConversationManagerTest, TitleGeneration) {
+TEST(ConversationManagerTest, SetTitle) {
     ConversationManager mgr;
     auto conv = mgr.create("Untitled", "llama3.1");
 
@@ -82,8 +82,10 @@ TEST(ConversationManagerTest, TitleGeneration) {
     msg.content = "What is the weather today?";
     mgr.addMessage(conv.id, std::move(msg));
 
+    mgr.setTitle(conv.id, "Weather question");
+
     auto updated = mgr.open(conv.id);
-    EXPECT_EQ(updated.title, "What is the weather today?");
+    EXPECT_EQ(updated.title, "Weather question");
 }
 
 TEST(ConversationManagerTest, TokenEstimation) {

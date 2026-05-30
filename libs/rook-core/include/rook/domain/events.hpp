@@ -81,6 +81,11 @@ struct ChatSelected {
     std::string chat_id;
 };
 
+struct ChatUpdated {
+    std::string chat_id;
+    std::string title;
+};
+
 struct SettingsChanged {
     std::string key;
     std::string value;
@@ -117,6 +122,7 @@ using DomainEvent = std::variant<
     ChatCreated,
     ChatDeleted,
     ChatSelected,
+    ChatUpdated,
     SettingsChanged,
     SyncStateReceived,
     TaskDelegated,
