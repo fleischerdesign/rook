@@ -12,6 +12,7 @@ struct UserInputReceived {
     std::string chat_id;
     std::string content;
     std::string source; // "text" | "voice"
+    std::string model;
 };
 
 struct LlmStreamChunk {

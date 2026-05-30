@@ -41,6 +41,7 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
     m_bus.publish(LlmRequested{event.chat_id, ""});
 
     std::string chat_id = event.chat_id;
+    std::string model = event.model;
 
     m_llm.streamChat(
         event.chat_id,
@@ -57,7 +58,8 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
             if (is_final) {
                 m_bus.publish(LlmCompleted{chat_id, 0});
             }
-        }
+        },
+        model
     );
 }
 

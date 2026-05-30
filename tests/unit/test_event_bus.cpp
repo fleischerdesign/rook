@@ -30,7 +30,7 @@ TEST(EventBusTest, MultipleSubscribers) {
     bus.subscribe<UserInputReceived>([&](const UserInputReceived&) { a++; });
     bus.subscribe<UserInputReceived>([&](const UserInputReceived&) { b++; });
 
-    bus.publish(UserInputReceived{"chat", "hello", "text"});
+    bus.publish(UserInputReceived{"chat", "hello", "text", ""});
 
     EXPECT_EQ(a, 1);
     EXPECT_EQ(b, 1);
@@ -63,7 +63,7 @@ TEST(EventBusTest, EventPayloadIsCorrect) {
         last_content = e.content;
     });
 
-    bus.publish(UserInputReceived{"chat-42", "hello world", "text"});
+    bus.publish(UserInputReceived{"chat-42", "hello world", "text", ""});
 
     EXPECT_EQ(last_id, "chat-42");
     EXPECT_EQ(last_content, "hello world");

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include "rook/ports/llm_port.hpp"
 #include "rook/adapters/llm/llm_http_client.hpp"
 
@@ -16,7 +17,8 @@ public:
     void streamChat(
         std::string_view chat_id,
         const std::vector<ports::LlmMessage>& messages,
-        std::function<void(std::string_view chunk, bool is_final)> on_chunk
+        std::function<void(std::string_view chunk, bool is_final)> on_chunk,
+        std::string_view model = ""
     ) override;
 
     std::vector<ports::LlmProviderConfig> listProviders() const override;
@@ -33,6 +35,7 @@ private:
     std::vector<ports::LlmProviderConfig> m_providers;
     std::unique_ptr<ports::LlmPort> m_active_adapter;
     std::string m_active_provider_id;
+    std::unordered_map<std::string, std::unique_ptr<ports::LlmPort>> m_provider_adapters;
 };
 
 } // namespace rook::adapters::llm

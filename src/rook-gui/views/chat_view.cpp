@@ -1,14 +1,17 @@
 #include "chat_view.hpp"
 #include "message_widget.hpp"
 #include "rook/domain/events.hpp"
+#include "rook/ports/llm_port.hpp"
 #include <spdlog/spdlog.h>
 
 namespace rook::gui {
 
-ChatView::ChatView(rook::domain::EventBus& bus, rook::domain::ConversationManager& conv)
+ChatView::ChatView(rook::domain::EventBus& bus, rook::domain::ConversationManager& conv,
+                   rook::ports::LlmPort& llm)
     : Gtk::Box(Gtk::Orientation::VERTICAL, 6)
     , m_bus(bus)
     , m_conv(conv)
+    , m_llm(llm)
 {
     setupUi();
 
@@ -64,8 +67,15 @@ void ChatView::setupUi() {
     m_scrolled.set_vexpand(true);
     append(m_scrolled);
 
+    m_model_dropdown.set_hexpand(false);
+    m_model_dropdown.set_margin_start(12);
+    m_model_dropdown.set_margin_end(6);
+    populateModelDropdown();
+
     auto input_box = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::HORIZONTAL, 6);
     input_box->set_margin(12);
+
+    input_box->append(m_model_dropdown);
 
     m_input_entry.set_hexpand(true);
     m_input_entry.set_placeholder_text("Type a message...");
@@ -82,6 +92,33 @@ void ChatView::setupUi() {
     append(*input_box);
 }
 
+void ChatView::populateModelDropdown() {
+    m_model_dropdown.remove_all();
+    auto providers = m_llm.listProviders();
+
+    for (const auto& prov : providers) {
+        if (!prov.enabled) continue;
+        auto info = rook::ports::ProviderRegistry::instance().find(prov.type);
+        auto models = info ? info->known_models : std::vector<std::string>{prov.default_model};
+        if (models.empty()) models = {prov.default_model};
+
+        for (const auto& model : models) {
+            auto label = prov.display_name + " / " + model;
+            m_model_dropdown.append(prov.id + ":" + model, label);
+        }
+    }
+
+    if (m_model_dropdown.get_active_id().empty() && !providers.empty()) {
+        auto& first = providers.front();
+        auto info = rook::ports::ProviderRegistry::instance().find(first.type);
+        auto default_model = info && !info->default_model.empty()
+            ? info->default_model : first.default_model;
+        m_model_dropdown.set_active_id(first.id + ":" + default_model);
+    }
+
+    m_model_dropdown.set_sensitive(true);
+}
+
 void ChatView::onSendClicked() {
     auto text = m_input_entry.get_text();
     if (text.empty() || m_chat_id.empty()) return;
@@ -91,10 +128,13 @@ void ChatView::onSendClicked() {
     auto* user_msg = Gtk::make_managed<MessageWidget>("user", std::string(text));
     m_message_list.append(*user_msg);
 
+    auto combo_id = std::string(m_model_dropdown.get_active_id());
+
     m_bus.publish(rook::domain::UserInputReceived{
         .chat_id = m_chat_id,
         .content = text,
         .source = "text",
+        .model = combo_id,
     });
 }
 

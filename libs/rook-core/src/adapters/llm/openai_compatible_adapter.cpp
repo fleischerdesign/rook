@@ -89,9 +89,15 @@ std::string OpenAiCompatibleAdapter::buildRequestBody(
 void OpenAiCompatibleAdapter::streamChat(
     std::string_view /*chat_id*/,
     const std::vector<ports::LlmMessage>& messages,
-    std::function<void(std::string_view chunk, bool is_final)> on_chunk
+    std::function<void(std::string_view chunk, bool is_final)> on_chunk,
+    std::string_view model
 ) {
     auto body = buildRequestBody(messages);
+    if (!model.empty()) {
+        auto j = nlohmann::json::parse(body);
+        j["model"] = std::string(model);
+        body = j.dump();
+    }
     auto url = m_base_url + "/v1/chat/completions";
 
     std::vector<std::pair<std::string, std::string>> headers = {

@@ -22,10 +22,11 @@ public:
     void streamChat(
         std::string_view /*chat_id*/,
         const std::vector<ports::LlmMessage>& messages,
-        std::function<void(std::string_view chunk, bool is_final)> on_chunk
+        std::function<void(std::string_view chunk, bool is_final)> on_chunk,
+        std::string_view model = ""
     ) override {
         nlohmann::json body;
-        body["model"] = m_model;
+        body["model"] = model.empty() ? m_model : std::string(model);
         body["stream"] = true;
 
         if (!m_system_prompt.empty()) {

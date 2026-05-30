@@ -4,6 +4,7 @@
 #include "rook/domain/events.hpp"
 #include "rook/domain/event_bus.hpp"
 #include "rook/domain/conversation.hpp"
+#include "rook/ports/llm_port.hpp"
 
 namespace rook::gui {
 
@@ -11,7 +12,8 @@ class MessageWidget;
 
 class ChatView : public Gtk::Box {
 public:
-    ChatView(rook::domain::EventBus& bus, rook::domain::ConversationManager& conv);
+    ChatView(rook::domain::EventBus& bus, rook::domain::ConversationManager& conv,
+             rook::ports::LlmPort& llm);
     ~ChatView() override;
 
     void setChatId(std::string_view id);
@@ -26,15 +28,18 @@ private:
 
     void setProcessing(bool active);
     void loadMessages(std::string_view chat_id);
+    void populateModelDropdown();
 
     rook::domain::EventBus& m_bus;
     rook::domain::ConversationManager& m_conv;
+    rook::ports::LlmPort& m_llm;
     std::string m_chat_id;
 
     Gtk::ScrolledWindow m_scrolled;
     Gtk::ListBox m_message_list;
     Gtk::Entry m_input_entry;
     Gtk::Button m_send_button;
+    Gtk::ComboBoxText m_model_dropdown;
     MessageWidget* m_pending_assistant = nullptr;
 
     rook::domain::EventBus::HandlerId m_chunk_handler;

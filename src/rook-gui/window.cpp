@@ -75,7 +75,7 @@ void RookWindow::onAbout() {
 
 void RookWindow::setupLayout(rook::domain::ConversationManager& conversations) {
     m_sidebar = Gtk::make_managed<ChatSidebar>(m_bus, conversations);
-    m_chat_view = Gtk::make_managed<ChatView>(m_bus, conversations);
+    m_chat_view = Gtk::make_managed<ChatView>(m_bus, conversations, m_llm);
 
     m_sidebar->loadConversations(conversations.list());
 
