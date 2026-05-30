@@ -22,7 +22,7 @@ public:
     void streamChat(
         std::string_view /*chat_id*/,
         const std::vector<ports::LlmMessage>& messages,
-        std::function<void(std::string_view chunk, bool is_final)> on_chunk,
+        std::function<void(std::string_view, bool, bool)> on_chunk,
         std::string_view model = ""
     ) override {
         nlohmann::json body;
@@ -55,7 +55,7 @@ public:
                     if (json.contains("message") && json["message"].contains("content")) {
                         auto content = json["message"]["content"].get<std::string>();
                         bool done = json.value("done", false);
-                        on_chunk(content, done);
+                        on_chunk(content, done, false);
                     }
                 } catch (const std::exception& e) {
                     spdlog::error("Ollama SSE parse error: {}", e.what());

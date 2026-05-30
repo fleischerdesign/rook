@@ -110,6 +110,26 @@ void ConversationManager::updateAssistantChunk(
     it->messages.back().content.append(chunk);
 }
 
+void ConversationManager::updateReasoningChunk(
+    std::string_view conv_id,
+    std::string_view chunk
+) {
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](auto& c) { return c.id == conv_id; });
+
+    if (it == m_conversations.end()) return;
+
+    if (it->messages.empty() || it->messages.back().role != "assistant") {
+        ChatMessage msg;
+        msg.id = generateId();
+        msg.role = "assistant";
+        msg.timestamp = std::chrono::system_clock::now();
+        it->messages.push_back(std::move(msg));
+    }
+
+    it->messages.back().reasoning_content.append(chunk);
+}
+
 std::vector<ports::LlmMessage> ConversationManager::buildLlmMessages(
     std::string_view conv_id
 ) const {
@@ -250,6 +270,7 @@ void ConversationManager::loadFromStore(ports::StorePort& store) {
                     msg.id = mj.value("id", generateId());
                     msg.role = mj.value("role", "user");
                     msg.content = mj.value("content", "");
+                    msg.reasoning_content = mj.value("reasoning_content", "");
                     msg.timestamp = std::chrono::system_clock::now();
                     msg.has_tool_calls = mj.value("has_tool_calls", false);
                     msg.tool_call_id = mj.value("tool_call_id", "");
@@ -283,6 +304,7 @@ void ConversationManager::saveActiveConversation(ports::StorePort& store) {
         mj["id"] = msg.id;
         mj["role"] = msg.role;
         mj["content"] = msg.content;
+        mj["reasoning_content"] = msg.reasoning_content;
         mj["has_tool_calls"] = msg.has_tool_calls;
         mj["tool_call_id"] = msg.tool_call_id;
         messages.push_back(mj);

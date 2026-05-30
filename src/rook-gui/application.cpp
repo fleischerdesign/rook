@@ -6,8 +6,11 @@
 #include "rook/adapters/llm/multi_provider_adapter.hpp"
 #include "rook/adapters/llm/llm_factory.hpp"
 #include "rook/adapters/store/json_store.hpp"
+#include "rook/adapters/model/model_cache.hpp"
+#include "rook/adapters/model/model_discovery_factory.hpp"
 #include <giomm.h>
 #include <spdlog/spdlog.h>
+#include <future>
 
 namespace rook::gui {
 
@@ -76,6 +79,36 @@ void RookApplication::on_activate() {
     add_window(*window);
     window->present();
     window.release();
+
+    startModelDiscovery();
+}
+
+void RookApplication::startModelDiscovery() {
+    auto providers = m_llm->listProviders();
+
+    for (const auto& prov : providers) {
+        if (!prov.enabled) continue;
+
+        auto api_key = prov.api_key;
+        auto base_url = prov.base_url;
+        auto prov_type = prov.type;
+        auto prov_id = prov.id;
+
+        (void)std::async(std::launch::async, [prov_type, prov_id, api_key, base_url]() {
+            std::unique_ptr<rook::ports::ModelDiscoveryPort> discovery;
+
+            if (prov_type == "ollama") {
+                discovery = rook::adapters::model::makeOllamaDiscovery(base_url);
+            } else if (prov_type == "anthropic") {
+                discovery = rook::adapters::model::makeAnthropicDiscovery();
+            } else {
+                discovery = rook::adapters::model::makeOpenAiDiscovery(base_url);
+            }
+
+            auto models = discovery->fetchModels(api_key);
+            rook::adapters::model::ModelCache::instance().store(prov_id, std::move(models));
+        });
+    }
 }
 
 void RookApplication::loadConfig() {

@@ -23,7 +23,7 @@ public:
     void streamChat(
         std::string_view /*chat_id*/,
         const std::vector<ports::LlmMessage>& messages,
-        std::function<void(std::string_view chunk, bool is_final)> on_chunk,
+        std::function<void(std::string_view, bool, bool)> on_chunk,
         std::string_view model = ""
     ) override {
         nlohmann::json body;
@@ -62,12 +62,12 @@ public:
 
                     if (json.contains("type") && json["type"] == "content_block_delta") {
                         if (json.contains("delta") && json["delta"].contains("text")) {
-                            on_chunk(json["delta"]["text"].get<std::string>(), false);
+                            on_chunk(json["delta"]["text"].get<std::string>(), false, false);
                         }
                     }
 
                     if (json.contains("type") && json["type"] == "message_stop") {
-                        on_chunk("", true);
+                        on_chunk("", true, false);
                     }
                 } catch (const std::exception& e) {
                     spdlog::error("Anthropic SSE parse error: {}", e.what());

@@ -13,8 +13,9 @@ namespace rook::domain {
 
 struct ChatMessage {
     std::string id;
-    std::string role; // "user", "assistant", "system", "tool"
+    std::string role;
     std::string content;
+    std::string reasoning_content;
     std::chrono::system_clock::time_point timestamp;
     std::string tool_call_id;
     bool has_tool_calls = false;
@@ -40,6 +41,7 @@ public:
 
     void addMessage(std::string_view conv_id, ChatMessage message);
     void updateAssistantChunk(std::string_view conv_id, std::string_view chunk);
+    void updateReasoningChunk(std::string_view conv_id, std::string_view chunk);
     void setTitle(std::string_view conv_id, std::string_view title);
     void setModel(std::string_view conv_id, std::string_view model);
     std::vector<ports::LlmMessage> buildLlmMessages(std::string_view conv_id) const;

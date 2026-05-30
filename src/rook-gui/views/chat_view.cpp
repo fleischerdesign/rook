@@ -2,6 +2,8 @@
 #include "message_widget.hpp"
 #include "rook/domain/events.hpp"
 #include "rook/ports/llm_port.hpp"
+#include "rook/ports/model_discovery_port.hpp"
+#include "rook/adapters/model/model_cache.hpp"
 #include <spdlog/spdlog.h>
 
 namespace rook::gui {
@@ -98,13 +100,21 @@ void ChatView::populateModelDropdown() {
 
     for (const auto& prov : providers) {
         if (!prov.enabled) continue;
-        auto info = rook::ports::ProviderRegistry::instance().find(prov.type);
-        auto models = info ? info->known_models : std::vector<std::string>{prov.default_model};
-        if (models.empty()) models = {prov.default_model};
 
-        for (const auto& model : models) {
-            auto label = prov.display_name + " / " + model;
-            m_model_dropdown.append(prov.id + ":" + model, label);
+        auto cached_models = rook::adapters::model::ModelCache::instance().getAllEnabled(
+            [&](std::string_view pid) { return pid == prov.id; }
+        );
+
+        if (!cached_models.empty()) {
+            for (const auto& model : cached_models) {
+                auto label = prov.display_name + " / " + model.display_name;
+                m_model_dropdown.append(prov.id + ":" + model.id, label);
+            }
+        } else {
+            auto info = rook::ports::ProviderRegistry::instance().find(prov.type);
+            auto default_model = info ? info->default_model : prov.default_model;
+            auto label = prov.display_name + " / " + default_model;
+            m_model_dropdown.append(prov.id + ":" + default_model, label);
         }
     }
 
@@ -115,8 +125,6 @@ void ChatView::populateModelDropdown() {
             ? info->default_model : first.default_model;
         m_model_dropdown.set_active_id(first.id + ":" + default_model);
     }
-
-    m_model_dropdown.set_sensitive(true);
 }
 
 void ChatView::onSendClicked() {
@@ -183,7 +191,8 @@ void ChatView::loadMessages(std::string_view chat_id) {
     auto conv = m_conv.open(chat_id);
     for (const auto& msg : conv.messages) {
         if (msg.role == "tool") continue;
-        auto* widget = Gtk::make_managed<MessageWidget>(msg.role, msg.content);
+        auto* widget = Gtk::make_managed<MessageWidget>(
+            msg.role, msg.content, msg.reasoning_content);
         m_message_list.append(*widget);
     }
 

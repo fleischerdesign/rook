@@ -21,7 +21,7 @@ void ThreadedLlmAdapter::configure(const ports::LlmConfig& config) {
 void ThreadedLlmAdapter::streamChat(
     std::string_view chat_id,
     const std::vector<ports::LlmMessage>& messages,
-    std::function<void(std::string_view chunk, bool is_final)> on_chunk,
+    std::function<void(std::string_view chunk, bool is_final, bool is_reasoning)> on_chunk,
     std::string_view model
 ) {
     auto self = std::this_thread::get_id();
@@ -41,7 +41,7 @@ void ThreadedLlmAdapter::streamChat(
     auto chat = std::string(chat_id);
     auto msgs = messages;
     auto model_str = std::string(model);
-    std::function<void(std::string_view, bool)> callback = std::move(on_chunk);
+    std::function<void(std::string_view, bool, bool)> callback = std::move(on_chunk);
 
     m_thread = std::jthread(
         [this, chat, msgs = std::move(msgs), callback = std::move(callback), model_str](

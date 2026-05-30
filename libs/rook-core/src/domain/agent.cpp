@@ -48,16 +48,17 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
     m_llm.streamChat(
         event.chat_id,
         messages,
-        [this, chat_id](std::string_view chunk, bool is_final) {
+        [this, chat_id](std::string_view chunk, bool is_final, bool is_reasoning) {
             if (!chunk.empty()) {
                 m_bus.publish(LlmStreamChunk{
                     .chat_id = chat_id,
                     .content = std::string(chunk),
                     .is_final = is_final,
+                    .is_reasoning = is_reasoning,
                 });
             }
 
-            if (is_final) {
+            if (is_final && !is_reasoning) {
                 m_bus.publish(LlmCompleted{chat_id, 0});
             }
         },
@@ -66,7 +67,11 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
 }
 
 void AgentEngine::onLlmChunk(const LlmStreamChunk& chunk) {
-    if (!chunk.chat_id.empty() && !chunk.chat_id.starts_with("__title__")) {
+    if (chunk.chat_id.empty() || chunk.chat_id.starts_with("__title__")) return;
+
+    if (chunk.is_reasoning) {
+        m_conv.updateReasoningChunk(chunk.chat_id, chunk.content);
+    } else {
         m_conv.updateAssistantChunk(chunk.chat_id, chunk.content);
     }
 }
@@ -105,7 +110,7 @@ void AgentEngine::onLlmCompleted(const LlmCompleted& event) {
     m_llm.streamChat(
         chat_id,
         {title_msg},
-        [this, chat_id, &accumulated](std::string_view chunk, bool is_final) {
+        [this, chat_id, &accumulated](std::string_view chunk, bool is_final, bool /*is_reasoning*/) {
             accumulated += std::string(chunk);
             if (is_final && !accumulated.empty()) {
                 std::string title = accumulated;

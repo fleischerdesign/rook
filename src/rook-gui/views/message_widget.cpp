@@ -3,7 +3,8 @@
 
 namespace rook::gui {
 
-MessageWidget::MessageWidget(std::string_view role, std::string_view content)
+MessageWidget::MessageWidget(std::string_view role, std::string_view content,
+                             std::string_view reasoning)
     : Gtk::Box(Gtk::Orientation::VERTICAL, 4)
     , m_role(role)
 {
@@ -16,6 +17,19 @@ MessageWidget::MessageWidget(std::string_view role, std::string_view content)
 
     setContent(content);
     applyStyle();
+
+    if (!reasoning.empty() && role == "assistant") {
+        m_reasoning_expander.set_label("Thinking...");
+        m_reasoning_label.set_wrap(true);
+        m_reasoning_label.set_wrap_mode(Pango::WrapMode::WORD_CHAR);
+        m_reasoning_label.set_max_width_chars(60);
+        m_reasoning_label.set_selectable(true);
+        m_reasoning_label.add_css_class("dim-label");
+        m_reasoning_label.set_margin_start(12);
+        m_reasoning_label.set_text(std::string(reasoning));
+        m_reasoning_expander.set_child(m_reasoning_label);
+        append(m_reasoning_expander);
+    }
 
     append(m_label);
     set_margin(8);

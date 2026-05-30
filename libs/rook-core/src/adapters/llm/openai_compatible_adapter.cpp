@@ -89,7 +89,7 @@ std::string OpenAiCompatibleAdapter::buildRequestBody(
 void OpenAiCompatibleAdapter::streamChat(
     std::string_view /*chat_id*/,
     const std::vector<ports::LlmMessage>& messages,
-    std::function<void(std::string_view chunk, bool is_final)> on_chunk,
+    std::function<void(std::string_view, bool, bool)> on_chunk,
     std::string_view model
 ) {
     auto body = buildRequestBody(messages);
@@ -122,11 +122,19 @@ void OpenAiCompatibleAdapter::streamChat(
                 if (!json.contains("choices") || json["choices"].empty()) return;
 
                 auto& choice = json["choices"][0];
-                if (!choice.contains("delta") || !choice["delta"].contains("content")) return;
+                if (!choice.contains("delta")) return;
 
-                auto content = choice["delta"]["content"].get<std::string>();
-                auto finish = choice.contains("finish_reason") && !choice["finish_reason"].is_null();
-                on_chunk(content, finish);
+                auto& delta = choice["delta"];
+
+                if (delta.contains("reasoning_content") && !delta["reasoning_content"].is_null()) {
+                    on_chunk(delta["reasoning_content"].get<std::string>(), false, true);
+                }
+
+                if (delta.contains("content") && !delta["content"].is_null()) {
+                    auto content = delta["content"].get<std::string>();
+                    auto finish = choice.contains("finish_reason") && !choice["finish_reason"].is_null();
+                    on_chunk(content, finish, false);
+                }
             } catch (const std::exception& e) {
                 spdlog::error("SSE parse error: {}", e.what());
             }

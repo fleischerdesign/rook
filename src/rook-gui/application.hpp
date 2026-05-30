@@ -30,6 +30,7 @@ protected:
 private:
     void loadConfig();
     void saveConfig();
+    void startModelDiscovery();
 
     std::string m_data_dir;
     rook::domain::EventBus m_bus;

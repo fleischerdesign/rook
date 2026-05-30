@@ -19,6 +19,7 @@ struct LlmStreamChunk {
     std::string chat_id;
     std::string content;
     bool is_final = false;
+    bool is_reasoning = false;
 };
 
 struct LlmRequested {

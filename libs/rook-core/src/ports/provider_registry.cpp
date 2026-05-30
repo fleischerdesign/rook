@@ -12,14 +12,10 @@ ProviderRegistry::ProviderRegistry() {
 }
 
 void ProviderRegistry::registerBuiltins() {
-    registerType({"ollama",    "Ollama (local)",   "http://localhost:11434",     "llama3.1",
-                  {"llama3.1", "mistral", "phi4", "codellama", "gemma3"}});
-    registerType({"openai",    "OpenAI",            "https://api.openai.com",    "gpt-4o",
-                  {"gpt-4o", "gpt-4o-mini", "o4-mini"}});
-    registerType({"deepseek",  "DeepSeek",          "https://api.deepseek.com",   "deepseek-chat",
-                  {"deepseek-chat", "deepseek-reasoner"}});
-    registerType({"anthropic", "Anthropic",         "https://api.anthropic.com", "claude-sonnet-4-20250514",
-                  {"claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"}});
+    registerType({"ollama",    "Ollama (local)",   "http://localhost:11434",     "llama3.1"});
+    registerType({"openai",    "OpenAI",            "https://api.openai.com",    "gpt-4o"});
+    registerType({"deepseek",  "DeepSeek",          "https://api.deepseek.com",   "deepseek-chat"});
+    registerType({"anthropic", "Anthropic",         "https://api.anthropic.com", "claude-sonnet-4-20250514"});
 }
 
 void ProviderRegistry::registerType(ProviderTypeInfo info) {

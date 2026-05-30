@@ -44,7 +44,7 @@ public:
     virtual void streamChat(
         std::string_view chat_id,
         const std::vector<LlmMessage>& messages,
-        std::function<void(std::string_view chunk, bool is_final)> on_chunk,
+        std::function<void(std::string_view chunk, bool is_final, bool is_reasoning)> on_chunk,
         std::string_view model = ""
     ) = 0;
 
@@ -62,7 +62,6 @@ struct ProviderTypeInfo {
     std::string display_name;
     std::string base_url;
     std::string default_model;
-    std::vector<std::string> known_models;
     bool builtin = true;
 };
 
