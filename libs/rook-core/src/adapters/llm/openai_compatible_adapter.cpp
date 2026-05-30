@@ -55,6 +55,10 @@ void OpenAiCompatibleAdapter::configure(const ports::LlmConfig& config) {
     m_temperature = config.temperature;
 }
 
+void OpenAiCompatibleAdapter::cancel() {
+    m_http->cancel();
+}
+
 std::string OpenAiCompatibleAdapter::buildRequestBody(
     const std::vector<ports::LlmMessage>& messages
 ) const {

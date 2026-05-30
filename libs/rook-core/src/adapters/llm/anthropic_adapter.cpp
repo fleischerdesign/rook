@@ -11,6 +11,8 @@ public:
         : m_http(std::move(http))
     {}
 
+    void cancel() override { m_http->cancel(); }
+
     void configure(const ports::LlmConfig& config) override {
         m_api_key = config.api_key;
         m_model = config.model.empty() ? "claude-sonnet-4-20250514" : config.model;

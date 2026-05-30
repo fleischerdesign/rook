@@ -54,6 +54,8 @@ public:
     virtual void removeProvider(std::string_view) {}
     virtual void setDefaultProvider(std::string_view) {}
     virtual std::optional<LlmProviderConfig> activeProvider() const { return std::nullopt; }
+
+    virtual void cancel() {}
 };
 
 struct ProviderTypeInfo {

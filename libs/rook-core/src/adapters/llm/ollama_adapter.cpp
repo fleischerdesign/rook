@@ -11,6 +11,8 @@ public:
         : m_http(std::move(http))
     {}
 
+    void cancel() override { m_http->cancel(); }
+
     void configure(const ports::LlmConfig& config) override {
         m_model = config.model.empty() ? "llama3.1" : config.model;
         m_system_prompt = config.system_prompt;

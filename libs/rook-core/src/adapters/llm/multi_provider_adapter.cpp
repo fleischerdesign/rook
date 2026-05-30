@@ -1,5 +1,6 @@
 #include "rook/adapters/llm/multi_provider_adapter.hpp"
 #include "rook/adapters/llm/llm_factory.hpp"
+#include "rook/adapters/llm/threaded_adapter.hpp"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <random>
@@ -110,15 +111,19 @@ std::optional<ports::LlmProviderConfig> MultiProviderLlmAdapter::activeProvider(
 std::unique_ptr<ports::LlmPort> MultiProviderLlmAdapter::createConcreteAdapter(
     const ports::LlmProviderConfig& provider
 ) {
+    std::unique_ptr<ports::LlmPort> adapter;
+
     if (provider.type == "openai") {
-        return makeOpenAiAdapter();
+        adapter = makeOpenAiAdapter();
     } else if (provider.type == "deepseek") {
-        return makeDeepSeekAdapter();
+        adapter = makeDeepSeekAdapter();
     } else if (provider.type == "anthropic") {
-        return makeAnthropicAdapter();
+        adapter = makeAnthropicAdapter();
     } else {
-        return makeOllamaAdapter();
+        adapter = makeOllamaAdapter();
     }
+
+    return std::make_unique<ThreadedLlmAdapter>(std::move(adapter));
 }
 
 std::unique_ptr<MultiProviderLlmAdapter> makeMultiProviderAdapter() {

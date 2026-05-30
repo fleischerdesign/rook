@@ -11,6 +11,7 @@ librook_core_sources = files(
   'src/adapters/llm/ollama_adapter.cpp',
   'src/adapters/llm/anthropic_adapter.cpp',
   'src/adapters/llm/multi_provider_adapter.cpp',
+  'src/adapters/llm/threaded_adapter.cpp',
   'src/adapters/store/json_store.cpp',
   'src/adapters/secret_store.cpp',
 )

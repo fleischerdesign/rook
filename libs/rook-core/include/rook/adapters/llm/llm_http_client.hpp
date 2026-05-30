@@ -30,6 +30,8 @@ public:
         std::function<void(std::string_view line)> on_line,
         std::function<void(int32_t status_code)> on_error
     ) = 0;
+
+    virtual void cancel() {}
 };
 
 std::unique_ptr<LlmHttpClient> makeCurlHttpClient();

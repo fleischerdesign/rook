@@ -23,6 +23,8 @@ private:
     void onStreamChunk(const rook::domain::LlmStreamChunk& event);
     void onLlmCompleted(const rook::domain::LlmCompleted& event);
     void onChatSelected(const rook::domain::ChatSelected& event);
+
+    void setProcessing(bool active);
     void loadMessages(std::string_view chat_id);
 
     rook::domain::EventBus& m_bus;
@@ -36,8 +38,11 @@ private:
     MessageWidget* m_pending_assistant = nullptr;
 
     rook::domain::EventBus::HandlerId m_chunk_handler;
-    rook::domain::EventBus::HandlerId m_completed_handler;
+    rook::domain::EventBus::HandlerId m_locked_handler;
+    rook::domain::EventBus::HandlerId m_unlock_handler;
+    rook::domain::EventBus::HandlerId m_error_unlock_handler;
     rook::domain::EventBus::HandlerId m_chat_selected_handler;
+    rook::domain::EventBus::HandlerId m_completed_handler;
 };
 
 } // namespace rook::gui

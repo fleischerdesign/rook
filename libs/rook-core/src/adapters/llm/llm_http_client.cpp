@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <cstring>
+#include <atomic>
 
 namespace rook::adapters::llm {
 
@@ -51,8 +52,15 @@ curl_slist* buildHeaders(
     return hlist;
 }
 
+int progressCallback(void* userp, curl_off_t /*dltotal*/, curl_off_t /*dlnow*/,
+                     curl_off_t /*ultotal*/, curl_off_t /*ulnow*/) {
+    auto* flag = static_cast<std::atomic<bool>*>(userp);
+    return flag->load() ? 1 : 0;
+}
+
 class CurlHttpClient final : public LlmHttpClient {
 public:
+    void cancel() override { m_abort.store(true); }
     HttpResponse post(
         std::string_view url,
         std::string_view body,
@@ -64,12 +72,15 @@ public:
             return {0, {}};
         }
 
+        m_abort.store(false);
         std::string response_body;
         curl_easy_setopt(handle, CURLOPT_URL, url.data());
         curl_easy_setopt(handle, CURLOPT_POSTFIELDS, body.data());
         curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
         curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback);
         curl_easy_setopt(handle, CURLOPT_WRITEDATA, &response_body);
+        curl_easy_setopt(handle, CURLOPT_XFERINFOFUNCTION, progressCallback);
+        curl_easy_setopt(handle, CURLOPT_XFERINFODATA, &m_abort);
 
         auto* hlist = buildHeaders(headers);
         curl_easy_setopt(handle, CURLOPT_HTTPHEADER, hlist);
@@ -100,6 +111,7 @@ public:
             return;
         }
 
+        m_abort.store(false);
         StreamContext ctx;
         ctx.on_line = std::move(on_line);
 
@@ -108,6 +120,8 @@ public:
         curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
         curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, streamCallback);
         curl_easy_setopt(handle, CURLOPT_WRITEDATA, &ctx);
+        curl_easy_setopt(handle, CURLOPT_XFERINFOFUNCTION, progressCallback);
+        curl_easy_setopt(handle, CURLOPT_XFERINFODATA, &m_abort);
 
         auto* hlist = buildHeaders(headers);
         curl_easy_setopt(handle, CURLOPT_HTTPHEADER, hlist);
@@ -123,6 +137,9 @@ public:
         curl_slist_free_all(hlist);
         curl_easy_cleanup(handle);
     }
+
+private:
+    std::atomic<bool> m_abort{false};
 };
 
 } // namespace

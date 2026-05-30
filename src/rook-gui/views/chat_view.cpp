@@ -22,6 +22,21 @@ ChatView::ChatView(rook::domain::EventBus& bus, rook::domain::ConversationManage
             onLlmCompleted(event);
         });
 
+    m_locked_handler = m_bus.subscribe<rook::domain::LlmRequested>(
+        [this](const rook::domain::LlmRequested& event) {
+            if (event.chat_id == m_chat_id) setProcessing(true);
+        });
+
+    m_unlock_handler = m_bus.subscribe<rook::domain::LlmCompleted>(
+        [this](const rook::domain::LlmCompleted& event) {
+            if (event.chat_id == m_chat_id) setProcessing(false);
+        });
+
+    m_error_unlock_handler = m_bus.subscribe<rook::domain::LlmError>(
+        [this](const rook::domain::LlmError& event) {
+            if (event.chat_id == m_chat_id) setProcessing(false);
+        });
+
     m_chat_selected_handler = m_bus.subscribe<rook::domain::ChatSelected>(
         [this](const rook::domain::ChatSelected& event) {
             onChatSelected(event);
@@ -31,6 +46,9 @@ ChatView::ChatView(rook::domain::EventBus& bus, rook::domain::ConversationManage
 ChatView::~ChatView() {
     m_bus.unsubscribe(m_chunk_handler);
     m_bus.unsubscribe(m_completed_handler);
+    m_bus.unsubscribe(m_locked_handler);
+    m_bus.unsubscribe(m_unlock_handler);
+    m_bus.unsubscribe(m_error_unlock_handler);
     m_bus.unsubscribe(m_chat_selected_handler);
 }
 
@@ -131,6 +149,18 @@ void ChatView::loadMessages(std::string_view chat_id) {
 
     auto adj = m_scrolled.get_vadjustment();
     if (adj) adj->set_value(adj->get_upper());
+}
+
+void ChatView::setProcessing(bool active) {
+    Glib::signal_idle().connect_once([this, active]() {
+        m_send_button.set_sensitive(!active);
+        m_input_entry.set_sensitive(!active);
+        if (active) {
+            m_send_button.set_label("...");
+        } else {
+            m_send_button.set_label("Send");
+        }
+    });
 }
 
 } // namespace rook::gui

@@ -35,6 +35,8 @@ public:
 
     void configure(const ports::LlmConfig& config) override;
 
+    void cancel() override;
+
     void streamChat(
         std::string_view chat_id,
         const std::vector<ports::LlmMessage>& messages,
