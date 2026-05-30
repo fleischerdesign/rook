@@ -48,16 +48,16 @@ void RookWindow::setupActions() {
 }
 
 void RookWindow::onSettings() {
-    auto dialog = SettingsDialog(*this);
-    dialog.present();
-
-    dialog.signal_response().connect(
-        [&dialog, this](int response) {
+    auto* dialog = new SettingsDialog(*this);
+    dialog->signal_response().connect(
+        [dialog, this](int response) {
             if (response == Gtk::ResponseType::OK) {
-                auto config = dialog.getConfig();
+                auto config = dialog->getConfig();
                 m_llm.configure(config);
             }
+            delete dialog;
         });
+    dialog->present();
 }
 
 void RookWindow::onAbout() {
