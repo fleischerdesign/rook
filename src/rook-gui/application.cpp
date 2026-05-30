@@ -32,7 +32,7 @@ Glib::RefPtr<RookApplication> RookApplication::create() {
 
 void RookApplication::on_activate() {
     if (get_windows().empty()) {
-        auto window = std::make_unique<RookWindow>(m_bus);
+        auto window = std::make_unique<RookWindow>(m_bus, *m_llm);
         add_window(*window);
         window->present();
         window.release();
