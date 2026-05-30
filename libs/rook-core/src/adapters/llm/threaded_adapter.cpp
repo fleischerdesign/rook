@@ -23,7 +23,14 @@ void ThreadedLlmAdapter::streamChat(
     const std::vector<ports::LlmMessage>& messages,
     std::function<void(std::string_view chunk, bool is_final)> on_chunk
 ) {
+    auto self = std::this_thread::get_id();
+
     if (m_thread.joinable()) {
+        if (m_thread.get_id() == self) {
+            m_stop_source.request_stop();
+            m_inner->streamChat(chat_id, messages, std::move(on_chunk));
+            return;
+        }
         m_stop_source.request_stop();
         m_thread.join();
     }

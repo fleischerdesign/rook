@@ -30,14 +30,22 @@ public:
     }
 
     void publish(const DomainEvent& event) {
-        std::shared_lock lock(m_mutex);
-        std::visit([this](const auto& concrete) {
-            using T = std::decay_t<decltype(concrete)>;
-            auto it = m_handlers.find(typeid(T));
-            if (it != m_handlers.end()) {
-                for (const auto& entry : it->second) {
-                    entry.callback(&concrete);
+        std::vector<std::function<void(const void*)>> handlers;
+        {
+            std::shared_lock lock(m_mutex);
+            std::visit([this, &handlers](const auto& concrete) {
+                using T = std::decay_t<decltype(concrete)>;
+                auto it = m_handlers.find(typeid(T));
+                if (it != m_handlers.end()) {
+                    for (const auto& entry : it->second) {
+                        handlers.push_back(entry.callback);
+                    }
                 }
+            }, event);
+        }
+        std::visit([&handlers](const auto& concrete) {
+            for (auto& fn : handlers) {
+                fn(&concrete);
             }
         }, event);
     }
