@@ -9,7 +9,17 @@ bool SettingsLoader::load(ports::StorePort& store, ports::LlmPort& llm,
                           rook::adapters::SecretStore& secrets) {
     auto json_str = store.loadConfig();
     if (json_str.empty() || json_str == "{}") {
-        spdlog::info("No config found, using defaults");
+        spdlog::info("No config found, adding default Ollama provider");
+
+        ports::LlmProviderConfig default_ollama;
+        default_ollama.display_name = "Ollama (local)";
+        default_ollama.type = "ollama";
+        default_ollama.base_url = "http://localhost:11434";
+        default_ollama.default_model = "llama3.1";
+        default_ollama.enabled = true;
+        default_ollama.is_default = true;
+
+        llm.addProvider(default_ollama);
         return false;
     }
 

@@ -21,18 +21,6 @@ std::string generateProviderId() {
 } // namespace
 
 MultiProviderLlmAdapter::MultiProviderLlmAdapter() {
-    ports::LlmProviderConfig default_ollama;
-    default_ollama.id = generateProviderId();
-    default_ollama.display_name = "Ollama (local)";
-    default_ollama.type = "ollama";
-    default_ollama.base_url = "http://localhost:11434";
-    default_ollama.default_model = "llama3.1";
-    default_ollama.enabled = true;
-    default_ollama.is_default = true;
-
-    m_providers.push_back(default_ollama);
-    m_active_provider_id = default_ollama.id;
-    m_active_adapter = createConcreteAdapter(default_ollama);
 }
 
 void MultiProviderLlmAdapter::configure(const ports::LlmConfig& config) {

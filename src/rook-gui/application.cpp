@@ -24,15 +24,17 @@ RookApplication::RookApplication()
 
     m_first_run = !m_settings.load(*m_store, *m_llm, *m_secrets);
 
-    m_llm->configure(rook::ports::LlmConfig{
-        .provider = "ollama",
-        .model = "llama3.1",
-        .api_key = "",
-        .base_url = "",
-        .max_tokens = 4096,
-        .temperature = 0.7f,
-        .system_prompt = "You are Rook, a helpful AI assistant.",
-    });
+    if (auto active = m_llm->activeProvider()) {
+        m_llm->configure(rook::ports::LlmConfig{
+            .provider = active->type,
+            .model = active->default_model,
+            .api_key = active->api_key,
+            .base_url = active->base_url,
+            .max_tokens = 4096,
+            .temperature = 0.7f,
+            .system_prompt = "You are Rook, a helpful AI assistant.",
+        });
+    }
 
     m_conversations.start(m_bus, m_store.get());
     m_conversations.loadFromStore(*m_store);
