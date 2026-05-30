@@ -1,1 +1,18 @@
-# Phase 1: no tests yet
+gtest_dep = dependency('gtest', main: true, required: false)
+
+if gtest_dep.found()
+  test_deps = [
+    librook_core_dep,
+    gtest_dep,
+  ]
+
+  test_executable = executable(
+    'rook-tests',
+    'unit/test_event_bus.cpp',
+    'unit/test_conversation.cpp',
+    dependencies: test_deps,
+    build_by_default: false,
+  )
+
+  test('rook-core-tests', test_executable)
+endif

@@ -4,6 +4,7 @@
 #include <adwaita.h>
 #include <giomm.h>
 #include "rook/domain/event_bus.hpp"
+#include "rook/domain/conversation.hpp"
 #include "rook/ports/llm_port.hpp"
 
 namespace rook::gui {
@@ -15,12 +16,13 @@ class MessageWidget;
 class RookWindow : public Gtk::Window {
 public:
     explicit RookWindow(rook::domain::EventBus& bus, rook::ports::LlmPort& llm,
+                        rook::domain::ConversationManager& conversations,
                         sigc::slot<void()> on_settings_changed = {});
     ~RookWindow() override = default;
 
 private:
     void setupHeaderBar();
-    void setupLayout();
+    void setupLayout(rook::domain::ConversationManager& conversations);
     void setupActions();
     void onSettings();
     void onAbout();

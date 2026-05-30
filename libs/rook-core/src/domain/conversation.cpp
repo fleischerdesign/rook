@@ -4,6 +4,7 @@
 #include <random>
 #include <sstream>
 #include <iomanip>
+#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 namespace rook::domain {
@@ -81,12 +82,17 @@ void ConversationManager::addMessage(std::string_view conv_id, ChatMessage messa
     message.id = generateId();
     message.timestamp = std::chrono::system_clock::now();
 
-    if (it->messages.empty() && message.role == "user") {
+    bool was_empty = it->messages.empty();
+    it->messages.push_back(std::move(message));
+    it->updated_at = std::chrono::system_clock::now();
+
+    if (was_empty && it->messages[0].role == "user") {
         it->title = generateTitle(*it);
     }
 
-    it->messages.push_back(std::move(message));
-    it->updated_at = std::chrono::system_clock::now();
+    if (m_store) {
+        saveActiveConversation(*m_store);
+    }
 }
 
 void ConversationManager::updateAssistantChunk(
@@ -153,8 +159,9 @@ void ConversationManager::setActive(std::string_view id) {
     m_active_id = id;
 }
 
-void ConversationManager::start(EventBus& bus) {
+void ConversationManager::start(EventBus& bus, ports::StorePort* store) {
     m_bus = &bus;
+    m_store = store;
 
     m_chat_created_handler = bus.subscribe<ChatCreated>(
         [this](const ChatCreated& event) { onChatCreated(event); });
@@ -166,6 +173,10 @@ void ConversationManager::start(EventBus& bus) {
 void ConversationManager::onChatCreated(const ChatCreated& /*event*/) {
     auto conv = create("New Chat", "default");
 
+    if (m_store) {
+        saveActiveConversation(*m_store);
+    }
+
     if (m_bus) {
         m_bus->publish(ChatSelected{
             .chat_id = conv.id
@@ -174,6 +185,9 @@ void ConversationManager::onChatCreated(const ChatCreated& /*event*/) {
 }
 
 void ConversationManager::onChatDeleted(const ChatDeleted& event) {
+    if (m_store) {
+        m_store->deleteChat(event.chat_id);
+    }
     remove(event.chat_id);
 }
 
@@ -185,6 +199,69 @@ std::string ConversationManager::generateTitle(const Conversation& conv) const {
         return title;
     }
     return "New Chat";
+}
+
+void ConversationManager::loadFromStore(ports::StorePort& store) {
+    auto chat_ids = store.listChats();
+    for (const auto& record : chat_ids) {
+        auto opt = store.loadChat(record.id);
+        if (!opt) continue;
+
+        Conversation conv;
+        conv.id = opt->id;
+        conv.title = opt->title;
+        conv.model = opt->model;
+        conv.created_at = opt->created_at;
+        conv.updated_at = opt->updated_at;
+
+        if (!opt->messages_json.empty()) {
+            try {
+                auto j = nlohmann::json::parse(opt->messages_json);
+                for (const auto& mj : j) {
+                    ChatMessage msg;
+                    msg.id = mj.value("id", generateId());
+                    msg.role = mj.value("role", "user");
+                    msg.content = mj.value("content", "");
+                    msg.timestamp = std::chrono::system_clock::now();
+                    msg.has_tool_calls = mj.value("has_tool_calls", false);
+                    msg.tool_call_id = mj.value("tool_call_id", "");
+                    conv.messages.push_back(std::move(msg));
+                }
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to parse messages for {}: {}", conv.id, e.what());
+            }
+        }
+
+        m_conversations.push_back(std::move(conv));
+    }
+
+    spdlog::info("Loaded {} conversations from store", m_conversations.size());
+}
+
+void ConversationManager::saveActiveConversation(ports::StorePort& store) {
+    auto conv = active();
+    if (!conv) return;
+
+    ports::ChatRecord record;
+    record.id = conv->id;
+    record.title = conv->title;
+    record.model = conv->model;
+    record.created_at = conv->created_at;
+    record.updated_at = conv->updated_at;
+
+    nlohmann::json messages = nlohmann::json::array();
+    for (const auto& msg : conv->messages) {
+        nlohmann::json mj;
+        mj["id"] = msg.id;
+        mj["role"] = msg.role;
+        mj["content"] = msg.content;
+        mj["has_tool_calls"] = msg.has_tool_calls;
+        mj["tool_call_id"] = msg.tool_call_id;
+        messages.push_back(mj);
+    }
+
+    record.messages_json = messages.dump();
+    store.saveChat(record);
 }
 
 } // namespace rook::domain

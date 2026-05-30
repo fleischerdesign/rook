@@ -7,6 +7,7 @@
 namespace rook::gui {
 
 RookWindow::RookWindow(rook::domain::EventBus& bus, rook::ports::LlmPort& llm,
+                       rook::domain::ConversationManager& conversations,
                        sigc::slot<void()> on_settings_changed)
     : m_bus(bus)
     , m_llm(llm)
@@ -17,7 +18,7 @@ RookWindow::RookWindow(rook::domain::EventBus& bus, rook::ports::LlmPort& llm,
 
     setupHeaderBar();
     setupActions();
-    setupLayout();
+    setupLayout(conversations);
 
     set_child(m_paned);
 }
@@ -72,9 +73,11 @@ void RookWindow::onAbout() {
     dialog->present();
 }
 
-void RookWindow::setupLayout() {
+void RookWindow::setupLayout(rook::domain::ConversationManager& conversations) {
     m_sidebar = Gtk::make_managed<ChatSidebar>(m_bus);
     m_chat_view = Gtk::make_managed<ChatView>(m_bus);
+
+    m_sidebar->loadConversations(conversations.list());
 
     m_paned.set_start_child(*m_sidebar);
     m_paned.set_end_child(*m_chat_view);

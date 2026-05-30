@@ -12,8 +12,8 @@ public:
 
     rook::ports::LlmConfig getConfig() const;
 
-    using SlotDone = sigc::slot<void()>;
-    SlotDone signal_done();
+    using SlotDone = sigc::signal<void()>;
+    SlotDone& signal_done();
 
 private:
     void setupUi();

@@ -82,7 +82,7 @@ void FirstRunWizard::onProviderChanged() {
 }
 
 void FirstRunWizard::onFinish() {
-    m_signal_done();
+    m_signal_done.emit();
     close();
 }
 
@@ -94,7 +94,7 @@ rook::ports::LlmConfig FirstRunWizard::getConfig() const {
     return config;
 }
 
-FirstRunWizard::SlotDone FirstRunWizard::signal_done() {
+FirstRunWizard::SlotDone& FirstRunWizard::signal_done() {
     return m_signal_done;
 }
 

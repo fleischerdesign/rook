@@ -2,6 +2,7 @@
 #include "window.hpp"
 #include "views/chat_view.hpp"
 #include "views/chat_sidebar.hpp"
+#include "views/first_run_wizard.hpp"
 #include "rook/adapters/llm/multi_provider_adapter.hpp"
 #include "rook/adapters/llm/llm_factory.hpp"
 #include "rook/adapters/store/json_store.hpp"
@@ -33,7 +34,8 @@ RookApplication::RookApplication()
         .system_prompt = "You are Rook, a helpful AI assistant.",
     });
 
-    m_conversations.start(m_bus);
+    m_conversations.start(m_bus, m_store.get());
+    m_conversations.loadFromStore(*m_store);
 
     m_engine = std::make_unique<rook::domain::AgentEngine>(
         m_bus, *m_llm, m_conversations);
@@ -52,7 +54,20 @@ void RookApplication::on_startup() {
 void RookApplication::on_activate() {
     if (get_windows().empty()) {
         auto save_fn = sigc::mem_fun(*this, &RookApplication::saveConfig);
-        auto window = std::make_unique<RookWindow>(m_bus, *m_llm, save_fn);
+
+        if (m_conversations.list().empty()) {
+            auto* wizard = new FirstRunWizard();
+            wizard->signal_done().connect([this, wizard, save_fn]() {
+                auto config = wizard->getConfig();
+                m_llm->configure(config);
+                saveConfig();
+                wizard->close();
+            });
+            wizard->signal_hide().connect([wizard]() { delete wizard; });
+            wizard->present();
+        }
+
+        auto window = std::make_unique<RookWindow>(m_bus, *m_llm, m_conversations, save_fn);
         add_window(*window);
         window->present();
         window.release();

@@ -6,6 +6,7 @@
 #include <optional>
 #include <chrono>
 #include "rook/ports/llm_port.hpp"
+#include "rook/ports/store_port.hpp"
 #include "rook/domain/event_bus.hpp"
 
 namespace rook::domain {
@@ -45,13 +46,17 @@ public:
     std::optional<Conversation> active() const;
     void setActive(std::string_view id);
 
-    void start(EventBus& bus);
+    void start(EventBus& bus, ports::StorePort* store = nullptr);
+
+    void loadFromStore(ports::StorePort& store);
+    void saveActiveConversation(ports::StorePort& store);
 
 private:
     std::vector<Conversation> m_conversations;
     std::string m_active_id;
 
     EventBus* m_bus = nullptr;
+    ports::StorePort* m_store = nullptr;
     EventBus::HandlerId m_chat_created_handler = 0;
     EventBus::HandlerId m_chat_deleted_handler = 0;
     EventBus::HandlerId m_settings_changed_handler = 0;

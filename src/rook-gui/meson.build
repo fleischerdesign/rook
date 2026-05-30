@@ -10,6 +10,7 @@ rook_gui_sources = files(
   'views/provider_dialog.cpp',
   'views/voice_settings_page.cpp',
   'views/appearance_page.cpp',
+  'views/first_run_wizard.cpp',
 )
 
 rook_gui_deps = [
