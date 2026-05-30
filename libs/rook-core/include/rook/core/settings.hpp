@@ -12,7 +12,7 @@ namespace rook::core {
 
 class SettingsLoader {
 public:
-    void load(ports::StorePort& store, ports::LlmPort& llm,
+    bool load(ports::StorePort& store, ports::LlmPort& llm,
               rook::adapters::SecretStore& secrets);
     void save(ports::StorePort& store, const ports::LlmPort& llm,
               rook::adapters::SecretStore& secrets);

@@ -83,22 +83,11 @@ void ProviderDialog::setupUi() {
 }
 
 void ProviderDialog::onTypeChanged() {
-    auto type = m_type.get_active_id();
+    auto type = std::string(m_type.get_active_id());
     m_api_key.set_sensitive(type != "ollama");
 
-    if (type == "ollama") {
-        m_base_url.set_text("http://localhost:11434");
-        m_model.set_text("llama3.1");
-    } else if (type == "openai") {
-        m_base_url.set_text("https://api.openai.com");
-        m_model.set_text("gpt-4o");
-    } else if (type == "deepseek") {
-        m_base_url.set_text("https://api.deepseek.com");
-        m_model.set_text("deepseek-chat");
-    } else if (type == "anthropic") {
-        m_base_url.set_text("https://api.anthropic.com");
-        m_model.set_text("claude-sonnet-4-20250514");
-    }
+    m_base_url.set_text(rook::ports::ProviderDefaults::baseUrl(type));
+    m_model.set_text(rook::ports::ProviderDefaults::defaultModel(type));
 }
 
 void ProviderDialog::onTestConnection() {

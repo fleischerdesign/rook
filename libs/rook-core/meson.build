@@ -3,6 +3,7 @@ librook_core_sources = files(
   'src/domain/conversation.cpp',
   'src/domain/agent.cpp',
   'src/core/settings.cpp',
+  'src/ports/provider_defaults.cpp',
   'src/adapters/llm/llm_http_client.cpp',
   'src/adapters/llm/openai_compatible_adapter.cpp',
   'src/adapters/llm/openai_adapter.cpp',

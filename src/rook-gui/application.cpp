@@ -22,7 +22,7 @@ RookApplication::RookApplication()
 
     m_llm = rook::adapters::llm::makeMultiProviderAdapter();
 
-    m_settings.load(*m_store, *m_llm, *m_secrets);
+    m_first_run = !m_settings.load(*m_store, *m_llm, *m_secrets);
 
     m_llm->configure(rook::ports::LlmConfig{
         .provider = "ollama",
@@ -52,49 +52,46 @@ void RookApplication::on_startup() {
 }
 
 void RookApplication::on_activate() {
-    if (get_windows().empty()) {
-        auto save_fn = sigc::mem_fun(*this, &RookApplication::saveConfig);
+    if (!get_windows().empty()) return;
 
-        if (m_conversations.list().empty()) {
-            auto* wizard = new FirstRunWizard();
-            wizard->signal_done().connect([this, wizard, save_fn]() {
-                auto cfg = wizard->getConfig();
+    auto save_fn = sigc::mem_fun(*this, &RookApplication::saveConfig);
 
-                auto new_provider = rook::ports::LlmProviderConfig{
-                    .id = "",
-                    .display_name = cfg.provider == "ollama"   ? "Ollama (local)"
-                                  : cfg.provider == "openai"   ? "OpenAI"
-                                  : cfg.provider == "deepseek"  ? "DeepSeek"
-                                  :                              "Anthropic",
-                    .type = cfg.provider,
-                    .base_url = cfg.provider == "openai"    ? "https://api.openai.com"
-                              : cfg.provider == "deepseek"   ? "https://api.deepseek.com"
-                              : cfg.provider == "anthropic"  ? "https://api.anthropic.com"
-                              :                               "http://localhost:11434",
-                    .api_key = cfg.api_key,
-                    .default_model = cfg.model,
-                    .enabled = true,
-                    .is_default = true,
-                };
+    if (m_first_run) {
+        auto* wizard = new FirstRunWizard();
+        wizard->signal_done().connect([this, wizard, save_fn]() {
+            auto cfg = wizard->getConfig();
 
-                m_llm->addProvider(new_provider);
-                m_llm->configure(cfg);
-                saveConfig();
-                wizard->close();
-            });
-            wizard->signal_hide().connect([wizard]() { delete wizard; });
-            wizard->present();
-        }
+            auto new_provider = rook::ports::LlmProviderConfig{
+                .id = "",
+                .display_name = rook::ports::ProviderDefaults::displayName(cfg.provider),
+                .type = cfg.provider,
+                .base_url = rook::ports::ProviderDefaults::baseUrl(cfg.provider),
+                .api_key = cfg.api_key,
+                .default_model = cfg.model.empty()
+                    ? rook::ports::ProviderDefaults::defaultModel(cfg.provider)
+                    : cfg.model,
+                .enabled = true,
+                .is_default = true,
+            };
 
-        auto window = std::make_unique<RookWindow>(m_bus, *m_llm, m_conversations, save_fn);
-        add_window(*window);
-        window->present();
-        window.release();
+            m_llm->addProvider(new_provider);
+            m_llm->configure(cfg);
+            m_first_run = false;
+            saveConfig();
+            wizard->close();
+        });
+        wizard->signal_hide().connect([wizard]() { delete wizard; });
+        wizard->present();
     }
+
+    auto window = std::make_unique<RookWindow>(m_bus, *m_llm, m_conversations, save_fn);
+    add_window(*window);
+    window->present();
+    window.release();
 }
 
 void RookApplication::loadConfig() {
-    m_settings.load(*m_store, *m_llm, *m_secrets);
+    m_first_run = !m_settings.load(*m_store, *m_llm, *m_secrets);
 }
 
 void RookApplication::saveConfig() {

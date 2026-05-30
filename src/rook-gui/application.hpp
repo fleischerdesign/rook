@@ -39,6 +39,7 @@ private:
     rook::core::SettingsLoader m_settings;
     rook::domain::ConversationManager m_conversations;
     std::unique_ptr<rook::domain::AgentEngine> m_engine;
+    bool m_first_run = true;
 };
 
 } // namespace rook::gui

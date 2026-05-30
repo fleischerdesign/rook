@@ -5,12 +5,12 @@
 
 namespace rook::core {
 
-void SettingsLoader::load(ports::StorePort& store, ports::LlmPort& llm,
+bool SettingsLoader::load(ports::StorePort& store, ports::LlmPort& llm,
                           rook::adapters::SecretStore& secrets) {
     auto json_str = store.loadConfig();
     if (json_str.empty() || json_str == "{}") {
         spdlog::info("No config found, using defaults");
-        return;
+        return false;
     }
 
     try {
@@ -41,7 +41,10 @@ void SettingsLoader::load(ports::StorePort& store, ports::LlmPort& llm,
         }
     } catch (const std::exception& e) {
         spdlog::error("Failed to parse config: {}", e.what());
+        return false;
     }
+
+    return true;
 }
 
 void SettingsLoader::save(ports::StorePort& store, const ports::LlmPort& llm,
