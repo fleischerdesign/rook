@@ -27,6 +27,7 @@ private:
     void onToolCallCompleted(const ToolCallCompleted& event);
 
     EventBus::HandlerId m_input_handler;
+    EventBus::HandlerId m_chunk_handler;
     EventBus::HandlerId m_completed_handler;
     EventBus::HandlerId m_error_handler;
     EventBus::HandlerId m_tool_handler;

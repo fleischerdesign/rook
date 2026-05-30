@@ -13,6 +13,9 @@ void AgentEngine::start() {
     m_input_handler = m_bus.subscribe<UserInputReceived>(
         [this](const UserInputReceived& event) { onUserInput(event); });
 
+    m_chunk_handler = m_bus.subscribe<LlmStreamChunk>(
+        [this](const LlmStreamChunk& event) { onLlmChunk(event); });
+
     m_completed_handler = m_bus.subscribe<LlmCompleted>(
         [this](const LlmCompleted& event) { onLlmCompleted(event); });
 
@@ -59,7 +62,7 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
 }
 
 void AgentEngine::onLlmChunk(const LlmStreamChunk& chunk) {
-    if (!chunk.chat_id.empty()) {
+    if (!chunk.chat_id.empty() && !chunk.chat_id.starts_with("__title__")) {
         m_conv.updateAssistantChunk(chunk.chat_id, chunk.content);
     }
 }
