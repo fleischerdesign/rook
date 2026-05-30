@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Rook
+Comment=A multi-modal AI voice assistant
+Exec=rook-gui
+Icon=io.github.fleischerdesign.Rook
+Type=Application
+Categories=Utility;AI
+StartupNotify=true
+Terminal=false

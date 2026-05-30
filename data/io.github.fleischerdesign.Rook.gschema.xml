@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="io.github.fleischerdesign.Rook" path="/io/github/fleischerdesign/Rook/">
+    <key name="llm-provider" type="s">
+      <default>"ollama"</default>
+      <summary>LLM Provider</summary>
+      <description>The LLM backend to use: ollama, openai, or anthropic.</description>
+    </key>
+    <key name="llm-model" type="s">
+      <default>""</default>
+      <summary>Model name</summary>
+      <description>The model identifier for the selected provider.</description>
+    </key>
+    <key name="llm-api-key" type="s">
+      <default>""</default>
+      <summary>API key</summary>
+      <description>API key for cloud providers. Stored via libsecret at runtime.</description>
+    </key>
+    <key name="llm-system-prompt" type="s">
+      <default>"You are Rook, a helpful AI assistant."</default>
+      <summary>System prompt</summary>
+      <description>The system prompt sent with every request.</description>
+    </key>
+    <key name="tts-voice" type="s">
+      <default>"en_US-lessac-medium"</default>
+      <summary>TTS voice</summary>
+      <description>Piper TTS voice model to use.</description>
+    </key>
+    <key name="wake-word-enabled" type="b">
+      <default>true</default>
+      <summary>Enable wake word</summary>
+      <description>Whether to listen for the wake word.</description>
+    </key>
+    <key name="microphone-device" type="s">
+      <default>""</default>
+      <summary>Microphone device</summary>
+      <description>Audio input device. Empty for system default.</description>
+    </key>
+    <key name="language" type="s">
+      <default>"de"</default>
+      <summary>Interface language</summary>
+      <description>ISO 639-1 language code for the UI.</description>
+    </key>
+  </schema>
+</schemalist>

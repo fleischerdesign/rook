@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package rook.v1;
+
+service RookService {
+  rpc SendMessage (SendMessageRequest) returns (SendMessageResponse);
+  rpc StreamChat (stream ChatChunk) returns (stream ChatChunk);
+  rpc ListExtensions (ListExtensionsRequest) returns (ListExtensionsResponse);
+  rpc InstallExtension (InstallExtensionRequest) returns (InstallExtensionResponse);
+  rpc RemoveExtension (RemoveExtensionRequest) returns (RemoveExtensionResponse);
+  rpc GetConfig (GetConfigRequest) returns (GetConfigResponse);
+  rpc UpdateConfig (UpdateConfigRequest) returns (UpdateConfigResponse);
+  rpc ListClients (ListClientsRequest) returns (ListClientsResponse);
+  rpc DelegateTask (DelegateTaskRequest) returns (DelegateTaskResponse);
+  rpc PushSyncState (PushSyncStateRequest) returns (PushSyncStateResponse);
+  rpc PullSyncState (PullSyncStateRequest) returns (PullSyncStateResponse);
+}
+
+message SendMessageRequest {
+  string chat_id = 1;
+  string content = 2;
+  string role = 3;
+}
+
+message SendMessageResponse {
+  string message_id = 1;
+}
+
+message ChatChunk {
+  string chat_id = 1;
+  string content = 2;
+  bool is_final = 3;
+}
+
+message Extension {
+  string id = 1;
+  string name = 2;
+  string version = 3;
+  string description = 4;
+  bool enabled = 5;
+}
+
+message ListExtensionsRequest {}
+message ListExtensionsResponse {
+  repeated Extension extensions = 1;
+}
+
+message InstallExtensionRequest {
+  string id = 1;
+}
+message InstallExtensionResponse {}
+
+message RemoveExtensionRequest {
+  string id = 1;
+}
+message RemoveExtensionResponse {}
+
+message ConfigEntry {
+  string key = 1;
+  string value = 2;
+}
+
+message GetConfigRequest {}
+message GetConfigResponse {
+  repeated ConfigEntry entries = 1;
+}
+
+message UpdateConfigRequest {
+  repeated ConfigEntry entries = 1;
+}
+message UpdateConfigResponse {}
+
+message Client {
+  string id = 1;
+  string name = 2;
+  string host = 3;
+  bool online = 4;
+}
+
+message ListClientsRequest {}
+message ListClientsResponse {
+  repeated Client clients = 1;
+}
+
+message DelegateTaskRequest {
+  string client_id = 1;
+  bytes payload = 2;
+}
+message DelegateTaskResponse {
+  string task_id = 1;
+}
+
+message SyncState {
+  bytes crdt_data = 1;
+  string node_id = 2;
+  int64 hlc_wall_time_ms = 3;
+  int32 hlc_logical_counter = 4;
+}
+
+message PushSyncStateRequest {
+  SyncState state = 1;
+}
+message PushSyncStateResponse {}
+
+message PullSyncStateRequest {
+  string node_id = 1;
+}
+message PullSyncStateResponse {
+  SyncState state = 1;
+}
