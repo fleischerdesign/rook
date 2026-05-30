@@ -24,12 +24,18 @@ ChatSidebar::ChatSidebar(rook::domain::EventBus& bus, rook::domain::Conversation
         [this](const rook::domain::ChatUpdated& event) {
             onChatUpdated(event);
         });
+
+    m_selected_handler = m_bus.subscribe<rook::domain::ChatSelected>(
+        [this](const rook::domain::ChatSelected& event) {
+            onChatSelected(event);
+        });
 }
 
 ChatSidebar::~ChatSidebar() {
     m_bus.unsubscribe(m_created_handler);
     m_bus.unsubscribe(m_deleted_handler);
     m_bus.unsubscribe(m_updated_handler);
+    m_bus.unsubscribe(m_selected_handler);
 }
 
 void ChatSidebar::setupUi() {
@@ -114,6 +120,17 @@ void ChatSidebar::onChatUpdated(const rook::domain::ChatUpdated& event) {
                     if (display.size() > 25) display = display.substr(0, 25) + "...";
                     label->set_text(display);
                 }
+                return;
+            }
+        }
+    });
+}
+
+void ChatSidebar::onChatSelected(const rook::domain::ChatSelected& event) {
+    Glib::signal_idle().connect_once([this, id = event.chat_id]() {
+        for (int i = 0; auto* row = m_list.get_row_at_index(i); ++i) {
+            if (std::string(row->get_name()) == id) {
+                m_list.select_row(*row);
                 return;
             }
         }
