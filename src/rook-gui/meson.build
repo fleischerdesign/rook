@@ -3,6 +3,10 @@ rook_gui_sources = files(
   'application.cpp',
   'window.cpp',
   'views/chat_view.cpp',
+  'views/message_widget.cpp',
+  'views/chat_sidebar.cpp',
+  'views/settings_dialog.cpp',
+  'views/first_run_wizard.cpp',
 )
 
 rook_gui_deps = [
