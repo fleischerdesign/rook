@@ -56,6 +56,7 @@ public:
         std::string_view body,
         const std::vector<std::pair<std::string, std::string>>& headers
     ) override {
+        curl_easy_reset(m_handle);
         std::string response_body;
         curl_easy_setopt(m_handle, CURLOPT_URL, url.data());
         curl_easy_setopt(m_handle, CURLOPT_POSTFIELDS, body.data());
@@ -84,6 +85,7 @@ public:
         std::function<void(std::string_view)> on_line,
         std::function<void(int32_t)> on_error
     ) override {
+        curl_easy_reset(m_handle);
         StreamContext ctx;
         ctx.on_line = std::move(on_line);
 
