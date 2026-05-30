@@ -1,5 +1,6 @@
 #include "rook/adapters/llm/llm_http_client.hpp"
 #include <curl/curl.h>
+#include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <cstring>
 
@@ -39,42 +40,50 @@ size_t streamCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     return total;
 }
 
+curl_slist* buildHeaders(
+    const std::vector<std::pair<std::string, std::string>>& headers
+) {
+    curl_slist* hlist = nullptr;
+    for (const auto& [key, value] : headers) {
+        std::string header = key + ": " + value;
+        hlist = curl_slist_append(hlist, header.c_str());
+    }
+    return hlist;
+}
+
 class CurlHttpClient final : public LlmHttpClient {
 public:
-    CurlHttpClient() {
-        m_handle = curl_easy_init();
-        if (!m_handle) throw std::runtime_error("curl_easy_init failed");
-    }
-
-    ~CurlHttpClient() override {
-        if (m_handle) curl_easy_cleanup(m_handle);
-        curl_slist_free_all(m_global_headers);
-    }
-
     HttpResponse post(
         std::string_view url,
         std::string_view body,
         const std::vector<std::pair<std::string, std::string>>& headers
     ) override {
-        curl_easy_reset(m_handle);
+        auto* handle = curl_easy_init();
+        if (!handle) {
+            spdlog::error("curl_easy_init failed");
+            return {0, {}};
+        }
+
         std::string response_body;
-        curl_easy_setopt(m_handle, CURLOPT_URL, url.data());
-        curl_easy_setopt(m_handle, CURLOPT_POSTFIELDS, body.data());
-        curl_easy_setopt(m_handle, CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
-        curl_easy_setopt(m_handle, CURLOPT_WRITEFUNCTION, writeCallback);
-        curl_easy_setopt(m_handle, CURLOPT_WRITEDATA, &response_body);
-        curl_easy_setopt(m_handle, CURLOPT_HTTPHEADER, nullptr);
+        curl_easy_setopt(handle, CURLOPT_URL, url.data());
+        curl_easy_setopt(handle, CURLOPT_POSTFIELDS, body.data());
+        curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
+        curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback);
+        curl_easy_setopt(handle, CURLOPT_WRITEDATA, &response_body);
 
         auto* hlist = buildHeaders(headers);
-        curl_easy_setopt(m_handle, CURLOPT_HTTPHEADER, hlist);
+        curl_easy_setopt(handle, CURLOPT_HTTPHEADER, hlist);
 
-        auto res = curl_easy_perform(m_handle);
+        auto res = curl_easy_perform(handle);
         int32_t status = 0;
         if (res == CURLE_OK) {
-            curl_easy_getinfo(m_handle, CURLINFO_RESPONSE_CODE, &status);
+            curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &status);
+        } else {
+            spdlog::error("CURL error: {} ({})", curl_easy_strerror(res), static_cast<int>(res));
         }
 
         curl_slist_free_all(hlist);
+        curl_easy_cleanup(handle);
         return {status, std::move(response_body)};
     }
 
@@ -85,43 +94,34 @@ public:
         std::function<void(std::string_view)> on_line,
         std::function<void(int32_t)> on_error
     ) override {
-        curl_easy_reset(m_handle);
+        auto* handle = curl_easy_init();
+        if (!handle) {
+            spdlog::error("curl_easy_init failed for postStream");
+            return;
+        }
+
         StreamContext ctx;
         ctx.on_line = std::move(on_line);
 
-        curl_easy_setopt(m_handle, CURLOPT_URL, url.data());
-        curl_easy_setopt(m_handle, CURLOPT_POSTFIELDS, body.data());
-        curl_easy_setopt(m_handle, CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
-        curl_easy_setopt(m_handle, CURLOPT_WRITEFUNCTION, streamCallback);
-        curl_easy_setopt(m_handle, CURLOPT_WRITEDATA, &ctx);
-        curl_easy_setopt(m_handle, CURLOPT_HTTPHEADER, nullptr);
+        curl_easy_setopt(handle, CURLOPT_URL, url.data());
+        curl_easy_setopt(handle, CURLOPT_POSTFIELDS, body.data());
+        curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE, static_cast<long>(body.size()));
+        curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, streamCallback);
+        curl_easy_setopt(handle, CURLOPT_WRITEDATA, &ctx);
 
         auto* hlist = buildHeaders(headers);
-        curl_easy_setopt(m_handle, CURLOPT_HTTPHEADER, hlist);
+        curl_easy_setopt(handle, CURLOPT_HTTPHEADER, hlist);
 
-        auto res = curl_easy_perform(m_handle);
+        auto res = curl_easy_perform(handle);
         if (res != CURLE_OK) {
             int32_t status = 0;
-            curl_easy_getinfo(m_handle, CURLINFO_RESPONSE_CODE, &status);
+            curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &status);
+            spdlog::error("CURL error: {} (HTTP {})", curl_easy_strerror(res), status);
             on_error(status);
         }
 
         curl_slist_free_all(hlist);
-    }
-
-private:
-    CURL* m_handle = nullptr;
-    curl_slist* m_global_headers = nullptr;
-
-    curl_slist* buildHeaders(
-        const std::vector<std::pair<std::string, std::string>>& headers
-    ) {
-        curl_slist* hlist = nullptr;
-        for (const auto& [key, value] : headers) {
-            std::string header = key + ": " + value;
-            hlist = curl_slist_append(hlist, header.c_str());
-        }
-        return hlist;
+        curl_easy_cleanup(handle);
     }
 };
 
