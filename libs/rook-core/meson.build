@@ -1,10 +1,17 @@
 librook_core_sources = files(
   'src/domain/event_bus.cpp',
+  'src/adapters/llm/llm_http_client.cpp',
+  'src/adapters/llm/openai_compatible_adapter.cpp',
+  'src/adapters/llm/openai_adapter.cpp',
+  'src/adapters/llm/deepseek_adapter.cpp',
+  'src/adapters/llm/ollama_adapter.cpp',
+  'src/adapters/llm/anthropic_adapter.cpp',
 )
 
 librook_core_deps = [
   dependency('nlohmann_json'),
   dependency('spdlog'),
+  dependency('libcurl'),
 ]
 
 librook_core_inc = include_directories('include')
