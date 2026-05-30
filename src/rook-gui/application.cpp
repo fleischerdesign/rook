@@ -24,18 +24,6 @@ RookApplication::RookApplication()
 
     m_first_run = !m_settings.load(*m_store, *m_llm, *m_secrets);
 
-    if (auto active = m_llm->activeProvider()) {
-        m_llm->configure(rook::ports::LlmConfig{
-            .provider = active->type,
-            .model = active->default_model,
-            .api_key = active->api_key,
-            .base_url = active->base_url,
-            .max_tokens = 4096,
-            .temperature = 0.7f,
-            .system_prompt = "You are Rook, a helpful AI assistant.",
-        });
-    }
-
     m_conversations.start(m_bus, m_store.get());
     m_conversations.loadFromStore(*m_store);
 
@@ -73,11 +61,9 @@ void RookApplication::on_activate() {
                 .default_model = !cfg.model.empty() ? cfg.model
                     : (info ? info->default_model : ""),
                 .enabled = true,
-                .is_default = true,
             };
 
             m_llm->addProvider(new_provider);
-            m_llm->configure(cfg);
             m_first_run = false;
             saveConfig();
             wizard->close();

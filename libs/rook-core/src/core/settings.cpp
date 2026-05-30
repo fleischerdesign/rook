@@ -17,7 +17,6 @@ bool SettingsLoader::load(ports::StorePort& store, ports::LlmPort& llm,
         default_ollama.base_url = "http://localhost:11434";
         default_ollama.default_model = "llama3.1";
         default_ollama.enabled = true;
-        default_ollama.is_default = true;
 
         llm.addProvider(default_ollama);
         return false;
@@ -34,7 +33,6 @@ bool SettingsLoader::load(ports::StorePort& store, ports::LlmPort& llm,
                 prov.base_url = pj.value("base_url", "");
                 prov.default_model = pj.value("default_model", "");
                 prov.enabled = pj.value("enabled", true);
-                prov.is_default = pj.value("is_default", false);
 
                 auto key_label = prov.display_name + ":" + prov.type;
 
@@ -71,7 +69,6 @@ void SettingsLoader::save(ports::StorePort& store, const ports::LlmPort& llm,
         pj["base_url"] = p.base_url;
         pj["default_model"] = p.default_model;
         pj["enabled"] = p.enabled;
-        pj["is_default"] = p.is_default;
 
         auto key_label = p.display_name + ":" + p.type;
         if (!p.api_key.empty()) {

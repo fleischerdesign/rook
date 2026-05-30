@@ -19,7 +19,6 @@ private:
     void onAddClicked();
     void onEditClicked(const std::string& provider_id);
     void onDeleteClicked(const std::string& provider_id);
-    void onSetDefault(const std::string& provider_id);
     void onToggleEnabled(const std::string& provider_id, bool enabled);
 
     rook::ports::LlmPort& m_llm;

@@ -24,7 +24,6 @@ private:
     Gtk::Entry m_base_url;
     Gtk::Entry m_api_key;
     Gtk::Entry m_model;
-    Gtk::Switch m_is_default;
     Gtk::Button m_test_button;
     Gtk::Label m_test_result;
 };

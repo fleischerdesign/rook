@@ -18,7 +18,6 @@ struct LlmProviderConfig {
     std::string api_key;       // empty = read from libsecret
     std::string default_model;
     bool enabled = true;
-    bool is_default = false;
 };
 
 struct LlmMessage {
@@ -53,7 +52,6 @@ public:
     virtual void addProvider(const LlmProviderConfig&) {}
     virtual void updateProvider(const LlmProviderConfig&) {}
     virtual void removeProvider(std::string_view) {}
-    virtual void setDefaultProvider(std::string_view) {}
     virtual std::optional<LlmProviderConfig> activeProvider() const { return std::nullopt; }
 
     virtual void cancel() {}

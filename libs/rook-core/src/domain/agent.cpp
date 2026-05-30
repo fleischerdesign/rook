@@ -36,6 +36,8 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
     msg.content = event.content;
     m_conv.addMessage(event.chat_id, std::move(msg));
 
+    m_conv.setModel(event.chat_id, event.model);
+
     auto messages = m_conv.buildLlmMessages(event.chat_id);
 
     m_bus.publish(LlmRequested{event.chat_id, ""});
@@ -98,6 +100,7 @@ void AgentEngine::onLlmCompleted(const LlmCompleted& event) {
 
     std::string accumulated;
     std::string chat_id = event.chat_id;
+    std::string model = conv.model;
 
     m_llm.streamChat(
         chat_id,
@@ -114,7 +117,8 @@ void AgentEngine::onLlmCompleted(const LlmCompleted& event) {
                     m_conv.setTitle(chat_id, title);
                 }
             }
-        }
+        },
+        model
     );
 }
 

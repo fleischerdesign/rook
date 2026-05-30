@@ -67,7 +67,6 @@ void LlmSettingsPage::refreshList() {
         info->set_hexpand(true);
 
         std::string title = prov.display_name;
-        if (prov.is_default) title += " (Default)";
 
         auto* name_label = Gtk::make_managed<Gtk::Label>(title);
         name_label->set_xalign(0.0f);
@@ -95,10 +94,6 @@ void LlmSettingsPage::refreshList() {
             },
             false);
 
-        if (prov.is_default) {
-            toggle->set_sensitive(false);
-        }
-
         box->append(*toggle);
 
         auto* edit_btn = Gtk::make_managed<Gtk::Button>("Edit");
@@ -107,14 +102,12 @@ void LlmSettingsPage::refreshList() {
             [this, prov_id]() { onEditClicked(prov_id); });
         box->append(*edit_btn);
 
-        if (!prov.is_default) {
-            auto* del_btn = Gtk::make_managed<Gtk::Button>("Delete");
-            del_btn->set_valign(Gtk::Align::CENTER);
-            del_btn->add_css_class("destructive-action");
-            del_btn->signal_clicked().connect(
-                [this, prov_id]() { onDeleteClicked(prov_id); });
-            box->append(*del_btn);
-        }
+        auto* del_btn = Gtk::make_managed<Gtk::Button>("Delete");
+        del_btn->set_valign(Gtk::Align::CENTER);
+        del_btn->add_css_class("destructive-action");
+        del_btn->signal_clicked().connect(
+            [this, prov_id]() { onDeleteClicked(prov_id); });
+        box->append(*del_btn);
 
         row->set_child(*box);
         m_list.append(*row);
@@ -166,11 +159,6 @@ void LlmSettingsPage::onDeleteClicked(const std::string& provider_id) {
     m_llm.removeProvider(provider_id);
     refreshList();
     m_signal_changed.emit();
-}
-
-void LlmSettingsPage::onSetDefault(const std::string& provider_id) {
-    m_llm.setDefaultProvider(provider_id);
-    refreshList();
 }
 
 void LlmSettingsPage::onToggleEnabled(const std::string& provider_id, bool enabled) {

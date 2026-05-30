@@ -26,7 +26,6 @@ public:
     void addProvider(const ports::LlmProviderConfig& provider) override;
     void updateProvider(const ports::LlmProviderConfig& provider) override;
     void removeProvider(std::string_view id) override;
-    void setDefaultProvider(std::string_view id) override;
     std::optional<ports::LlmProviderConfig> activeProvider() const override;
 
     void cancel();

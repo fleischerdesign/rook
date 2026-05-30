@@ -68,10 +68,6 @@ void ThreadedLlmAdapter::removeProvider(std::string_view id) {
     m_inner->removeProvider(id);
 }
 
-void ThreadedLlmAdapter::setDefaultProvider(std::string_view id) {
-    m_inner->setDefaultProvider(id);
-}
-
 std::optional<ports::LlmProviderConfig> ThreadedLlmAdapter::activeProvider() const {
     return m_inner->activeProvider();
 }

@@ -221,6 +221,14 @@ void ConversationManager::setTitle(std::string_view conv_id, std::string_view ti
     }
 }
 
+void ConversationManager::setModel(std::string_view conv_id, std::string_view model) {
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](auto& c) { return c.id == conv_id; });
+
+    if (it == m_conversations.end()) return;
+    it->model = model;
+}
+
 void ConversationManager::loadFromStore(ports::StorePort& store) {
     auto chat_ids = store.listChats();
     for (const auto& record : chat_ids) {

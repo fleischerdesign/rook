@@ -24,10 +24,7 @@ std::string generateProviderId() {
 MultiProviderLlmAdapter::MultiProviderLlmAdapter() {
 }
 
-void MultiProviderLlmAdapter::configure(const ports::LlmConfig& config) {
-    if (m_active_adapter) {
-        m_active_adapter->configure(config);
-    }
+void MultiProviderLlmAdapter::configure(const ports::LlmConfig& /*config*/) {
 }
 
 void MultiProviderLlmAdapter::streamChat(
@@ -49,14 +46,13 @@ void MultiProviderLlmAdapter::streamChat(
         }
     }
 
-    ports::LlmPort* adapter = m_active_adapter.get();
-
-    if (!provider_id.empty() && m_provider_adapters.count(provider_id)) {
-        adapter = m_provider_adapters[provider_id].get();
+    auto it = m_provider_adapters.find(provider_id);
+    if (it == m_provider_adapters.end() && !m_provider_adapters.empty()) {
+        it = m_provider_adapters.begin();
     }
 
-    if (adapter) {
-        adapter->streamChat(chat_id, messages, std::move(on_chunk), real_model);
+    if (it != m_provider_adapters.end()) {
+        it->second->streamChat(chat_id, messages, std::move(on_chunk), real_model);
     }
 }
 
@@ -71,10 +67,6 @@ void MultiProviderLlmAdapter::addProvider(const ports::LlmProviderConfig& provid
 
     auto concrete = createConcreteAdapter(prov);
     m_provider_adapters[prov.id] = std::move(concrete);
-
-    if (prov.is_default || m_active_provider_id.empty()) {
-        setDefaultProvider(prov.id);
-    }
 }
 
 void MultiProviderLlmAdapter::updateProvider(const ports::LlmProviderConfig& provider) {
@@ -91,41 +83,10 @@ void MultiProviderLlmAdapter::updateProvider(const ports::LlmProviderConfig& pro
 void MultiProviderLlmAdapter::removeProvider(std::string_view id) {
     std::erase_if(m_providers, [id](const auto& p) { return p.id == id; });
     m_provider_adapters.erase(std::string(id));
-
-    if (m_active_provider_id == id) {
-        m_active_provider_id.clear();
-        m_active_adapter.reset();
-
-        if (!m_providers.empty()) {
-            auto& first = m_providers.front();
-            m_active_provider_id = first.id;
-            m_active_adapter = std::move(m_provider_adapters[first.id]);
-            spdlog::info("Switched to provider: {}", first.display_name);
-        }
-    }
-}
-
-void MultiProviderLlmAdapter::setDefaultProvider(std::string_view id) {
-    for (auto& p : m_providers) {
-        p.is_default = (p.id == id);
-    }
-
-    if (m_active_provider_id != id) {
-        auto it = m_provider_adapters.find(std::string(id));
-        if (it != m_provider_adapters.end()) {
-            m_active_provider_id = id;
-            m_active_adapter = std::move(it->second);
-            m_provider_adapters.erase(it);
-            spdlog::info("Switched to default provider: {}", id);
-        }
-    }
 }
 
 std::optional<ports::LlmProviderConfig> MultiProviderLlmAdapter::activeProvider() const {
-    auto it = std::ranges::find_if(m_providers,
-        [this](const auto& p) { return p.id == m_active_provider_id; });
-
-    if (it != m_providers.end()) return *it;
+    if (!m_providers.empty()) return m_providers.front();
     return std::nullopt;
 }
 

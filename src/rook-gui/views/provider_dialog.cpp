@@ -48,14 +48,6 @@ void ProviderDialog::setupUi() {
     m_model.set_text("llama3.1");
     content->append(*makeRow("Model", m_model));
 
-    auto is_default_row = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::HORIZONTAL, 12);
-    auto* def_label = Gtk::make_managed<Gtk::Label>("Set as Default");
-    def_label->set_xalign(0.0f);
-    def_label->set_width_chars(12);
-    is_default_row->append(*def_label);
-    is_default_row->append(m_is_default);
-    content->append(*is_default_row);
-
     auto test_row = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::HORIZONTAL, 12);
     auto* test_lbl = Gtk::make_managed<Gtk::Label>("Connection");
     test_lbl->set_xalign(0.0f);
@@ -109,7 +101,6 @@ rook::ports::LlmProviderConfig ProviderDialog::getProvider() const {
     config.api_key = m_api_key.get_text();
     config.default_model = m_model.get_text();
     config.enabled = true;
-    config.is_default = m_is_default.get_active();
     return config;
 }
 
@@ -120,7 +111,6 @@ void ProviderDialog::setProvider(const rook::ports::LlmProviderConfig& config) {
     m_base_url.set_text(config.base_url);
     m_api_key.set_text(config.api_key);
     m_model.set_text(config.default_model);
-    m_is_default.set_active(config.is_default);
 }
 
 } // namespace rook::gui
