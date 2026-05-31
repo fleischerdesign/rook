@@ -45,11 +45,6 @@ void FirstRunWizard::setupUi() {
         sigc::mem_fun(*this, &FirstRunWizard::onProviderChanged));
     content->append(m_provider);
 
-    m_model.set_placeholder_text("Model name");
-    m_model.set_text("llama3.1");
-    m_model.set_hexpand(true);
-    content->append(m_model);
-
     m_api_key.set_placeholder_text("API Key");
     m_api_key.set_visibility(false);
     m_api_key.set_sensitive(false);
@@ -70,11 +65,6 @@ void FirstRunWizard::onProviderChanged() {
     auto provider = std::string(m_provider.get_active_id());
     bool needs_key = (provider != "ollama");
     m_api_key.set_sensitive(needs_key);
-
-    auto info = rook::ports::ProviderRegistry::instance().find(provider);
-    if (info) {
-        m_model.set_text(info->default_model);
-    }
     if (provider == "ollama") {
         m_api_key.set_text("");
     }
@@ -88,7 +78,7 @@ void FirstRunWizard::onFinish() {
 rook::ports::LlmConfig FirstRunWizard::getConfig() const {
     rook::ports::LlmConfig config;
     config.provider = m_provider.get_active_id();
-    config.model = m_model.get_text();
+    config.model = "";
     config.api_key = m_api_key.get_text();
     return config;
 }

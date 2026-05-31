@@ -25,7 +25,6 @@ private:
     Gtk::Box m_page2;
 
     Gtk::ComboBoxText m_provider;
-    Gtk::Entry m_model;
     Gtk::Entry m_api_key;
 
     SlotDone m_signal_done;
