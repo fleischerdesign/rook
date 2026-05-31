@@ -18,7 +18,6 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
 {
     auto dialog = Object::create<PreferencesWindow>();
     dialog->set_title("Preferences");
-    dialog->set_follows_content_size(true);
 
     auto llm_page = Adw::PreferencesPage::create();
     llm_page->set_title("Providers");
