@@ -27,9 +27,9 @@ class ChatView final : public peel::Gtk::Box
     std::string m_chat_id;
     std::string m_pending_input;
 
-    peel::FloatPtr<peel::Gtk::Stack> m_stack;
-    peel::FloatPtr<peel::Gtk::ScrolledWindow> m_scrolled;
-    peel::FloatPtr<peel::Gtk::ListBox> m_message_list;
+    peel::Gtk::Stack *m_stack = nullptr;
+    peel::Gtk::ScrolledWindow *m_scrolled = nullptr;
+    peel::Gtk::ListBox *m_message_list = nullptr;
 
     peel::Gtk::DropDown *m_welcome_model = nullptr;
     peel::Gtk::DropDown *m_chat_model = nullptr;

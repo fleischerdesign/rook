@@ -26,6 +26,7 @@ class RookApplication final : public peel::Adw::Application
 
     inline void init(Class *);
     inline void vfunc_activate ();
+    inline void vfunc_dispose ();
 
     void loadConfig();
     void saveConfig();

@@ -18,10 +18,13 @@ PEEL_CLASS_IMPL(RookApplication, "RookApplication", Adw::Application)
 inline void RookApplication::Class::init()
 {
     override_vfunc_activate<RookApplication>();
+    override_vfunc_dispose<RookApplication>();
 }
 
 inline void RookApplication::init(Class *)
 {
+    new (&m_bus) rook::domain::EventBus();
+
     m_data_dir = GLib::get_user_data_dir() + std::string("/rook");
 
     m_store = rook::adapters::store::makeJsonStore(m_data_dir);
@@ -50,7 +53,6 @@ RefPtr<RookApplication> RookApplication::create()
 inline void RookApplication::vfunc_activate()
 {
     parent_vfunc_activate<RookApplication>();
-
     if (get_active_window() != nullptr) return;
 
     auto *window = RookWindow::create(this, m_bus, *m_llm, m_conversations,
@@ -80,11 +82,21 @@ inline void RookApplication::vfunc_activate()
             startModelDiscovery(*window);
             raw_wiz->close();
         });
-        raw_wiz->connect_hide([raw_wiz](Gtk::Widget *) { delete raw_wiz; });
+        raw_wiz->connect_hide([raw_wiz](Gtk::Widget *) { g_object_unref(raw_wiz); });
         raw_wiz->present();
     }
 
     startModelDiscovery(*window);
+}
+
+inline void RookApplication::vfunc_dispose()
+{
+    m_llm.reset();
+    m_store.reset();
+    m_secrets.reset();
+    m_engine.reset();
+    m_bus.~EventBus();
+    parent_vfunc_dispose<RookApplication>();
 }
 
 void RookApplication::startModelDiscovery(RookWindow &window)

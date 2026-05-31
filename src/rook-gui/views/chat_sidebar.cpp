@@ -35,12 +35,13 @@ inline void ChatSidebar::init(Class *)
     append(std::move(m_new_button));
 
     auto scrolled = Gtk::ScrolledWindow::create();
-    m_list = Gtk::ListBox::create();
-    m_list->set_hexpand(true);
-    m_list->set_vexpand(true);
-    m_list->connect_row_activated(
+    auto list = Gtk::ListBox::create();
+    list->set_hexpand(true);
+    list->set_vexpand(true);
+    list->connect_row_activated(
         [this](Gtk::ListBox *, Gtk::ListBoxRow *r) { onRowActivated(nullptr, r); });
-    scrolled->set_child(std::move(m_list));
+    m_list = list;
+    scrolled->set_child(std::move(list));
     append(std::move(scrolled));
 }
 

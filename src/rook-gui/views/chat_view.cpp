@@ -73,8 +73,8 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
             v->onChatDeleted(event);
         });
 
-    v->m_stack = Gtk::Stack::create();
-    v->m_stack->set_vexpand(true);
+    auto stack = Gtk::Stack::create();
+    stack->set_vexpand(true);
 
     auto welcome_page = Adw::StatusPage::create();
     welcome_page->set_title("Welcome to Rook");
@@ -117,18 +117,18 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
     welcome_box->append(std::move(welcome_page));
     welcome_box->append(std::move(welcome_bar));
 
-    v->m_stack->add_named(std::move(welcome_box), "welcome");
-
     auto chat_page = Gtk::Box::create(Gtk::Orientation::VERTICAL, 0);
 
-    v->m_message_list = Gtk::ListBox::create();
-    v->m_message_list->set_hexpand(true);
-    v->m_message_list->set_vexpand(true);
+    auto msg_list = Gtk::ListBox::create();
+    msg_list->set_hexpand(true);
+    msg_list->set_vexpand(true);
+    v->m_message_list = msg_list;
 
-    v->m_scrolled = Gtk::ScrolledWindow::create();
-    v->m_scrolled->set_child(std::move(v->m_message_list));
-    v->m_scrolled->set_vexpand(true);
-    chat_page->append(std::move(v->m_scrolled));
+    auto scrolled = Gtk::ScrolledWindow::create();
+    scrolled->set_child(std::move(msg_list));
+    scrolled->set_vexpand(true);
+    v->m_scrolled = scrolled;
+    chat_page->append(std::move(scrolled));
 
     auto chat_bar = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 6);
     chat_bar->set_margin_start(12);
@@ -159,10 +159,14 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
     }
 
     chat_page->append(std::move(chat_bar));
-    v->m_stack->add_named(std::move(chat_page), "chat");
-    v->m_stack->set_visible_child_name("welcome");
 
-    v->append(std::move(v->m_stack));
+    v->m_stack = stack;
+
+    stack->add_named(std::move(welcome_box), "welcome");
+    stack->add_named(std::move(chat_page), "chat");
+    stack->set_visible_child_name("welcome");
+
+    v->append(std::move(stack));
 
     v->populateModelDropdown();
 
