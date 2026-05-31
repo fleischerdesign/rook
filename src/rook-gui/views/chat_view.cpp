@@ -88,8 +88,6 @@ void ChatView::setupUi() {
     subtitle->set_justify(Gtk::Justification::CENTER);
     welcome->append(*subtitle);
 
-    welcome->append(m_input_box);
-
     m_stack.add(*welcome, "welcome");
 
     auto* chat_page = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::VERTICAL, 0);
@@ -99,8 +97,6 @@ void ChatView::setupUi() {
     m_scrolled.set_child(m_message_list);
     m_scrolled.set_vexpand(true);
     chat_page->append(m_scrolled);
-
-    chat_page->append(m_input_box);
 
     m_stack.add(*chat_page, "chat");
 
@@ -127,6 +123,8 @@ void ChatView::setupUi() {
     m_send_button.signal_clicked().connect(
         sigc::mem_fun(*this, &ChatView::onSendClicked));
     m_input_box.append(m_send_button);
+
+    append(m_input_box);
 }
 
 void ChatView::populateModelDropdown() {
