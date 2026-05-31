@@ -61,6 +61,39 @@ int progressCallback(void* userp, curl_off_t /*dltotal*/, curl_off_t /*dlnow*/,
 class CurlHttpClient final : public LlmHttpClient {
 public:
     void cancel() override { m_abort.store(true); }
+
+    HttpResponse get(
+        std::string_view url,
+        const std::vector<std::pair<std::string, std::string>>& headers
+    ) override {
+        auto* handle = curl_easy_init();
+        if (!handle) {
+            spdlog::error("curl_easy_init failed for get");
+            return {0, {}};
+        }
+
+        std::string response_body;
+        curl_easy_setopt(handle, CURLOPT_URL, url.data());
+        curl_easy_setopt(handle, CURLOPT_HTTPGET, 1L);
+        curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, writeCallback);
+        curl_easy_setopt(handle, CURLOPT_WRITEDATA, &response_body);
+
+        auto* hlist = buildHeaders(headers);
+        curl_easy_setopt(handle, CURLOPT_HTTPHEADER, hlist);
+
+        auto res = curl_easy_perform(handle);
+        int32_t status = 0;
+        if (res == CURLE_OK) {
+            curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &status);
+        } else {
+            spdlog::error("CURL error: {} ({})", curl_easy_strerror(res), static_cast<int>(res));
+        }
+
+        curl_slist_free_all(hlist);
+        curl_easy_cleanup(handle);
+        return {status, std::move(response_body)};
+    }
+
     HttpResponse post(
         std::string_view url,
         std::string_view body,

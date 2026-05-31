@@ -11,10 +11,10 @@ class OllamaModelDiscovery final : public ports::ModelDiscoveryPort {
 public:
     explicit OllamaModelDiscovery(std::string base_url)
         : m_base_url(std::move(base_url)), m_http(makeCurlHttpClient()) {}
-
     std::vector<ports::ModelInfo> fetchModels(std::string_view /*api_key*/) override {
-        auto response = m_http->post(
-            m_base_url + "/api/tags", "", {{"Content-Type", "application/json"}});
+        auto response = m_http->get(
+            m_base_url + "/api/tags",
+            {{"Content-Type", "application/json"}});
 
         std::vector<ports::ModelInfo> result;
         try {
@@ -46,8 +46,8 @@ public:
         : m_base_url(std::move(base_url)), m_http(makeCurlHttpClient()) {}
 
     std::vector<ports::ModelInfo> fetchModels(std::string_view api_key) override {
-        auto response = m_http->post(
-            m_base_url + "/models", "",
+        auto response = m_http->get(
+            m_base_url + "/models",
             {{"Authorization", "Bearer " + std::string(api_key)},
              {"Content-Type", "application/json"}});
 
@@ -80,8 +80,8 @@ public:
     AnthropicModelDiscovery() : m_http(makeCurlHttpClient()) {}
 
     std::vector<ports::ModelInfo> fetchModels(std::string_view api_key) override {
-        auto response = m_http->post(
-            "https://api.anthropic.com/v1/models", "",
+        auto response = m_http->get(
+            "https://api.anthropic.com/v1/models",
             {{"x-api-key", std::string(api_key)},
              {"anthropic-version", "2023-06-01"},
              {"Content-Type", "application/json"}});
