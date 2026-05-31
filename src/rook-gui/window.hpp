@@ -20,6 +20,8 @@ public:
                         sigc::slot<void()> on_settings_changed = {});
     ~RookWindow() override = default;
 
+    void refreshModels();
+
 private:
     void setupHeaderBar();
     void setupLayout(rook::domain::ConversationManager& conversations);

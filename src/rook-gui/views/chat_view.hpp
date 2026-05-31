@@ -17,6 +17,7 @@ public:
     ~ChatView() override;
 
     void setChatId(std::string_view id);
+    void populateModelDropdown();
 
 private:
     void setupUi();
@@ -25,10 +26,8 @@ private:
     void onStreamChunk(const rook::domain::LlmStreamChunk& event);
     void onLlmCompleted(const rook::domain::LlmCompleted& event);
     void onChatSelected(const rook::domain::ChatSelected& event);
-
-    void setProcessing(bool active);
     void loadMessages(std::string_view chat_id);
-    void populateModelDropdown();
+    void setProcessing(bool active);
 
     rook::domain::EventBus& m_bus;
     rook::domain::ConversationManager& m_conv;

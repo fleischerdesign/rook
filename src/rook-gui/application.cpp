@@ -78,12 +78,13 @@ void RookApplication::on_activate() {
     auto window = std::make_unique<RookWindow>(m_bus, *m_llm, m_conversations, save_fn);
     add_window(*window);
     window->present();
+    auto* raw_window = window.get();
     window.release();
 
-    startModelDiscovery();
+    startModelDiscovery(*raw_window);
 }
 
-void RookApplication::startModelDiscovery() {
+void RookApplication::startModelDiscovery(RookWindow& window) {
     auto providers = m_llm->listProviders();
 
     for (const auto& prov : providers) {
@@ -94,7 +95,7 @@ void RookApplication::startModelDiscovery() {
         auto prov_type = prov.type;
         auto prov_id = prov.id;
 
-        (void)std::async(std::launch::async, [prov_type, prov_id, api_key, base_url]() {
+        (void)std::async(std::launch::async, [prov_type, prov_id, api_key, base_url, &window]() {
             std::unique_ptr<rook::ports::ModelDiscoveryPort> discovery;
 
             if (prov_type == "ollama") {
@@ -107,6 +108,10 @@ void RookApplication::startModelDiscovery() {
 
             auto models = discovery->fetchModels(api_key);
             rook::adapters::model::ModelCache::instance().store(prov_id, std::move(models));
+
+            Glib::signal_idle().connect_once([&window]() {
+                window.refreshModels();
+            });
         });
     }
 }

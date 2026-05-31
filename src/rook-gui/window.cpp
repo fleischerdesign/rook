@@ -73,6 +73,12 @@ void RookWindow::onAbout() {
     dialog->present();
 }
 
+void RookWindow::refreshModels() {
+    if (m_chat_view) {
+        m_chat_view->populateModelDropdown();
+    }
+}
+
 void RookWindow::setupLayout(rook::domain::ConversationManager& conversations) {
     m_sidebar = Gtk::make_managed<ChatSidebar>(m_bus, conversations);
     m_chat_view = Gtk::make_managed<ChatView>(m_bus, conversations, m_llm);
