@@ -49,9 +49,15 @@ void RookApplication::on_activate() {
 
     auto save_fn = sigc::mem_fun(*this, &RookApplication::saveConfig);
 
+    auto window = std::make_unique<RookWindow>(m_bus, *m_llm, m_conversations, save_fn);
+    add_window(*window);
+    window->present();
+    auto* raw_window = window.get();
+    window.release();
+
     if (m_first_run) {
         auto* wizard = new FirstRunWizard();
-        wizard->signal_done().connect([this, wizard, save_fn]() {
+        wizard->signal_done().connect([this, wizard, raw_window, save_fn]() {
             auto cfg = wizard->getConfig();
             auto info = rook::ports::ProviderRegistry::instance().find(cfg.provider);
 
@@ -69,17 +75,12 @@ void RookApplication::on_activate() {
             m_llm->addProvider(new_provider);
             m_first_run = false;
             saveConfig();
+            startModelDiscovery(*raw_window);
             wizard->close();
         });
         wizard->signal_hide().connect([wizard]() { delete wizard; });
         wizard->present();
     }
-
-    auto window = std::make_unique<RookWindow>(m_bus, *m_llm, m_conversations, save_fn);
-    add_window(*window);
-    window->present();
-    auto* raw_window = window.get();
-    window.release();
 
     startModelDiscovery(*raw_window);
 }
