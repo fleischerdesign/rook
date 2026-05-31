@@ -24,13 +24,15 @@
             gettext
             desktop-file-utils
             gcc14
+            python3
+            gobject-introspection
             clang-tools
             gdb
             valgrind
           ];
 
           buildInputs = with pkgs; [
-            gtkmm4
+            gtk4
             libadwaita
             libayatana-appindicator
             nlohmann_json
@@ -51,6 +53,7 @@
           };
 
           shellHook = ''
+            export XDG_DATA_DIRS="${pkgs.gtk4.dev}/share:${pkgs.libadwaita.dev}/share:${pkgs.gobject-introspection}/share:$XDG_DATA_DIRS"
             echo "Entering Rook development environment"
           '';
         };
@@ -69,7 +72,7 @@
           ];
 
           buildInputs = with pkgs; [
-            gtkmm4
+            gtk4
             libadwaita
             libayatana-appindicator
             nlohmann_json

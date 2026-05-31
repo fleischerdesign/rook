@@ -1,8 +1,12 @@
 #pragma once
 
-#include <gtkmm.h>
-#include <adwaita.h>
+#include <peel/Adw/Adw.h>
+#include <peel/Gtk/Gtk.h>
+#include <peel/Gio/Gio.h>
+#include <peel/GLib/functions.h>
+#include <peel/class.h>
 #include <memory>
+#include <string_view>
 #include "rook/domain/event_bus.hpp"
 #include "rook/domain/conversation.hpp"
 #include "rook/domain/agent.hpp"
@@ -15,22 +19,18 @@ namespace rook::gui {
 
 class RookWindow;
 
-class RookApplication : public Gtk::Application {
-public:
-    static Glib::RefPtr<RookApplication> create();
-    ~RookApplication() override = default;
+class RookApplication final : public peel::Adw::Application
+{
+    PEEL_SIMPLE_CLASS(RookApplication, peel::Adw::Application)
+    friend class peel::Gio::Application;
 
-    rook::domain::EventBus& eventBus() { return m_bus; }
+    inline void init(Class *);
+    inline void vfunc_activate ();
 
-protected:
-    RookApplication();
-    void on_activate() override;
-    void on_startup() override;
-
-private:
     void loadConfig();
     void saveConfig();
-    void startModelDiscovery(RookWindow& window);
+    void startModelDiscovery(RookWindow &window);
+    void onFirstRunDone(RookWindow *window);
 
     std::string m_data_dir;
     rook::domain::EventBus m_bus;
@@ -41,6 +41,11 @@ private:
     rook::domain::ConversationManager m_conversations;
     std::unique_ptr<rook::domain::AgentEngine> m_engine;
     bool m_first_run = true;
+
+public:
+    static peel::RefPtr<RookApplication> create();
+
+    rook::domain::EventBus& eventBus() { return m_bus; }
 };
 
 } // namespace rook::gui

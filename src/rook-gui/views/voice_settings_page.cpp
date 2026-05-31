@@ -1,27 +1,10 @@
 #include "voice_settings_page.hpp"
-
+using namespace peel;
 namespace rook::gui {
-
-VoiceSettingsPage::VoiceSettingsPage()
-    : Gtk::Box(Gtk::Orientation::VERTICAL, 6)
-{
-    setupUi();
+PEEL_CLASS_IMPL(VoiceSettingsPage, "RookVoiceSettingsPage", Gtk::Box)
+inline void VoiceSettingsPage::Class::init() {}
+inline void VoiceSettingsPage::init(Class*) {
+    append(Gtk::Label::create("Voice Settings (TODO)"));
 }
-
-void VoiceSettingsPage::setupUi() {
-    set_margin(24);
-
-    auto* heading = Gtk::make_managed<Gtk::Label>("Voice");
-    heading->set_xalign(0.0f);
-    heading->add_css_class("title-2");
-    append(*heading);
-
-    auto* desc = Gtk::make_managed<Gtk::Label>(
-        "Voice settings will be available in Phase 4 (Voice Pipeline).");
-    desc->set_xalign(0.0f);
-    desc->set_wrap(true);
-    desc->add_css_class("dim-label");
-    append(*desc);
+FloatPtr<VoiceSettingsPage> VoiceSettingsPage::create() { return Object::create<VoiceSettingsPage>(); }
 }
-
-} // namespace rook::gui

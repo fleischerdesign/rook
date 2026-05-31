@@ -1,33 +1,31 @@
 #pragma once
 
-#include <gtkmm.h>
+#include <peel/Gtk/Gtk.h>
+#include <peel/class.h>
+#include <peel/signal.h>
 #include "rook/ports/llm_port.hpp"
 
 namespace rook::gui {
 
-class FirstRunWizard : public Gtk::Window {
+class FirstRunWizard final : public peel::Gtk::Window
+{
+    PEEL_SIMPLE_CLASS(FirstRunWizard, peel::Gtk::Window)
+
+    peel::Gtk::DropDown *m_provider = nullptr;
+    peel::Gtk::Entry *m_api_key = nullptr;
+    rook::ports::LlmConfig m_config;
+    static peel::Signal<FirstRunWizard, void(void)> sig_done;
+    std::vector<std::string> m_provider_ids;
+
+    inline void init(Class *);
+    void onFinish(peel::Gtk::Button *);
+
 public:
-    FirstRunWizard();
-    ~FirstRunWizard() override = default;
+    static peel::FloatPtr<FirstRunWizard> create();
 
-    rook::ports::LlmConfig getConfig() const;
+    rook::ports::LlmConfig getConfig() const { return m_config; }
 
-    using SlotDone = sigc::signal<void()>;
-    SlotDone& signal_done();
-
-private:
-    void setupUi();
-    void onProviderChanged();
-    void onFinish();
-
-    Gtk::Box m_stack;
-    Gtk::Box m_page1;
-    Gtk::Box m_page2;
-
-    Gtk::ComboBoxText m_provider;
-    Gtk::Entry m_api_key;
-
-    SlotDone m_signal_done;
+    PEEL_SIGNAL_CONNECT_METHOD(done, sig_done)
 };
 
 } // namespace rook::gui

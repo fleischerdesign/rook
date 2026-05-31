@@ -14,14 +14,16 @@ rook_gui_sources = files(
 )
 
 rook_gui_deps = [
-  dependency('gtkmm-4.0'),
+  dependency('gtk4'),
   dependency('libadwaita-1'),
+  peel_dep,
   librook_core_dep,
 ]
 
 rook_gui = executable(
   'rook-gui',
   rook_gui_sources,
+  peel_bindings,
   dependencies: rook_gui_deps,
   install: true,
 )

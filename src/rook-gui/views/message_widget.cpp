@@ -1,84 +1,83 @@
 #include "message_widget.hpp"
-#include <pango/pango.h>
+
+using namespace peel;
 
 namespace rook::gui {
 
-MessageWidget::MessageWidget(std::string_view role, std::string_view content,
-                             std::string_view reasoning)
-    : Gtk::Box(Gtk::Orientation::VERTICAL, 4)
-    , m_role(role)
+PEEL_CLASS_IMPL(MessageWidget, "RookMessageWidget", Gtk::Box)
+
+inline void MessageWidget::Class::init()
 {
-    m_label.set_wrap(true);
-    m_label.set_wrap_mode(Pango::WrapMode::WORD_CHAR);
-    m_label.set_max_width_chars(60);
-    m_label.set_selectable(true);
-    m_label.set_use_markup(true);
-    m_label.set_xalign(0.0f);
+    set_css_name("messagewidget");
+}
 
-    setContent(content);
-    applyStyle();
+inline void MessageWidget::init(Class *)
+{
+    set_spacing(2);
+    set_margin_start(6);
+    set_margin_end(6);
+    set_margin_top(4);
+    set_margin_bottom(4);
+}
 
-    if (!reasoning.empty() && role == "assistant") {
-        m_reasoning_expander.set_label("Thinking...");
-        m_reasoning_expander.set_expanded(false);
-        m_reasoning_label.set_wrap(true);
-        m_reasoning_label.set_wrap_mode(Pango::WrapMode::WORD_CHAR);
-        m_reasoning_label.set_max_width_chars(60);
-        m_reasoning_label.set_selectable(true);
-        m_reasoning_label.add_css_class("dim-label");
-        m_reasoning_label.set_margin_start(12);
-        m_reasoning_label.set_text(std::string(reasoning));
-        m_reasoning_expander.set_child(m_reasoning_label);
-        append(m_reasoning_expander);
-        m_reasoning_created = true;
+FloatPtr<MessageWidget> MessageWidget::create(const std::string &role,
+                                                const std::string &content,
+                                                const std::string &reasoning_content)
+{
+    auto widget = Object::create<MessageWidget>();
+    widget->m_role = role;
+
+    if (!reasoning_content.empty()) {
+        auto expander = Gtk::Expander::create("Thinking...");
+        expander->set_expanded(false);
+
+        auto rlabel = Gtk::Label::create(reasoning_content.c_str());
+        rlabel->set_wrap(true);
+        rlabel->set_xalign(0.0f);
+        rlabel->set_max_width_chars(80);
+        rlabel->add_css_class("dim-label");
+        rlabel->set_use_markup(true);
+
+        Gtk::Label *rlabel_ptr = rlabel;
+        Gtk::Expander *expander_ptr = expander;
+        expander->set_child(std::move(rlabel).release_floating_ptr());
+        widget->m_reasoning_expander = expander_ptr;
+        widget->m_reasoning_label = rlabel_ptr;
+        widget->append(std::move(expander));
     }
 
-    append(m_label);
-    set_margin(8);
-    set_margin_start(12);
-    set_margin_end(12);
-}
-
-void MessageWidget::appendChunk(std::string_view chunk) {
-    auto text = m_label.get_text();
-    text.append(std::string(chunk));
-    m_label.set_text(text);
-}
-
-void MessageWidget::setContent(std::string_view content) {
-    m_label.set_text(std::string(content));
-}
-
-void MessageWidget::appendReasoningChunk(std::string_view chunk) {
-    if (!m_reasoning_created && m_role == "assistant") {
-        m_reasoning_expander.set_label("Thinking...");
-        m_reasoning_expander.set_expanded(false);
-        m_reasoning_label.set_wrap(true);
-        m_reasoning_label.set_wrap_mode(Pango::WrapMode::WORD_CHAR);
-        m_reasoning_label.set_max_width_chars(60);
-        m_reasoning_label.set_selectable(true);
-        m_reasoning_label.add_css_class("dim-label");
-        m_reasoning_label.set_margin_start(12);
-        m_reasoning_label.set_text("");
-        m_reasoning_expander.set_child(m_reasoning_label);
-        insert_child_at_start(m_reasoning_expander);
-        m_reasoning_created = true;
-    }
-
-    auto text = m_reasoning_label.get_text();
-    text.append(std::string(chunk));
-    m_reasoning_label.set_text(text);
-}
-
-void MessageWidget::applyStyle() {
-    if (m_role == "user") {
-        add_css_class("message-user");
-        m_label.set_halign(Gtk::Align::END);
-        m_label.add_css_class("frame");
+    auto label = Gtk::Label::create(content.c_str());
+    label->set_wrap(true);
+    label->set_xalign(0.0f);
+    label->set_max_width_chars(80);
+    label->set_use_markup(true);
+    if (role == "user") {
+        label->add_css_class("frame");
+        widget->add_css_class("message-user");
     } else {
-        add_css_class("message-assistant");
-        m_label.set_halign(Gtk::Align::START);
+        widget->add_css_class("message-assistant");
     }
+    Gtk::Label *label_ptr = label;
+    widget->m_label = label_ptr;
+    widget->append(std::move(label));
+
+    return widget;
+}
+
+void MessageWidget::appendChunk(std::string_view chunk)
+{
+    if (!m_label) return;
+    auto current = std::string(m_label->get_text());
+    current.append(chunk);
+    m_label->set_label(current.c_str());
+}
+
+void MessageWidget::appendReasoningChunk(std::string_view chunk)
+{
+    if (!m_reasoning_label) return;
+    auto current = std::string(m_reasoning_label->get_text());
+    current.append(chunk);
+    m_reasoning_label->set_label(current.c_str());
 }
 
 } // namespace rook::gui

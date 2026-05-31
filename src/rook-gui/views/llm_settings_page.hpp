@@ -1,30 +1,14 @@
 #pragma once
-
-#include <gtkmm.h>
-#include "rook/ports/llm_port.hpp"
+#include <peel/Gtk/Gtk.h>
+#include <peel/class.h>
 
 namespace rook::gui {
 
-class LlmSettingsPage : public Gtk::Box {
+class LlmSettingsPage final : public peel::Gtk::Box {
+    PEEL_SIMPLE_CLASS(LlmSettingsPage, peel::Gtk::Box)
+    inline void init(Class*);
 public:
-    explicit LlmSettingsPage(rook::ports::LlmPort& llm);
-    ~LlmSettingsPage() override = default;
-
-    sigc::signal<void()>& signal_changed() { return m_signal_changed; }
-
-private:
-    void setupUi();
-    void refreshList();
-    Gtk::Window* getParentWindow();
-    void onAddClicked();
-    void onEditClicked(const std::string& provider_id);
-    void onDeleteClicked(const std::string& provider_id);
-    void onToggleEnabled(const std::string& provider_id, bool enabled);
-
-    rook::ports::LlmPort& m_llm;
-    sigc::signal<void()> m_signal_changed;
-    Gtk::ListBox m_list;
-    Gtk::Button m_add_button;
+    static peel::FloatPtr<LlmSettingsPage> create();
 };
 
 } // namespace rook::gui

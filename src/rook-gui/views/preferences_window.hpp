@@ -1,36 +1,15 @@
 #pragma once
-
-#include <gtkmm.h>
-#include "rook/ports/llm_port.hpp"
+#include <peel/Gtk/Gtk.h>
+#include <peel/Adw/Adw.h>
+#include <peel/class.h>
 
 namespace rook::gui {
 
-class LlmSettingsPage;
-class VoiceSettingsPage;
-class AppearancePage;
-
-class PreferencesWindow : public Gtk::Window {
+class PreferencesWindow final : public peel::Adw::PreferencesDialog {
+    PEEL_SIMPLE_CLASS(PreferencesWindow, peel::Adw::PreferencesDialog)
+    inline void init(Class*);
 public:
-    PreferencesWindow(Gtk::Window& parent, rook::ports::LlmPort& llm,
-                      const std::string& config_path);
-    ~PreferencesWindow() override = default;
-
-    sigc::signal<void()>& signal_changed() { return m_signal_changed; }
-
-private:
-    void setupUi();
-    void onSidebarRowActivated(Gtk::ListBoxRow* row);
-
-    rook::ports::LlmPort& m_llm;
-    std::string m_config_path;
-    sigc::signal<void()> m_signal_changed;
-
-    Gtk::ListBox m_sidebar;
-    Gtk::Stack m_stack;
-
-    LlmSettingsPage* m_llm_page = nullptr;
-    VoiceSettingsPage* m_voice_page = nullptr;
-    AppearancePage* m_appearance_page = nullptr;
+    static peel::FloatPtr<PreferencesWindow> create();
 };
 
 } // namespace rook::gui

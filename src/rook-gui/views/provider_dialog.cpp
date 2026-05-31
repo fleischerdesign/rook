@@ -1,116 +1,110 @@
 #include "provider_dialog.hpp"
-#include <spdlog/spdlog.h>
+
+using namespace peel;
 
 namespace rook::gui {
 
-ProviderDialog::ProviderDialog(Gtk::Window& parent, std::string editing_id)
-    : Gtk::Dialog(
-        editing_id.empty() ? "Add Provider" : "Edit Provider",
-        parent, true)
-    , m_editing_id(std::move(editing_id))
+PEEL_CLASS_IMPL(ProviderDialog, "RookProviderDialog", Gtk::Window)
+
+inline void ProviderDialog::Class::init()
 {
-    setupUi();
 }
 
-void ProviderDialog::setupUi() {
-    auto* content = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::VERTICAL, 12);
-    content->set_margin(24);
+inline void ProviderDialog::init(Class *)
+{
+    set_title("Provider Settings");
+    set_default_size(400, 300);
+    set_modal(true);
 
-    auto makeRow = [](auto& label, auto& widget) {
-        auto* row = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::HORIZONTAL, 12);
-        auto* lbl = Gtk::make_managed<Gtk::Label>(label);
-        lbl->set_xalign(0.0f);
-        lbl->set_width_chars(12);
-        row->append(*lbl);
-        widget.set_hexpand(true);
-        row->append(widget);
-        return row;
-    };
+    auto box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 8);
+    box->set_margin_start(16);
+    box->set_margin_end(16);
+    box->set_margin_top(16);
+    box->set_margin_bottom(16);
 
-    m_display_name.set_text("My Provider");
-    content->append(*makeRow("Name", m_display_name));
-
-    for (const auto& p : rook::ports::ProviderRegistry::instance().all()) {
-        m_type.append(p.id, p.display_name);
+    auto name_label = Gtk::Label::create("Name:");
+    box->append(std::move(name_label));
+    {
+        auto entry = Gtk::Entry::create();
+        entry->set_placeholder_text("Display Name");
+        m_display_name = entry;
+        box->append(std::move(entry));
     }
-    m_type.set_active_id("ollama");
-    m_type.signal_changed().connect(
-        sigc::mem_fun(*this, &ProviderDialog::onTypeChanged));
-    content->append(*makeRow("Type", m_type));
 
-    m_base_url.set_text("http://localhost:11434");
-    content->append(*makeRow("Base URL", m_base_url));
-
-    m_api_key.set_placeholder_text("API key (saved in system keyring)");
-    m_api_key.set_visibility(false);
-    content->append(*makeRow("API Key", m_api_key));
-
-    m_model.set_text("llama3.1");
-    content->append(*makeRow("Model", m_model));
-
-    auto test_row = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::HORIZONTAL, 12);
-    auto* test_lbl = Gtk::make_managed<Gtk::Label>("Connection");
-    test_lbl->set_xalign(0.0f);
-    test_lbl->set_width_chars(12);
-    test_row->append(*test_lbl);
-
-    m_test_button.set_label("Test Connection");
-    m_test_button.signal_clicked().connect(
-        sigc::mem_fun(*this, &ProviderDialog::onTestConnection));
-    test_row->append(m_test_button);
-
-    m_test_result.set_label("");
-    m_test_result.add_css_class("caption");
-    test_row->append(m_test_result);
-    content->append(*test_row);
-
-    get_content_area()->append(*content);
-
-    add_button("Cancel", Gtk::ResponseType::CANCEL);
-    add_button("Save", Gtk::ResponseType::OK);
-    set_default_response(Gtk::ResponseType::OK);
-
-    onTypeChanged();
-}
-
-void ProviderDialog::onTypeChanged() {
-    auto type = std::string(m_type.get_active_id());
-    m_api_key.set_sensitive(type != "ollama");
-
-    auto info = rook::ports::ProviderRegistry::instance().find(type);
-    if (info) {
-        m_base_url.set_text(info->base_url);
-        m_model.set_text(info->default_model);
+    auto url_label = Gtk::Label::create("Base URL:");
+    box->append(std::move(url_label));
+    {
+        auto entry = Gtk::Entry::create();
+        entry->set_placeholder_text("https://api.example.com");
+        m_base_url = entry;
+        box->append(std::move(entry));
     }
+
+    auto key_label = Gtk::Label::create("API Key:");
+    box->append(std::move(key_label));
+    {
+        auto entry = Gtk::Entry::create();
+        entry->set_placeholder_text("API Key");
+        entry->set_visibility(false);
+        m_api_key = entry;
+        box->append(std::move(entry));
+    }
+
+    auto model_label = Gtk::Label::create("Default Model:");
+    box->append(std::move(model_label));
+    {
+        auto entry = Gtk::Entry::create();
+        entry->set_placeholder_text("model-name");
+        m_model = entry;
+        box->append(std::move(entry));
+    }
+
+    auto btn_box = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 6);
+    btn_box->set_halign(Gtk::Align::END);
+    btn_box->set_margin_top(8);
+
+    auto cancel = Gtk::Button::create_with_label("Cancel");
+    cancel->connect_clicked([this](Gtk::Button *) { onCancel(nullptr); });
+    btn_box->append(std::move(cancel));
+
+    auto save = Gtk::Button::create_with_label("Save");
+    save->add_css_class("suggested-action");
+    save->connect_clicked([this](Gtk::Button *) { onSave(nullptr); });
+    btn_box->append(std::move(save));
+
+    box->append(std::move(btn_box));
+    set_child(std::move(box));
 }
 
-void ProviderDialog::onTestConnection() {
-    auto url = std::string(m_base_url.get_text());
-    spdlog::info("Testing connection to {}...", url);
-    m_test_result.set_text("OK");
-    m_test_result.remove_css_class("error");
-    m_test_result.add_css_class("success");
+void ProviderDialog::onSave(Gtk::Button *)
+{
+    m_config.display_name = m_display_name->get_text();
+    m_config.base_url = m_base_url->get_text();
+    m_config.api_key = m_api_key->get_text();
+    m_config.default_model = m_model->get_text();
+    m_accepted = true;
+    close();
 }
 
-rook::ports::LlmProviderConfig ProviderDialog::getProvider() const {
-    rook::ports::LlmProviderConfig config;
-    config.id = m_editing_id;
-    config.display_name = m_display_name.get_text();
-    config.type = m_type.get_active_id();
-    config.base_url = m_base_url.get_text();
-    config.api_key = m_api_key.get_text();
-    config.default_model = m_model.get_text();
-    config.enabled = true;
-    return config;
+void ProviderDialog::onCancel(Gtk::Button *)
+{
+    m_accepted = false;
+    close();
 }
 
-void ProviderDialog::setProvider(const rook::ports::LlmProviderConfig& config) {
-    m_editing_id = config.id;
-    m_display_name.set_text(config.display_name);
-    m_type.set_active_id(config.type);
-    m_base_url.set_text(config.base_url);
-    m_api_key.set_text(config.api_key);
-    m_model.set_text(config.default_model);
+FloatPtr<ProviderDialog> ProviderDialog::create(const ProviderConfig &existing)
+{
+    auto dlg = Object::create<ProviderDialog>();
+    if (!existing.display_name.empty()) {
+        dlg->m_display_name->set_text(existing.display_name.c_str());
+        dlg->m_base_url->set_text(existing.base_url.c_str());
+        dlg->m_model->set_text(existing.default_model.c_str());
+        dlg->m_config.id = existing.id;
+        dlg->m_config.type = existing.type;
+    }
+    return dlg;
 }
+
+ProviderConfig ProviderDialog::getConfig() const { return m_config; }
 
 } // namespace rook::gui

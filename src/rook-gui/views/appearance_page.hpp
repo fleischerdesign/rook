@@ -1,20 +1,14 @@
 #pragma once
-
-#include <gtkmm.h>
-#include <string>
+#include <peel/Gtk/Gtk.h>
+#include <peel/class.h>
 
 namespace rook::gui {
 
-class AppearancePage : public Gtk::Box {
+class AppearancePage final : public peel::Gtk::Box {
+    PEEL_SIMPLE_CLASS(AppearancePage, peel::Gtk::Box)
+    inline void init(Class*);
 public:
-    explicit AppearancePage(std::string config_path);
-    ~AppearancePage() override = default;
-
-private:
-    void setupUi();
-
-    std::string m_config_path;
-    Gtk::ComboBoxText m_language;
+    static peel::FloatPtr<AppearancePage> create();
 };
 
 } // namespace rook::gui

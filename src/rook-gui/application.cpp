@@ -1,23 +1,28 @@
 #include "application.hpp"
 #include "window.hpp"
-#include "views/chat_view.hpp"
-#include "views/chat_sidebar.hpp"
 #include "views/first_run_wizard.hpp"
 #include "rook/adapters/llm/multi_provider_adapter.hpp"
 #include "rook/adapters/llm/llm_factory.hpp"
 #include "rook/adapters/store/json_store.hpp"
 #include "rook/adapters/model/model_cache.hpp"
 #include "rook/adapters/model/model_discovery_factory.hpp"
-#include <giomm.h>
 #include <spdlog/spdlog.h>
 #include <future>
 
+using namespace peel;
+
 namespace rook::gui {
 
-RookApplication::RookApplication()
-    : Gtk::Application("io.github.fleischerdesign.Rook")
+PEEL_CLASS_IMPL(RookApplication, "RookApplication", Adw::Application)
+
+inline void RookApplication::Class::init()
 {
-    m_data_dir = Glib::get_user_data_dir() + "/rook";
+    override_vfunc_activate<RookApplication>();
+}
+
+inline void RookApplication::init(Class *)
+{
+    m_data_dir = GLib::get_user_data_dir() + std::string("/rook");
 
     m_store = rook::adapters::store::makeJsonStore(m_data_dir);
     m_secrets = std::make_unique<rook::adapters::SecretStore>(
@@ -32,33 +37,31 @@ RookApplication::RookApplication()
 
     m_engine = std::make_unique<rook::domain::AgentEngine>(
         m_bus, *m_llm, m_conversations);
-
     m_engine->start();
 }
 
-Glib::RefPtr<RookApplication> RookApplication::create() {
-    return Glib::make_refptr_for_instance<RookApplication>(new RookApplication());
+RefPtr<RookApplication> RookApplication::create()
+{
+    return Object::create<RookApplication>(
+        prop_application_id(), "io.github.fleischerdesign.Rook",
+        prop_flags(), Gio::Application::Flags::DEFAULT_FLAGS);
 }
 
-void RookApplication::on_startup() {
-    Gtk::Application::on_startup();
-}
+inline void RookApplication::vfunc_activate()
+{
+    parent_vfunc_activate<RookApplication>();
 
-void RookApplication::on_activate() {
-    if (!get_windows().empty()) return;
+    if (get_active_window() != nullptr) return;
 
-    auto save_fn = sigc::mem_fun(*this, &RookApplication::saveConfig);
-
-    auto window = std::make_unique<RookWindow>(m_bus, *m_llm, m_conversations, save_fn);
-    add_window(*window);
+    auto *window = RookWindow::create(this, m_bus, *m_llm, m_conversations,
+        [this]() { saveConfig(); });
     window->present();
-    auto* raw_window = window.get();
-    window.release();
 
     if (m_first_run) {
-        auto* wizard = new FirstRunWizard();
-        wizard->signal_done().connect([this, wizard, raw_window, save_fn]() {
-            auto cfg = wizard->getConfig();
+        auto wizard = FirstRunWizard::create();
+        FirstRunWizard *raw_wiz = wizard;
+        raw_wiz->connect_done([this, raw_wiz, window](FirstRunWizard *) {
+            auto cfg = raw_wiz->getConfig();
             auto info = rook::ports::ProviderRegistry::instance().find(cfg.provider);
 
             auto new_provider = rook::ports::LlmProviderConfig{
@@ -67,28 +70,28 @@ void RookApplication::on_activate() {
                 .type = cfg.provider,
                 .base_url = info ? info->base_url : "",
                 .api_key = cfg.api_key,
-                .default_model = !cfg.model.empty() ? cfg.model
-                    : (info ? info->default_model : ""),
+                .default_model = info ? info->default_model : "",
                 .enabled = true,
             };
 
             m_llm->addProvider(new_provider);
             m_first_run = false;
             saveConfig();
-            startModelDiscovery(*raw_window);
-            wizard->close();
+            startModelDiscovery(*window);
+            raw_wiz->close();
         });
-        wizard->signal_hide().connect([wizard]() { delete wizard; });
-        wizard->present();
+        raw_wiz->connect_hide([raw_wiz](Gtk::Widget *) { delete raw_wiz; });
+        raw_wiz->present();
     }
 
-    startModelDiscovery(*raw_window);
+    startModelDiscovery(*window);
 }
 
-void RookApplication::startModelDiscovery(RookWindow& window) {
+void RookApplication::startModelDiscovery(RookWindow &window)
+{
     auto providers = m_llm->listProviders();
 
-    for (const auto& prov : providers) {
+    for (const auto &prov : providers) {
         if (!prov.enabled) continue;
 
         auto api_key = prov.api_key;
@@ -110,18 +113,15 @@ void RookApplication::startModelDiscovery(RookWindow& window) {
             auto models = discovery->fetchModels(api_key);
             rook::adapters::model::ModelCache::instance().store(prov_id, std::move(models));
 
-            Glib::signal_idle().connect_once([&window]() {
+            GLib::idle_add_once([&window]() {
                 window.refreshModels();
             });
         });
     }
 }
 
-void RookApplication::loadConfig() {
-    m_first_run = !m_settings.load(*m_store, *m_llm, *m_secrets);
-}
-
-void RookApplication::saveConfig() {
+void RookApplication::saveConfig()
+{
     m_settings.save(*m_store, *m_llm, *m_secrets);
     spdlog::info("Config saved to {}", m_data_dir);
 }

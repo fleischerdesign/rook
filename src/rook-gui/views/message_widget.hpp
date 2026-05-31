@@ -1,29 +1,30 @@
 #pragma once
 
-#include <gtkmm.h>
+#include <peel/Gtk/Gtk.h>
+#include <peel/class.h>
+#include <string>
 
 namespace rook::gui {
 
-class MessageWidget : public Gtk::Box {
+class MessageWidget final : public peel::Gtk::Box
+{
+    PEEL_SIMPLE_CLASS(MessageWidget, peel::Gtk::Box)
+
+    std::string m_role;
+    peel::Gtk::Label *m_label = nullptr;
+    peel::Gtk::Expander *m_reasoning_expander = nullptr;
+    peel::Gtk::Label *m_reasoning_label = nullptr;
+
+    inline void init(Class *);
+
 public:
-    MessageWidget(std::string_view role, std::string_view content,
-                  std::string_view reasoning = {});
-    ~MessageWidget() override = default;
+    static peel::FloatPtr<MessageWidget> create(const std::string &role,
+                                                  const std::string &content,
+                                                  const std::string &reasoning_content = "");
 
     void appendChunk(std::string_view chunk);
     void appendReasoningChunk(std::string_view chunk);
-    void setContent(std::string_view content);
-
-    const std::string& role() const { return m_role; }
-
-private:
-    std::string m_role;
-    Gtk::Expander m_reasoning_expander;
-    Gtk::Label m_reasoning_label;
-    Gtk::Label m_label;
-    bool m_reasoning_created = false;
-
-    void applyStyle();
+    std::string role() const { return m_role; }
 };
 
 } // namespace rook::gui

@@ -1,90 +1,106 @@
 #include "first_run_wizard.hpp"
+#include "rook/ports/llm_port.hpp"
+
+using namespace peel;
 
 namespace rook::gui {
 
-FirstRunWizard::FirstRunWizard()
-    : Gtk::Window()
+Signal<FirstRunWizard, void(void)> FirstRunWizard::sig_done;
+
+PEEL_CLASS_IMPL(FirstRunWizard, "RookFirstRunWizard", Gtk::Window)
+
+inline void FirstRunWizard::Class::init()
+{
+    sig_done = Signal<FirstRunWizard, void(void)>::create("done");
+}
+
+inline void FirstRunWizard::init(Class *)
 {
     set_title("Welcome to Rook");
-    set_default_size(500, 400);
+    set_default_size(450, 350);
     set_modal(true);
-    setupUi();
-}
 
-void FirstRunWizard::setupUi() {
-    auto* main_box = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::VERTICAL, 0);
+    auto box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 12);
+    box->set_margin_start(24);
+    box->set_margin_end(24);
+    box->set_margin_top(24);
+    box->set_margin_bottom(24);
 
-    auto* header = Gtk::make_managed<Gtk::HeaderBar>();
-    header->set_title_widget(*Gtk::make_managed<Gtk::Label>("Setup"));
-    main_box->append(*header);
-
-    auto* content = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::VERTICAL, 24);
-    content->set_margin(48);
-    content->set_valign(Gtk::Align::CENTER);
-    content->set_halign(Gtk::Align::CENTER);
-
-    auto* title = Gtk::make_managed<Gtk::Label>("Choose your LLM Provider");
+    auto title = Gtk::Label::create("Set Up Your AI Assistant");
     title->add_css_class("title-1");
-    content->append(*title);
+    box->append(std::move(title));
 
-    auto* subtitle = Gtk::make_managed<Gtk::Label>(
-        "Rook needs an LLM backend to function. You can change this later in Settings.");
-    subtitle->set_wrap(true);
-    subtitle->set_max_width_chars(40);
+    auto subtitle = Gtk::Label::create(
+        "Rook needs an LLM backend to function. "
+        "You can change this later in Settings.");
     subtitle->add_css_class("dim-label");
-    content->append(*subtitle);
+    subtitle->set_wrap(true);
+    box->append(std::move(subtitle));
 
-    for (const auto& p : rook::ports::ProviderRegistry::instance().all()) {
-        auto label = p.display_name;
-        if (p.id != "ollama") label += " (API key required)";
+    const char *empty[] = {nullptr};
+    RefPtr<Gtk::StringList> model = Gtk::StringList::create(empty);
+    auto types = rook::ports::ProviderRegistry::instance().all();
+    for (const auto &t : types) {
+        auto label = t.display_name;
+        if (t.id != "ollama") label += " (API key required)";
         else label += " (local, free)";
-        m_provider.append(p.id, label);
+        model->append(label.c_str());
+        m_provider_ids.push_back(t.id);
     }
-    m_provider.set_active_id("ollama");
-    m_provider.signal_changed().connect(
-        sigc::mem_fun(*this, &FirstRunWizard::onProviderChanged));
-    content->append(m_provider);
 
-    m_api_key.set_placeholder_text("API Key");
-    m_api_key.set_visibility(false);
-    m_api_key.set_sensitive(false);
-    content->append(m_api_key);
+    auto provider_label = Gtk::Label::create("Provider:");
+    provider_label->set_xalign(0.0f);
+    box->append(std::move(provider_label));
 
-    auto* finish_btn = Gtk::make_managed<Gtk::Button>("Get Started");
-    finish_btn->add_css_class("suggested-action");
-    finish_btn->add_css_class("pill");
-    finish_btn->signal_clicked().connect(
-        sigc::mem_fun(*this, &FirstRunWizard::onFinish));
-    content->append(*finish_btn);
-
-    main_box->append(*content);
-    set_child(*main_box);
-}
-
-void FirstRunWizard::onProviderChanged() {
-    auto provider = std::string(m_provider.get_active_id());
-    bool needs_key = (provider != "ollama");
-    m_api_key.set_sensitive(needs_key);
-    if (provider == "ollama") {
-        m_api_key.set_text("");
+    {
+        auto dd = Gtk::DropDown::create(model, RefPtr<Gtk::Expression>());
+        if (model->get_n_items() > 0) {
+            for (size_t i = 0; i < m_provider_ids.size(); ++i) {
+                if (m_provider_ids[i] == "ollama") {
+                    dd->set_selected(i);
+                    break;
+                }
+            }
+        }
+        m_provider = dd;
+        box->append(std::move(dd));
     }
+
+    auto key_label = Gtk::Label::create("API Key:");
+    key_label->set_xalign(0.0f);
+    box->append(std::move(key_label));
+
+    {
+        auto entry = Gtk::Entry::create();
+        entry->set_placeholder_text("Enter your API key");
+        entry->set_visibility(false);
+        m_api_key = entry;
+        box->append(std::move(entry));
+    }
+
+    auto finish = Gtk::Button::create_with_label("Get Started");
+    finish->add_css_class("suggested-action");
+    finish->add_css_class("pill");
+    finish->set_halign(Gtk::Align::CENTER);
+    finish->connect_clicked([this](Gtk::Button *) { onFinish(nullptr); });
+    box->append(std::move(finish));
+
+    set_child(std::move(box));
 }
 
-void FirstRunWizard::onFinish() {
-    m_signal_done.emit();
-    close();
+void FirstRunWizard::onFinish(Gtk::Button *)
+{
+    auto sel = m_provider->get_selected();
+    if (sel < m_provider_ids.size()) {
+        m_config.provider = m_provider_ids[sel];
+    }
+    m_config.api_key = m_api_key->get_text();
+    sig_done.emit(this);
 }
 
-rook::ports::LlmConfig FirstRunWizard::getConfig() const {
-    rook::ports::LlmConfig config;
-    config.provider = m_provider.get_active_id();
-    config.model = "";
-    config.api_key = m_api_key.get_text();
-    return config;
-}
-
-FirstRunWizard::SlotDone& FirstRunWizard::signal_done() {
-    return m_signal_done;
+FloatPtr<FirstRunWizard> FirstRunWizard::create()
+{
+    return Object::create<FirstRunWizard>();
 }
 
 } // namespace rook::gui

@@ -1,31 +1,42 @@
 #pragma once
 
-#include <gtkmm.h>
-#include "rook/ports/llm_port.hpp"
+#include <peel/Gtk/Gtk.h>
+#include <peel/class.h>
+#include <string>
 
 namespace rook::gui {
 
-class ProviderDialog : public Gtk::Dialog {
-public:
-    ProviderDialog(Gtk::Window& parent, std::string editing_id);
-    ~ProviderDialog() override = default;
+struct ProviderConfig {
+    std::string id;
+    std::string display_name;
+    std::string type;
+    std::string base_url;
+    std::string api_key;
+    std::string default_model;
+};
 
-    rook::ports::LlmProviderConfig getProvider() const;
-    void setProvider(const rook::ports::LlmProviderConfig& provider);
+class ProviderDialog final : public peel::Gtk::Window
+{
+    PEEL_SIMPLE_CLASS(ProviderDialog, peel::Gtk::Window)
+
+    peel::Gtk::Entry *m_display_name = nullptr;
+    peel::Gtk::Entry *m_base_url = nullptr;
+    peel::Gtk::Entry *m_api_key = nullptr;
+    peel::Gtk::Entry *m_model = nullptr;
+    ProviderConfig m_config;
+
+    inline void init(Class *);
+    void onSave(peel::Gtk::Button *);
+    void onCancel(peel::Gtk::Button *);
+
+public:
+    static peel::FloatPtr<ProviderDialog> create(const ProviderConfig &existing = {});
+
+    ProviderConfig getConfig() const;
+    bool wasAccepted() const { return m_accepted; }
 
 private:
-    void setupUi();
-    void onTypeChanged();
-    void onTestConnection();
-
-    std::string m_editing_id;
-    Gtk::Entry m_display_name;
-    Gtk::ComboBoxText m_type;
-    Gtk::Entry m_base_url;
-    Gtk::Entry m_api_key;
-    Gtk::Entry m_model;
-    Gtk::Button m_test_button;
-    Gtk::Label m_test_result;
+    bool m_accepted = false;
 };
 
 } // namespace rook::gui

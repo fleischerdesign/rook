@@ -1,42 +1,42 @@
 #pragma once
 
-#include <gtkmm.h>
-#include <adwaita.h>
-#include <giomm.h>
+#include <peel/Adw/Adw.h>
+#include <peel/Gtk/Gtk.h>
+#include <peel/class.h>
+#include <functional>
+#include <string_view>
 #include "rook/domain/event_bus.hpp"
 #include "rook/domain/conversation.hpp"
 #include "rook/ports/llm_port.hpp"
 
 namespace rook::gui {
 
-class ChatView;
 class ChatSidebar;
-class MessageWidget;
+class ChatView;
 
-class RookWindow : public Gtk::Window {
-public:
-    explicit RookWindow(rook::domain::EventBus& bus, rook::ports::LlmPort& llm,
-                        rook::domain::ConversationManager& conversations,
-                        sigc::slot<void()> on_settings_changed = {});
-    ~RookWindow() override = default;
+class RookWindow final : public peel::Adw::ApplicationWindow
+{
+    PEEL_SIMPLE_CLASS(RookWindow, peel::Adw::ApplicationWindow)
 
-    void refreshModels();
+    peel::FloatPtr<peel::Adw::HeaderBar> m_header;
+    peel::FloatPtr<peel::Adw::NavigationSplitView> m_split;
+    ChatSidebar *m_sidebar = nullptr;
+    ChatView *m_chat_view = nullptr;
+    std::function<void()> m_save_fn;
 
-private:
-    void setupHeaderBar();
-    void setupLayout(rook::domain::ConversationManager& conversations);
-    void setupActions();
-    void onSettings();
+    inline void init(Class *);
+
+    void onPreferences();
     void onAbout();
 
-    rook::domain::EventBus& m_bus;
-    rook::ports::LlmPort& m_llm;
-    sigc::slot<void()> m_on_settings_changed;
-    Glib::RefPtr<Gio::SimpleActionGroup> m_action_group;
-    Gtk::HeaderBar m_header_bar;
-    Gtk::Paned m_paned;
-    ChatSidebar* m_sidebar = nullptr;
-    ChatView* m_chat_view = nullptr;
+public:
+    static RookWindow *create(peel::Gtk::Application *app,
+                               rook::domain::EventBus &bus,
+                               rook::ports::LlmPort &llm,
+                               rook::domain::ConversationManager &conv,
+                               std::function<void()> save_fn);
+
+    void refreshModels();
 };
 
 } // namespace rook::gui
