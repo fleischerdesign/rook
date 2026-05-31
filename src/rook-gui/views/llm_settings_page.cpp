@@ -49,11 +49,11 @@ FloatPtr<LlmSettingsPage> LlmSettingsPage::create(rook::ports::LlmPort &llm)
     list->set_hexpand(true);
     list->set_vexpand(true);
     list->add_css_class("boxed-list");
+    raw->m_list = list;
 
     auto scrolled = Gtk::ScrolledWindow::create();
     scrolled->set_child(std::move(list));
     scrolled->set_vexpand(true);
-    raw->m_list = static_cast<Gtk::ListBox*>(scrolled->get_child());
     raw->append(std::move(scrolled));
 
     auto add_btn = Gtk::Button::create_with_label("Add Provider");
