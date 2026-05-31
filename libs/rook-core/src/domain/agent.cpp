@@ -34,9 +34,8 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
     ChatMessage msg;
     msg.role = "user";
     msg.content = event.content;
-    m_conv.addMessage(event.chat_id, std::move(msg));
-
     m_conv.setModel(event.chat_id, event.model);
+    m_conv.addMessage(event.chat_id, std::move(msg));
 
     auto messages = m_conv.buildLlmMessages(event.chat_id);
 
