@@ -19,7 +19,8 @@ class RookWindow final : public peel::Adw::ApplicationWindow
     PEEL_SIMPLE_CLASS(RookWindow, peel::Adw::ApplicationWindow)
 
     peel::FloatPtr<peel::Adw::HeaderBar> m_header;
-    peel::FloatPtr<peel::Adw::NavigationSplitView> m_split;
+    peel::FloatPtr<peel::Adw::OverlaySplitView> m_split;
+    peel::Gtk::Button *m_sidebar_toggle = nullptr;
     ChatSidebar *m_sidebar = nullptr;
     ChatView *m_chat_view = nullptr;
     std::function<void()> m_save_fn;

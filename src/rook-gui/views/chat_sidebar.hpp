@@ -17,7 +17,6 @@ class ChatSidebar final : public peel::Gtk::Box
     rook::domain::EventBus *m_bus = nullptr;
     rook::domain::ConversationManager *m_conv = nullptr;
 
-    peel::FloatPtr<peel::Gtk::Button> m_new_button;
     peel::Gtk::ListBox *m_list = nullptr;
 
     rook::domain::EventBus::HandlerId m_created_handler;

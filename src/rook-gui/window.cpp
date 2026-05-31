@@ -40,6 +40,17 @@ RookWindow *RookWindow::create(Gtk::Application *app,
 
     win->m_header = Adw::HeaderBar::create();
 
+    auto sidebar_toggle = Gtk::Button::create_from_icon_name("sidebar-hide-symbolic");
+    sidebar_toggle->set_tooltip_text("Toggle Sidebar");
+    sidebar_toggle->connect_clicked([win](Gtk::Button *) {
+        bool show = !win->m_split->get_show_sidebar();
+        win->m_split->set_show_sidebar(show);
+        win->m_sidebar_toggle->set_icon_name(
+            show ? "sidebar-hide-symbolic" : "sidebar-show-symbolic");
+    });
+    win->m_sidebar_toggle = sidebar_toggle;
+    win->m_header->pack_start(std::move(sidebar_toggle));
+
     RefPtr<Gio::Menu> menu = Gio::Menu::create();
     menu->append("_Preferences", "app.preferences");
     menu->append("_About", "app.about");
@@ -51,14 +62,11 @@ RookWindow *RookWindow::create(Gtk::Application *app,
     menu_button->set_tooltip_text("Menu");
     win->m_header->pack_end(std::move(menu_button));
 
-    auto sidebar_page = Adw::NavigationPage::create(
-        win->m_sidebar, "Chats");
-    auto content_page = Adw::NavigationPage::create(
-        win->m_chat_view, "");
-
-    win->m_split = Adw::NavigationSplitView::create();
-    win->m_split->set_sidebar(std::move(sidebar_page).release_floating_ptr());
-    win->m_split->set_content(std::move(content_page).release_floating_ptr());
+    win->m_split = Adw::OverlaySplitView::create();
+    win->m_split->set_sidebar(win->m_sidebar);
+    win->m_split->set_content(win->m_chat_view);
+    win->m_split->set_show_sidebar(true);
+    win->m_split->set_collapsed(false);
 
     auto toolbar = Adw::ToolbarView::create();
     toolbar->add_top_bar(std::move(win->m_header));
