@@ -163,6 +163,10 @@ void ChatSidebar::onChatUpdated(const rook::domain::ChatUpdated &event)
 void ChatSidebar::onChatSelected(const rook::domain::ChatSelected &event)
 {
     GLib::idle_add_once([this, id = event.chat_id]() {
+        if (id.empty()) {
+            m_list->select_row(nullptr);
+            return;
+        }
         for (int i = 0; auto *row = m_list->get_row_at_index(i); ++i) {
             if (std::string(row->get_name()) == id) {
                 m_list->select_row(row);
