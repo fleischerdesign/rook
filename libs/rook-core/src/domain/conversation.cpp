@@ -86,7 +86,7 @@ void ConversationManager::addMessage(std::string_view conv_id, ChatMessage messa
     it->updated_at = std::chrono::system_clock::now();
 
     if (m_store) {
-        saveActiveConversation(*m_store);
+        saveActiveConversation();
     }
 }
 
@@ -191,7 +191,7 @@ void ConversationManager::onChatCreated(const ChatCreated& event) {
     auto conv = create("New Chat", "default");
 
     if (m_store) {
-        saveActiveConversation(*m_store);
+        saveActiveConversation();
     }
 
     if (m_bus) {
@@ -237,7 +237,7 @@ void ConversationManager::setTitle(std::string_view conv_id, std::string_view ti
     }
 
     if (m_store) {
-        saveActiveConversation(*m_store);
+        saveActiveConversation();
     }
 }
 
@@ -287,7 +287,8 @@ void ConversationManager::loadFromStore(ports::StorePort& store) {
     spdlog::info("Loaded {} conversations from store", m_conversations.size());
 }
 
-void ConversationManager::saveActiveConversation(ports::StorePort& store) {
+void ConversationManager::saveActiveConversation() {
+    if (!m_store) return;
     auto conv = active();
     if (!conv) return;
 
@@ -311,7 +312,7 @@ void ConversationManager::saveActiveConversation(ports::StorePort& store) {
     }
 
     record.messages_json = messages.dump();
-    store.saveChat(record);
+    m_store->saveChat(record);
 }
 
 } // namespace rook::domain

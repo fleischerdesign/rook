@@ -51,9 +51,8 @@ public:
     void setActive(std::string_view id);
 
     void start(EventBus& bus, ports::StorePort* store = nullptr);
-
+    void saveActiveConversation();
     void loadFromStore(ports::StorePort& store);
-    void saveActiveConversation(ports::StorePort& store);
 
 private:
     std::vector<Conversation> m_conversations;

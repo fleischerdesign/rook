@@ -78,6 +78,8 @@ void AgentEngine::onLlmChunk(const LlmStreamChunk& chunk) {
 void AgentEngine::onLlmCompleted(const LlmCompleted& event) {
     spdlog::info("LLM response complete for chat {}", event.chat_id);
 
+    m_conv.saveActiveConversation();
+
     auto conv = m_conv.open(event.chat_id);
     if (conv.title != "New Chat") return;
 
