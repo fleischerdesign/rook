@@ -88,6 +88,33 @@ void ChatView::setupUi() {
     subtitle->set_justify(Gtk::Justification::CENTER);
     welcome->append(*subtitle);
 
+    auto setupInput = [](InputBar& bar, ChatView* view) {
+        bar.model.set_hexpand(false);
+        bar.model.set_margin_end(6);
+
+        bar.entry.set_hexpand(true);
+        bar.entry.set_placeholder_text("Type a message...");
+        bar.entry.signal_activate().connect(
+            sigc::mem_fun(*view, &ChatView::onMessageEntryActivated));
+
+        bar.send.set_label("Send");
+        bar.send.add_css_class("suggested-action");
+        bar.send.signal_clicked().connect(
+            sigc::mem_fun(*view, &ChatView::onSendClicked));
+
+        bar.box.set_orientation(Gtk::Orientation::HORIZONTAL);
+        bar.box.set_spacing(6);
+        bar.box.set_margin(12);
+        bar.box.append(bar.model);
+        bar.box.append(bar.entry);
+        bar.box.append(bar.send);
+    };
+
+    setupInput(m_welcome_input, this);
+    setupInput(m_chat_input, this);
+
+    welcome->append(m_welcome_input.box);
+
     m_stack.add(*welcome, "welcome");
 
     auto* chat_page = Gtk::make_managed<Gtk::Box>(Gtk::Orientation::VERTICAL, 0);
@@ -98,37 +125,18 @@ void ChatView::setupUi() {
     m_scrolled.set_vexpand(true);
     chat_page->append(m_scrolled);
 
+    chat_page->append(m_chat_input.box);
+
     m_stack.add(*chat_page, "chat");
 
     m_stack.set_visible_child("welcome");
 
-    m_model_dropdown.set_hexpand(false);
-    m_model_dropdown.set_margin_start(12);
-    m_model_dropdown.set_margin_end(6);
     populateModelDropdown();
-
-    m_input_box.set_orientation(Gtk::Orientation::HORIZONTAL);
-    m_input_box.set_spacing(6);
-    m_input_box.set_margin(12);
-    m_input_box.append(m_model_dropdown);
-
-    m_input_entry.set_hexpand(true);
-    m_input_entry.set_placeholder_text("Type a message...");
-    m_input_entry.signal_activate().connect(
-        sigc::mem_fun(*this, &ChatView::onMessageEntryActivated));
-    m_input_box.append(m_input_entry);
-
-    m_send_button.set_label("Send");
-    m_send_button.add_css_class("suggested-action");
-    m_send_button.signal_clicked().connect(
-        sigc::mem_fun(*this, &ChatView::onSendClicked));
-    m_input_box.append(m_send_button);
-
-    append(m_input_box);
 }
 
 void ChatView::populateModelDropdown() {
-    m_model_dropdown.remove_all();
+    m_welcome_input.model.remove_all();
+    m_chat_input.model.remove_all();
     auto providers = m_llm.listProviders();
 
     for (const auto& prov : providers) {
@@ -141,83 +149,67 @@ void ChatView::populateModelDropdown() {
         if (!cached_models.empty()) {
             for (const auto& model : cached_models) {
                 auto label = prov.display_name + " / " + model.display_name;
-                m_model_dropdown.append(prov.id + ":" + model.id, label);
+                m_welcome_input.model.append(prov.id + ":" + model.id, label);
+                m_chat_input.model.append(prov.id + ":" + model.id, label);
             }
         } else {
             auto info = rook::ports::ProviderRegistry::instance().find(prov.type);
             auto default_model = info ? info->default_model : prov.default_model;
             auto label = prov.display_name + " / " + default_model;
-            m_model_dropdown.append(prov.id + ":" + default_model, label);
+            m_welcome_input.model.append(prov.id + ":" + default_model, label);
+            m_chat_input.model.append(prov.id + ":" + default_model, label);
         }
     }
 
-    if (m_model_dropdown.get_active_id().empty() && !providers.empty()) {
+    if (m_welcome_input.model.get_active_id().empty() && !providers.empty()) {
         auto& first = providers.front();
         auto info = rook::ports::ProviderRegistry::instance().find(first.type);
         auto default_model = info && !info->default_model.empty()
             ? info->default_model : first.default_model;
-        m_model_dropdown.set_active_id(first.id + ":" + default_model);
+        m_welcome_input.model.set_active_id(first.id + ":" + default_model);
+        m_chat_input.model.set_active_id(first.id + ":" + default_model);
     }
 }
 
 void ChatView::onSendClicked() {
     if (m_stack.get_visible_child_name() == "welcome") {
-        onWelcomeSendClicked();
+        auto text = m_welcome_input.entry.get_text();
+        if (text.empty()) return;
+
+        m_welcome_input.entry.set_text("");
+        m_pending_input = text;
+
+        if (m_chat_input.entry.get_text().empty()) {
+            m_chat_input.model.set_active_id(m_welcome_input.model.get_active_id());
+        }
+
+        setProcessing(true);
+        m_bus.publish(rook::domain::ChatCreated{
+            .chat_id = ""
+        });
         return;
     }
 
-    auto text = m_input_entry.get_text();
-    if (text.empty() || m_chat_id.empty()) return;
+    doSend(m_chat_input, m_chat_id);
+}
 
-    m_input_entry.set_text("");
+void ChatView::doSend(InputBar& bar, std::string_view chat_id) {
+    auto text = bar.entry.get_text();
+    if (text.empty()) return;
+
+    bar.entry.set_text("");
 
     auto* user_msg = Gtk::make_managed<MessageWidget>("user", std::string(text));
     m_message_list.append(*user_msg);
 
-    auto combo_id = std::string(m_model_dropdown.get_active_id());
+    auto combo_id = std::string(bar.model.get_active_id());
 
     m_bus.publish(rook::domain::UserInputReceived{
-        .chat_id = m_chat_id,
+        .chat_id = std::string(chat_id),
         .content = text,
         .source = "text",
         .model = combo_id,
     });
-}
-
-void ChatView::onWelcomeSendClicked() {
-    auto text = m_input_entry.get_text();
-    if (text.empty()) return;
-
-    m_input_entry.set_text("");
-    m_pending_input = text;
-    setProcessing(true);
-
-    m_bus.publish(rook::domain::ChatCreated{
-        .chat_id = ""
-    });
-}
-
-void ChatView::switchToChat(std::string_view chat_id) {
-    m_chat_id = chat_id;
-    m_stack.set_visible_child("chat");
-    loadMessages(chat_id);
-
-    if (!m_pending_input.empty()) {
-        auto text = m_pending_input;
-        m_pending_input.clear();
-
-        auto* user_msg = Gtk::make_managed<MessageWidget>("user", std::string(text));
-        m_message_list.append(*user_msg);
-
-        auto combo_id = std::string(m_model_dropdown.get_active_id());
-
-        m_bus.publish(rook::domain::UserInputReceived{
-            .chat_id = m_chat_id,
-            .content = text,
-            .source = "text",
-            .model = combo_id,
-        });
-    }
 }
 
 void ChatView::onMessageEntryActivated() {
@@ -275,6 +267,30 @@ void ChatView::onChatDeleted(const rook::domain::ChatDeleted& /*event*/) {
     });
 }
 
+void ChatView::switchToChat(std::string_view chat_id) {
+    m_chat_id = chat_id;
+    m_stack.set_visible_child("chat");
+    loadMessages(chat_id);
+
+    if (!m_pending_input.empty()) {
+        m_chat_input.entry.set_text(m_pending_input);
+        auto text = m_pending_input;
+        m_pending_input.clear();
+
+        auto* user_msg = Gtk::make_managed<MessageWidget>("user", std::string(text));
+        m_message_list.append(*user_msg);
+
+        auto combo_id = std::string(m_chat_input.model.get_active_id());
+
+        m_bus.publish(rook::domain::UserInputReceived{
+            .chat_id = m_chat_id,
+            .content = text,
+            .source = "text",
+            .model = combo_id,
+        });
+    }
+}
+
 void ChatView::loadMessages(std::string_view chat_id) {
     while (auto* row = m_message_list.get_row_at_index(0)) {
         m_message_list.remove(*row);
@@ -290,7 +306,7 @@ void ChatView::loadMessages(std::string_view chat_id) {
     }
 
     if (!conv.model.empty()) {
-        m_model_dropdown.set_active_id(conv.model);
+        m_chat_input.model.set_active_id(conv.model);
     }
 
     auto adj = m_scrolled.get_vadjustment();
@@ -299,13 +315,14 @@ void ChatView::loadMessages(std::string_view chat_id) {
 
 void ChatView::setProcessing(bool active) {
     Glib::signal_idle().connect_once([this, active]() {
-        m_send_button.set_sensitive(!active);
-        m_input_entry.set_sensitive(!active);
-        if (active) {
-            m_send_button.set_label("...");
-        } else {
-            m_send_button.set_label("Send");
-        }
+        m_welcome_input.send.set_sensitive(!active);
+        m_welcome_input.entry.set_sensitive(!active);
+        m_chat_input.send.set_sensitive(!active);
+        m_chat_input.entry.set_sensitive(!active);
+
+        auto label = active ? "..." : "Send";
+        m_welcome_input.send.set_label(label);
+        m_chat_input.send.set_label(label);
     });
 }
 

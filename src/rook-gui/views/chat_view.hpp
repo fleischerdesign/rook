@@ -20,9 +20,15 @@ public:
     void populateModelDropdown();
 
 private:
+    struct InputBar {
+        Gtk::Box box;
+        Gtk::ComboBoxText model;
+        Gtk::Entry entry;
+        Gtk::Button send;
+    };
+
     void setupUi();
     void onSendClicked();
-    void onWelcomeSendClicked();
     void onMessageEntryActivated();
     void onStreamChunk(const rook::domain::LlmStreamChunk& event);
     void onLlmCompleted(const rook::domain::LlmCompleted& event);
@@ -31,6 +37,7 @@ private:
     void loadMessages(std::string_view chat_id);
     void setProcessing(bool active);
     void switchToChat(std::string_view chat_id);
+    void doSend(InputBar& bar, std::string_view chat_id);
 
     rook::domain::EventBus& m_bus;
     rook::domain::ConversationManager& m_conv;
@@ -41,10 +48,8 @@ private:
     Gtk::Stack m_stack;
     Gtk::ScrolledWindow m_scrolled;
     Gtk::ListBox m_message_list;
-    Gtk::Box m_input_box;
-    Gtk::Entry m_input_entry;
-    Gtk::Button m_send_button;
-    Gtk::ComboBoxText m_model_dropdown;
+    InputBar m_welcome_input;
+    InputBar m_chat_input;
     MessageWidget* m_pending_assistant = nullptr;
 
     rook::domain::EventBus::HandlerId m_chunk_handler;
