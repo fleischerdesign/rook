@@ -86,7 +86,7 @@ void ProviderDialog::onSave(Gtk::Button *)
 void ProviderDialog::onCancel(Gtk::Button *)
 {
     m_accepted = false;
-    sig_done.emit(this);
+    close();
 }
 
 FloatPtr<ProviderDialog> ProviderDialog::create(const ProviderConfig &existing)

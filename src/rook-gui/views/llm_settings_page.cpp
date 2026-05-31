@@ -20,6 +20,7 @@ inline void LlmSettingsPage::init(Class *)
     gtk_orientable_set_orientation(
         GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
         GTK_ORIENTATION_VERTICAL);
+    set_vexpand(true);
     set_margin_start(24);
     set_margin_end(24);
     set_margin_top(24);
@@ -50,11 +51,7 @@ FloatPtr<LlmSettingsPage> LlmSettingsPage::create(rook::ports::LlmPort &llm)
     list->set_vexpand(true);
     list->add_css_class("boxed-list");
     raw->m_list = list;
-
-    auto scrolled = Gtk::ScrolledWindow::create();
-    scrolled->set_child(std::move(list));
-    scrolled->set_vexpand(true);
-    raw->append(std::move(scrolled));
+    raw->append(std::move(list));
 
     auto add_btn = Gtk::Button::create_with_label("Add Provider");
     add_btn->add_css_class("suggested-action");
