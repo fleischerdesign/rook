@@ -19,7 +19,6 @@ inline void ChatSidebar::init(Class *)
         GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
         GTK_ORIENTATION_VERTICAL);
     set_size_request(220, -1);
-    add_css_class("navigation-sidebar");
 
     auto grid = Gtk::Grid::create();
     grid->set_row_homogeneous(true);
@@ -32,21 +31,18 @@ inline void ChatSidebar::init(Class *)
     grid->set_margin_bottom(6);
 
     auto search_btn = Gtk::Button::create_from_icon_name("system-search-symbolic");
-    search_btn->set_has_frame(false);
     search_btn->set_hexpand(true);
     search_btn->set_halign(Gtk::Align::FILL);
     search_btn->set_valign(Gtk::Align::FILL);
     grid->attach(std::move(search_btn), 0, 0, 1, 1);
 
     auto library_btn = Gtk::Button::create_from_icon_name("folder-documents-symbolic");
-    library_btn->set_has_frame(false);
     library_btn->set_hexpand(true);
     library_btn->set_halign(Gtk::Align::FILL);
     library_btn->set_valign(Gtk::Align::FILL);
     grid->attach(std::move(library_btn), 1, 0, 1, 1);
 
     auto presets_btn = Gtk::Button::create_from_icon_name("document-edit-symbolic");
-    presets_btn->set_has_frame(false);
     presets_btn->set_hexpand(true);
     presets_btn->set_halign(Gtk::Align::FILL);
     presets_btn->set_valign(Gtk::Align::FILL);
@@ -64,6 +60,7 @@ inline void ChatSidebar::init(Class *)
 
     auto scrolled = Gtk::ScrolledWindow::create();
     auto list = Gtk::ListBox::create();
+    list->add_css_class("navigation-sidebar");
     list->set_hexpand(true);
     list->set_vexpand(true);
     list->connect_row_activated(
