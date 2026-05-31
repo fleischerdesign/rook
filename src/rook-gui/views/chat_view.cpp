@@ -3,6 +3,7 @@
 #include "rook/adapters/model/model_cache.hpp"
 #include "rook/ports/model_discovery_port.hpp"
 #include <spdlog/spdlog.h>
+#include <gtk/gtk.h>
 
 using namespace peel;
 
@@ -17,6 +18,9 @@ inline void ChatView::Class::init()
 
 inline void ChatView::init(Class *)
 {
+    gtk_orientable_set_orientation(
+        GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
+        GTK_ORIENTATION_VERTICAL);
 }
 
 inline void ChatView::vfunc_dispose()

@@ -41,6 +41,24 @@ inline void RookApplication::init(Class *)
     m_engine = std::make_unique<rook::domain::AgentEngine>(
         m_bus, *m_llm, m_conversations);
     m_engine->start();
+
+    auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);
+    prefs_action->connect_activate(
+        [this](Gio::SimpleAction *, GLib::Variant *) {
+            if (auto *w = get_active_window())
+                if (auto *rw = w->template cast<RookWindow>())
+                    rw->showPreferences();
+        });
+    cast<Gio::ActionMap>()->add_action(prefs_action);
+
+    auto about_action = Gio::SimpleAction::create("about", nullptr);
+    about_action->connect_activate(
+        [this](Gio::SimpleAction *, GLib::Variant *) {
+            if (auto *w = get_active_window())
+                if (auto *rw = w->template cast<RookWindow>())
+                    rw->showAbout();
+        });
+    cast<Gio::ActionMap>()->add_action(about_action);
 }
 
 RefPtr<RookApplication> RookApplication::create()
@@ -102,6 +120,7 @@ inline void RookApplication::vfunc_dispose()
 void RookApplication::startModelDiscovery(RookWindow &window)
 {
     auto providers = m_llm->listProviders();
+    RookWindow *win = &window;
 
     for (const auto &prov : providers) {
         if (!prov.enabled) continue;
@@ -111,7 +130,7 @@ void RookApplication::startModelDiscovery(RookWindow &window)
         auto prov_type = prov.type;
         auto prov_id = prov.id;
 
-        (void)std::async(std::launch::async, [prov_type, prov_id, api_key, base_url, &window]() {
+        (void)std::async(std::launch::async, [prov_type, prov_id, api_key, base_url, win]() {
             std::unique_ptr<rook::ports::ModelDiscoveryPort> discovery;
 
             if (prov_type == "ollama") {
@@ -125,8 +144,8 @@ void RookApplication::startModelDiscovery(RookWindow &window)
             auto models = discovery->fetchModels(api_key);
             rook::adapters::model::ModelCache::instance().store(prov_id, std::move(models));
 
-            GLib::idle_add_once([&window]() {
-                window.refreshModels();
+            GLib::idle_add_once([win]() {
+                win->refreshModels();
             });
         });
     }

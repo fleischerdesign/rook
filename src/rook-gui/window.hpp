@@ -26,10 +26,10 @@ class RookWindow final : public peel::Adw::ApplicationWindow
 
     inline void init(Class *);
 
-    void onPreferences();
-    void onAbout();
-
 public:
+    void showPreferences() { onPreferences(); }
+    void showAbout() { onAbout(); }
+
     static RookWindow *create(peel::Gtk::Application *app,
                                rook::domain::EventBus &bus,
                                rook::ports::LlmPort &llm,
@@ -37,6 +37,10 @@ public:
                                std::function<void()> save_fn);
 
     void refreshModels();
+
+private:
+    void onPreferences();
+    void onAbout();
 };
 
 } // namespace rook::gui

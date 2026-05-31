@@ -1,4 +1,5 @@
 #include "message_widget.hpp"
+#include <gtk/gtk.h>
 
 using namespace peel;
 
@@ -13,6 +14,9 @@ inline void MessageWidget::Class::init()
 
 inline void MessageWidget::init(Class *)
 {
+    gtk_orientable_set_orientation(
+        GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
+        GTK_ORIENTATION_VERTICAL);
     set_spacing(2);
     set_margin_start(6);
     set_margin_end(6);

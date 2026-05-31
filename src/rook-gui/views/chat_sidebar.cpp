@@ -1,5 +1,6 @@
 #include "chat_sidebar.hpp"
 #include <spdlog/spdlog.h>
+#include <gtk/gtk.h> // gtk_orientable_set_orientation
 
 using namespace peel;
 
@@ -14,6 +15,9 @@ inline void ChatSidebar::Class::init()
 
 inline void ChatSidebar::init(Class *)
 {
+    gtk_orientable_set_orientation(
+        GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
+        GTK_ORIENTATION_VERTICAL);
     set_size_request(220, -1);
     add_css_class("navigation-sidebar");
 
