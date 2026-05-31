@@ -40,13 +40,13 @@ RookWindow *RookWindow::create(Gtk::Application *app,
 
     win->m_header = Adw::HeaderBar::create();
 
-    auto sidebar_toggle = Gtk::Button::create_from_icon_name("sidebar-hide-symbolic");
+    auto sidebar_toggle = Gtk::Button::create_from_icon_name("view-conceal-symbolic");
     sidebar_toggle->set_tooltip_text("Toggle Sidebar");
     sidebar_toggle->connect_clicked([win](Gtk::Button *) {
         bool show = !win->m_split->get_show_sidebar();
         win->m_split->set_show_sidebar(show);
         win->m_sidebar_toggle->set_icon_name(
-            show ? "sidebar-hide-symbolic" : "sidebar-show-symbolic");
+            show ? "view-conceal-symbolic" : "sidebar-show-symbolic");
     });
     win->m_sidebar_toggle = sidebar_toggle;
     win->m_header->pack_start(std::move(sidebar_toggle));

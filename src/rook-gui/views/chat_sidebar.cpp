@@ -32,28 +32,24 @@ inline void ChatSidebar::init(Class *)
     grid->set_margin_bottom(6);
 
     auto search_btn = Gtk::Button::create_from_icon_name("system-search-symbolic");
-    search_btn->set_has_frame(false);
     search_btn->set_hexpand(true);
     search_btn->set_halign(Gtk::Align::FILL);
     search_btn->set_valign(Gtk::Align::FILL);
     grid->attach(std::move(search_btn), 0, 0, 1, 1);
 
-    auto library_btn = Gtk::Button::create_from_icon_name("emblem-documents-symbolic");
-    library_btn->set_has_frame(false);
+    auto library_btn = Gtk::Button::create_from_icon_name("folder-documents-symbolic");
     library_btn->set_hexpand(true);
     library_btn->set_halign(Gtk::Align::FILL);
     library_btn->set_valign(Gtk::Align::FILL);
     grid->attach(std::move(library_btn), 1, 0, 1, 1);
 
     auto presets_btn = Gtk::Button::create_from_icon_name("document-edit-symbolic");
-    presets_btn->set_has_frame(false);
     presets_btn->set_hexpand(true);
     presets_btn->set_halign(Gtk::Align::FILL);
     presets_btn->set_valign(Gtk::Align::FILL);
     grid->attach(std::move(presets_btn), 0, 1, 1, 1);
 
     auto new_btn = Gtk::Button::create_from_icon_name("tab-new-symbolic");
-    new_btn->set_has_frame(false);
     new_btn->set_hexpand(true);
     new_btn->set_halign(Gtk::Align::FILL);
     new_btn->set_valign(Gtk::Align::FILL);
