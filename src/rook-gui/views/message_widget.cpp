@@ -20,6 +20,7 @@ MessageWidget::MessageWidget(std::string_view role, std::string_view content,
 
     if (!reasoning.empty() && role == "assistant") {
         m_reasoning_expander.set_label("Thinking...");
+        m_reasoning_expander.set_expanded(false);
         m_reasoning_label.set_wrap(true);
         m_reasoning_label.set_wrap_mode(Pango::WrapMode::WORD_CHAR);
         m_reasoning_label.set_max_width_chars(60);
@@ -29,6 +30,7 @@ MessageWidget::MessageWidget(std::string_view role, std::string_view content,
         m_reasoning_label.set_text(std::string(reasoning));
         m_reasoning_expander.set_child(m_reasoning_label);
         append(m_reasoning_expander);
+        m_reasoning_created = true;
     }
 
     append(m_label);
@@ -45,6 +47,27 @@ void MessageWidget::appendChunk(std::string_view chunk) {
 
 void MessageWidget::setContent(std::string_view content) {
     m_label.set_text(std::string(content));
+}
+
+void MessageWidget::appendReasoningChunk(std::string_view chunk) {
+    if (!m_reasoning_created && m_role == "assistant") {
+        m_reasoning_expander.set_label("Thinking...");
+        m_reasoning_expander.set_expanded(false);
+        m_reasoning_label.set_wrap(true);
+        m_reasoning_label.set_wrap_mode(Pango::WrapMode::WORD_CHAR);
+        m_reasoning_label.set_max_width_chars(60);
+        m_reasoning_label.set_selectable(true);
+        m_reasoning_label.add_css_class("dim-label");
+        m_reasoning_label.set_margin_start(12);
+        m_reasoning_label.set_text("");
+        m_reasoning_expander.set_child(m_reasoning_label);
+        insert_child_at_start(m_reasoning_expander);
+        m_reasoning_created = true;
+    }
+
+    auto text = m_reasoning_label.get_text();
+    text.append(std::string(chunk));
+    m_reasoning_label.set_text(text);
 }
 
 void MessageWidget::applyStyle() {

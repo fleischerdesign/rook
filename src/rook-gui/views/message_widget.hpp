@@ -11,6 +11,7 @@ public:
     ~MessageWidget() override = default;
 
     void appendChunk(std::string_view chunk);
+    void appendReasoningChunk(std::string_view chunk);
     void setContent(std::string_view content);
 
     const std::string& role() const { return m_role; }
@@ -20,6 +21,7 @@ private:
     Gtk::Expander m_reasoning_expander;
     Gtk::Label m_reasoning_label;
     Gtk::Label m_label;
+    bool m_reasoning_created = false;
 
     void applyStyle();
 };

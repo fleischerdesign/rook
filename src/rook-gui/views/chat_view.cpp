@@ -153,7 +153,8 @@ void ChatView::onMessageEntryActivated() {
 void ChatView::onStreamChunk(const rook::domain::LlmStreamChunk& event) {
     if (event.chat_id != m_chat_id) return;
 
-    Glib::signal_idle().connect_once([this, content = std::string(event.content)]() {
+    Glib::signal_idle().connect_once([this, content = std::string(event.content),
+                                      is_reasoning = event.is_reasoning]() {
         if (!m_pending_assistant) {
             m_pending_assistant = Gtk::make_managed<MessageWidget>(
                 "assistant", "");
@@ -161,7 +162,11 @@ void ChatView::onStreamChunk(const rook::domain::LlmStreamChunk& event) {
         }
 
         if (!content.empty()) {
-            m_pending_assistant->appendChunk(content);
+            if (is_reasoning) {
+                m_pending_assistant->appendReasoningChunk(content);
+            } else {
+                m_pending_assistant->appendChunk(content);
+            }
         }
 
         auto adj = m_scrolled.get_vadjustment();
