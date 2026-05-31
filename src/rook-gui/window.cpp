@@ -1,6 +1,7 @@
 #include "window.hpp"
 #include "views/chat_view.hpp"
 #include "views/chat_sidebar.hpp"
+#include "views/preferences_window.hpp"
 
 #include <peel/Gio/Gio.h>
 
@@ -28,6 +29,7 @@ RookWindow *RookWindow::create(Gtk::Application *app,
 {
     auto *win = Object::create<RookWindow>(prop_application(), app);
     win->m_save_fn = std::move(save_fn);
+    win->m_llm = &llm;
 
     auto sidebar = ChatSidebar::create(bus, conv);
     sidebar->loadConversations(conv.list());
@@ -74,7 +76,8 @@ void RookWindow::refreshModels()
 
 void RookWindow::onPreferences()
 {
-    // TODO: Adw::PreferencesDialog with settings pages
+    auto prefs = PreferencesWindow::create(*m_llm, m_save_fn);
+    prefs->present(this);
 }
 
 void RookWindow::onAbout()

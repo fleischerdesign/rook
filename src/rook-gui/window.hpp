@@ -23,6 +23,7 @@ class RookWindow final : public peel::Adw::ApplicationWindow
     ChatSidebar *m_sidebar = nullptr;
     ChatView *m_chat_view = nullptr;
     std::function<void()> m_save_fn;
+    rook::ports::LlmPort *m_llm = nullptr;
 
     inline void init(Class *);
 

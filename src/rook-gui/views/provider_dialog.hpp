@@ -2,28 +2,28 @@
 
 #include <peel/Gtk/Gtk.h>
 #include <peel/class.h>
+#include <peel/signal.h>
 #include <string>
+#include <vector>
+#include "rook/ports/llm_port.hpp"
 
 namespace rook::gui {
 
 struct ProviderConfig {
-    std::string id;
-    std::string display_name;
     std::string type;
-    std::string base_url;
     std::string api_key;
-    std::string default_model;
 };
 
 class ProviderDialog final : public peel::Gtk::Window
 {
     PEEL_SIMPLE_CLASS(ProviderDialog, peel::Gtk::Window)
 
-    peel::Gtk::Entry *m_display_name = nullptr;
-    peel::Gtk::Entry *m_base_url = nullptr;
+    peel::Gtk::DropDown *m_type = nullptr;
     peel::Gtk::Entry *m_api_key = nullptr;
-    peel::Gtk::Entry *m_model = nullptr;
     ProviderConfig m_config;
+    bool m_accepted = false;
+    std::vector<std::string> m_type_ids;
+    static peel::Signal<ProviderDialog, void(void)> sig_done;
 
     inline void init(Class *);
     void onSave(peel::Gtk::Button *);
@@ -32,11 +32,10 @@ class ProviderDialog final : public peel::Gtk::Window
 public:
     static peel::FloatPtr<ProviderDialog> create(const ProviderConfig &existing = {});
 
-    ProviderConfig getConfig() const;
+    ProviderConfig getConfig() const { return m_config; }
     bool wasAccepted() const { return m_accepted; }
 
-private:
-    bool m_accepted = false;
+    PEEL_SIGNAL_CONNECT_METHOD(done, sig_done)
 };
 
 } // namespace rook::gui
