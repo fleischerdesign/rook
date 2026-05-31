@@ -62,15 +62,16 @@ RookWindow *RookWindow::create(Gtk::Application *app,
     menu_button->set_tooltip_text("Menu");
     win->m_header->pack_end(std::move(menu_button));
 
-    win->m_split = Adw::OverlaySplitView::create();
-    win->m_split->set_sidebar(win->m_sidebar);
-    win->m_split->set_content(win->m_chat_view);
-    win->m_split->set_show_sidebar(true);
-    win->m_split->set_collapsed(false);
+    auto split = Adw::OverlaySplitView::create();
+    split->set_sidebar(win->m_sidebar);
+    split->set_content(win->m_chat_view);
+    split->set_show_sidebar(true);
+    split->set_collapsed(false);
+    win->m_split = split;
 
     auto toolbar = Adw::ToolbarView::create();
     toolbar->add_top_bar(std::move(win->m_header));
-    toolbar->set_content(std::move(win->m_split));
+    toolbar->set_content(std::move(split));
 
     win->set_content(std::move(toolbar));
 
