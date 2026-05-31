@@ -97,30 +97,43 @@ void AgentEngine::onLlmCompleted(const LlmCompleted& event) {
 
     spdlog::info("Generating title for chat {}", event.chat_id);
 
+    ports::LlmMessage sys_msg;
+    sys_msg.role = "system";
+    sys_msg.content = "You are a title generator. Reply with ONLY the raw title text, "
+                      "no quotes, no prefixes, no markdown, no explanation.";
+
     ports::LlmMessage title_msg;
     title_msg.role = "user";
-    title_msg.content = "Generate a short title in the same language (max 5 words) for this chat.\n"
+    title_msg.content = "Generate a short title (max 5 words) in the same language "
+                        "for this conversation:\n\n"
                         "User: " + last_user + "\n"
-                        "Assistant: " + last_assistant + "\n"
-                        "Title:";
+                        "Assistant: " + last_assistant;
 
     std::string accumulated;
     std::string chat_id = event.chat_id;
     std::string model = conv.model;
 
+    auto cleanTitle = [](std::string s) -> std::string {
+        s.erase(0, s.find_first_not_of(" \t\n\r\"'"));
+        s.erase(s.find_last_not_of(" \t\n\r\"'") + 1);
+        for (auto prefix : {"Title:", "title:", "Title :", "title :",
+                            "**", "##", "#"}) {
+            if (s.starts_with(prefix)) { s.erase(0, std::strlen(prefix)); break; }
+        }
+        if (!s.empty() && s.back() == '.') s.pop_back();
+        return s;
+    };
+
     m_llm.streamChat(
         chat_id,
-        {title_msg},
-        [this, chat_id, &accumulated](std::string_view chunk, bool is_final, bool /*is_reasoning*/) {
+        {sys_msg, title_msg},
+        [this, chat_id, &accumulated, &cleanTitle](std::string_view chunk, bool is_final, bool is_reasoning) {
+            if (is_reasoning) return;
             accumulated += std::string(chunk);
             if (is_final && !accumulated.empty()) {
-                std::string title = accumulated;
-                while (!title.empty() && (title.front() == '"' || title.front() == '\n' || title.front() == ' '))
-                    title.erase(0, 1);
-                while (!title.empty() && (title.back() == '"' || title.back() == '\n' || title.back() == ' '))
-                    title.pop_back();
+                std::string title = cleanTitle(accumulated);
                 if (!title.empty()) {
-                    m_conv.setTitle(chat_id, title);
+                    m_conv.setTitle(chat_id, std::move(title));
                 }
             }
         },
