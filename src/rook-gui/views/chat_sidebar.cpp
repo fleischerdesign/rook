@@ -67,7 +67,7 @@ void ChatSidebar::setupUi() {
 }
 
 void ChatSidebar::onNewChat() {
-    m_bus.publish(rook::domain::ChatCreated{
+    m_bus.publish(rook::domain::ChatSelected{
         .chat_id = ""
     });
 }

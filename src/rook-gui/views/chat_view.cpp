@@ -258,6 +258,11 @@ void ChatView::onLlmCompleted(const rook::domain::LlmCompleted& /*event*/) {
 
 void ChatView::onChatSelected(const rook::domain::ChatSelected& event) {
     Glib::signal_idle().connect_once([this, id = event.chat_id]() {
+        if (id.empty()) {
+            m_chat_id.clear();
+            m_stack.set_visible_child("welcome");
+            return;
+        }
         switchToChat(id);
     });
 }
