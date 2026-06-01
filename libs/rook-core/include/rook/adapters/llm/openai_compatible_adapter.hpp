@@ -42,7 +42,8 @@ public:
         const std::vector<ports::LlmMessage>& messages,
         std::function<void(std::string_view chunk, bool is_final, bool is_reasoning)> on_chunk,
         std::string_view model = "",
-        std::function<void(std::string_view name, std::string_view arguments, std::string_view call_id)> on_tool_call = nullptr
+        std::function<void(std::string_view name, std::string_view arguments, std::string_view call_id)> on_tool_call = nullptr,
+        std::string_view tools_json = ""
     ) override;
 
 protected:
@@ -53,7 +54,10 @@ protected:
     std::string m_system_prompt;
     float m_temperature = 0.7f;
 
-    std::string buildRequestBody(const std::vector<ports::LlmMessage>& messages) const;
+    std::string buildRequestBody(
+        const std::vector<ports::LlmMessage>& messages,
+        std::string_view tools_json = ""
+    ) const;
 
 private:
     SseParser m_sse;

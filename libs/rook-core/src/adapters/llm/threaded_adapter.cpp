@@ -23,14 +23,15 @@ void ThreadedLlmAdapter::streamChat(
     const std::vector<ports::LlmMessage>& messages,
     std::function<void(std::string_view chunk, bool is_final, bool is_reasoning)> on_chunk,
     std::string_view model,
-    std::function<void(std::string_view, std::string_view, std::string_view)> on_tool_call
+    std::function<void(std::string_view, std::string_view, std::string_view)> on_tool_call,
+    std::string_view tools_json
 ) {
     auto self = std::this_thread::get_id();
 
     if (m_thread.joinable()) {
         if (m_thread.get_id() == self) {
             m_stop_source.request_stop();
-            m_inner->streamChat(chat_id, messages, std::move(on_chunk), model, std::move(on_tool_call));
+            m_inner->streamChat(chat_id, messages, std::move(on_chunk), model, std::move(on_tool_call), tools_json);
             return;
         }
         m_stop_source.request_stop();
@@ -44,14 +45,15 @@ void ThreadedLlmAdapter::streamChat(
     auto model_str = std::string(model);
     std::function<void(std::string_view, bool, bool)> callback = std::move(on_chunk);
     std::function<void(std::string_view, std::string_view, std::string_view)> tool_callback = std::move(on_tool_call);
+    auto tools = std::string(tools_json);
 
     m_thread = std::jthread(
         [this, chat, msgs = std::move(msgs), callback = std::move(callback),
-         model_str, tool_callback = std::move(tool_callback)](
+         model_str, tool_callback = std::move(tool_callback), tools](
             std::stop_token token
         ) mutable {
             (void)token;
-            m_inner->streamChat(chat, msgs, std::move(callback), model_str, std::move(tool_callback));
+            m_inner->streamChat(chat, msgs, std::move(callback), model_str, std::move(tool_callback), tools);
         });
 }
 

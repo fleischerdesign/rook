@@ -25,7 +25,8 @@ public:
         const std::vector<ports::LlmMessage>& messages,
         std::function<void(std::string_view, bool, bool)> on_chunk,
         std::string_view model = "",
-        std::function<void(std::string_view, std::string_view, std::string_view)> on_tool_call = nullptr
+        std::function<void(std::string_view, std::string_view, std::string_view)> on_tool_call = nullptr,
+        std::string_view /*tools_json*/ = ""
     ) override {
         (void)on_tool_call;
         nlohmann::json body;

@@ -18,6 +18,7 @@ struct ChatMessage {
     std::string reasoning_content;
     std::chrono::system_clock::time_point timestamp;
     std::string tool_call_id;
+    std::string tool_calls_json;
     bool has_tool_calls = false;
 };
 

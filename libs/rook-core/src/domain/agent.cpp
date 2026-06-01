@@ -1,4 +1,5 @@
 #include "rook/domain/agent.hpp"
+#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 namespace rook::domain {
@@ -43,8 +44,39 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
     runLlm(event.chat_id, event.model);
 }
 
+static std::string buildToolsJson(const std::vector<ports::ToolDefinition>& tools) {
+    nlohmann::json arr = nlohmann::json::array();
+    for (auto& t : tools) {
+        nlohmann::json tool;
+        tool["type"] = "function";
+        tool["function"]["name"] = t.name;
+        tool["function"]["description"] = t.description;
+
+        nlohmann::json props = nlohmann::json::object();
+        nlohmann::json required = nlohmann::json::array();
+        for (auto& p : t.parameters) {
+            nlohmann::json prop;
+            prop["type"] = p.type;
+            prop["description"] = p.description;
+            props[p.name] = prop;
+            if (p.required) required.push_back(p.name);
+        }
+        tool["function"]["parameters"]["type"] = "object";
+        tool["function"]["parameters"]["properties"] = props;
+        if (!required.empty()) {
+            tool["function"]["parameters"]["required"] = required;
+        }
+
+        arr.push_back(std::move(tool));
+    }
+    return arr.dump();
+}
+
 void AgentEngine::runLlm(std::string chat_id, std::string model) {
     auto messages = m_conv.buildLlmMessages(chat_id);
+
+    auto tools = m_tool.listTools();
+    auto tools_json = buildToolsJson(tools);
 
     m_bus.publish(LlmRequested{chat_id, ""});
 
@@ -81,7 +113,8 @@ void AgentEngine::runLlm(std::string chat_id, std::string model) {
             });
 
             m_pending_tool_calls.push_back(std::move(call));
-        }
+        },
+        tools_json
     );
 }
 
@@ -170,6 +203,26 @@ bool AgentEngine::processPendingToolCalls(std::string_view chat_id) {
 
     auto conv = m_conv.open(chat_id);
     std::string model = conv.model;
+
+    nlohmann::json tc_json = nlohmann::json::array();
+    for (auto& tc : m_pending_tool_calls) {
+        nlohmann::json item;
+        item["id"] = tc.id;
+        item["type"] = "function";
+        item["function"]["name"] = tc.name;
+        item["function"]["arguments"] = tc.arguments;
+        tc_json.push_back(std::move(item));
+    }
+
+    for (auto& msg : conv.messages) {
+        if (msg.role == "assistant" && msg.content.empty() && !msg.has_tool_calls) {
+            ChatMessage updated = msg;
+            updated.has_tool_calls = true;
+            updated.tool_calls_json = tc_json.dump();
+            m_conv.addMessage(chat_id, std::move(updated));
+            break;
+        }
+    }
 
     auto calls = std::move(m_pending_tool_calls);
     m_pending_tool_calls.clear();

@@ -60,7 +60,8 @@ void OpenAiCompatibleAdapter::cancel() {
 }
 
 std::string OpenAiCompatibleAdapter::buildRequestBody(
-    const std::vector<ports::LlmMessage>& messages
+    const std::vector<ports::LlmMessage>& messages,
+    std::string_view tools_json
 ) const {
     nlohmann::json body;
     body["model"] = m_model;
@@ -77,10 +78,34 @@ std::string OpenAiCompatibleAdapter::buildRequestBody(
     }
 
     for (const auto& msg : messages) {
-        body["messages"].push_back({
-            {"role", msg.role},
-            {"content", msg.content}
-        });
+        nlohmann::json m;
+        m["role"] = msg.role;
+
+        if (!msg.content.empty()) {
+            m["content"] = msg.content;
+        }
+
+        if (!msg.tool_call_id.empty()) {
+            m["tool_call_id"] = msg.tool_call_id;
+        }
+
+        if (!msg.tool_calls.empty()) {
+            try {
+                m["tool_calls"] = nlohmann::json::parse(msg.tool_calls);
+            } catch (...) {
+                spdlog::warn("Failed to parse tool_calls JSON");
+            }
+        }
+
+        body["messages"].push_back(std::move(m));
+    }
+
+    if (!tools_json.empty()) {
+        try {
+            body["tools"] = nlohmann::json::parse(std::string(tools_json));
+        } catch (...) {
+            spdlog::warn("Failed to parse tools JSON");
+        }
     }
 
     return body.dump();
@@ -91,9 +116,10 @@ void OpenAiCompatibleAdapter::streamChat(
     const std::vector<ports::LlmMessage>& messages,
     std::function<void(std::string_view, bool, bool)> on_chunk,
     std::string_view model,
-    std::function<void(std::string_view, std::string_view, std::string_view)> on_tool_call
+    std::function<void(std::string_view, std::string_view, std::string_view)> on_tool_call,
+    std::string_view tools_json
 ) {
-    auto body = buildRequestBody(messages);
+    auto body = buildRequestBody(messages, tools_json);
     if (!model.empty()) {
         auto j = nlohmann::json::parse(body);
         j["model"] = std::string(model);
@@ -111,11 +137,15 @@ void OpenAiCompatibleAdapter::streamChat(
     using TCall = std::function<void(std::string_view, std::string_view, std::string_view)>;
     TCall tool_handler = std::move(on_tool_call);
 
+    std::map<int, std::string> tc_ids;
+    std::map<int, std::string> tc_names;
+    std::map<int, std::string> tc_args;
+
     m_http->postStream(
         url,
         body,
         headers,
-        [&on_chunk, &tool_handler, this](std::string_view line) {
+        [&on_chunk, &tool_handler, &tc_ids, &tc_names, &tc_args, this](std::string_view line) {
             if (!line.starts_with("data: ")) return;
 
             auto data = line.substr(6);
@@ -126,33 +156,45 @@ void OpenAiCompatibleAdapter::streamChat(
                 if (!json.contains("choices") || json["choices"].empty()) return;
 
                 auto& choice = json["choices"][0];
-                if (!choice.contains("delta")) return;
 
-                auto& delta = choice["delta"];
+                auto finish_reason = choice.value("finish_reason", "");
 
-                if (delta.contains("reasoning_content") && !delta["reasoning_content"].is_null()) {
-                    on_chunk(delta["reasoning_content"].get<std::string>(), false, true);
-                }
+                if (choice.contains("delta")) {
+                    auto& delta = choice["delta"];
 
-                if (delta.contains("tool_calls") && delta["tool_calls"].is_array()) {
-                    for (auto& tc : delta["tool_calls"]) {
-                        std::string call_id = tc.value("id", "");
-                        std::string fn_name;
-                        std::string fn_args;
-                        if (tc.contains("function")) {
-                            fn_name = tc["function"].value("name", "");
-                            fn_args = tc["function"].value("arguments", "");
+                    if (delta.contains("reasoning_content") && !delta["reasoning_content"].is_null()) {
+                        on_chunk(delta["reasoning_content"].get<std::string>(), false, true);
+                    }
+
+                    if (delta.contains("tool_calls") && delta["tool_calls"].is_array()) {
+                        for (auto& tc : delta["tool_calls"]) {
+                            int idx = tc.value("index", 0);
+                            if (tc.contains("id") && !tc["id"].is_null())
+                                tc_ids[idx] = tc["id"].get<std::string>();
+                            if (tc.contains("function")) {
+                                auto& fn = tc["function"];
+                                if (fn.contains("name") && !fn["name"].is_null())
+                                    tc_names[idx] = fn["name"].get<std::string>();
+                                if (fn.contains("arguments") && !fn["arguments"].is_null())
+                                    tc_args[idx] += fn["arguments"].get<std::string>();
+                            }
                         }
-                        if (tool_handler && !fn_name.empty()) {
-                            tool_handler(fn_name, fn_args, call_id);
-                        }
+                    }
+
+                    if (delta.contains("content") && !delta["content"].is_null()) {
+                        auto content = delta["content"].get<std::string>();
+                        auto finish = !finish_reason.empty();
+                        on_chunk(content, finish, false);
                     }
                 }
 
-                if (delta.contains("content") && !delta["content"].is_null()) {
-                    auto content = delta["content"].get<std::string>();
-                    auto finish = choice.contains("finish_reason") && !choice["finish_reason"].is_null();
-                    on_chunk(content, finish, false);
+                if (finish_reason == "tool_calls" && tool_handler) {
+                    for (auto& [idx, name] : tc_names) {
+                        tool_handler(name, tc_args[idx], tc_ids[idx]);
+                    }
+                    tc_ids.clear();
+                    tc_names.clear();
+                    tc_args.clear();
                 }
             } catch (const std::exception& e) {
                 spdlog::error("SSE parse error: {}", e.what());

@@ -141,8 +141,12 @@ std::vector<ports::LlmMessage> ConversationManager::buildLlmMessages(
     if (it == m_conversations.end()) return result;
 
     for (const auto& msg : it->messages) {
-        if (msg.role == "tool") continue;
-        result.push_back({msg.role, msg.content});
+        ports::LlmMessage lm;
+        lm.role = msg.role;
+        lm.content = msg.content;
+        lm.tool_call_id = msg.tool_call_id;
+        lm.tool_calls = msg.tool_calls_json;
+        result.push_back(std::move(lm));
     }
 
     return result;
@@ -274,6 +278,7 @@ void ConversationManager::loadFromStore(ports::StorePort& store) {
                     msg.timestamp = std::chrono::system_clock::now();
                     msg.has_tool_calls = mj.value("has_tool_calls", false);
                     msg.tool_call_id = mj.value("tool_call_id", "");
+                    msg.tool_calls_json = mj.value("tool_calls_json", "");
                     conv.messages.push_back(std::move(msg));
                 }
             } catch (const std::exception& e) {
@@ -308,6 +313,7 @@ void ConversationManager::saveActiveConversation() {
         mj["reasoning_content"] = msg.reasoning_content;
         mj["has_tool_calls"] = msg.has_tool_calls;
         mj["tool_call_id"] = msg.tool_call_id;
+        mj["tool_calls_json"] = msg.tool_calls_json;
         messages.push_back(mj);
     }
 
