@@ -1,0 +1,55 @@
+#pragma once
+
+#include "rook/adapters/mcp/mcp_client.hpp"
+#include "rook/ports/tool_port.hpp"
+
+#include <memory>
+#include <mutex>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
+
+namespace rook::adapters::mcp {
+
+struct McpServerConfig {
+    std::string id;
+    std::string command;
+    std::vector<std::string> args;
+    bool enabled = true;
+};
+
+class McpServerManager {
+public:
+    void addServer(McpServerConfig config);
+
+    void removeServer(std::string_view id);
+
+    void startAll(std::string_view client_name = "rook",
+                  std::string_view client_version = "0.1.0");
+
+    void stopAll();
+
+    std::vector<rook::ports::ToolDefinition> listAllTools();
+
+    rook::ports::ToolResult executeTool(const rook::ports::ToolCall& call);
+
+    size_t serverCount() const;
+
+private:
+    struct ServerEntry {
+        McpServerConfig config;
+        std::unique_ptr<McpClient> client;
+        std::vector<rook::ports::ToolDefinition> tools;
+        bool started = false;
+    };
+
+    ServerEntry* findEntry(std::string_view id);
+    ServerEntry* findToolOwner(std::string_view tool_name);
+
+    std::vector<ServerEntry> m_servers;
+    std::unordered_map<std::string, size_t> m_tool_index;
+    mutable std::mutex m_mutex;
+};
+
+} // namespace rook::adapters::mcp
