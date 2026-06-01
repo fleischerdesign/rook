@@ -185,7 +185,7 @@ void OpenAiCompatibleAdapter::streamChat(
 
                     if (delta.contains("content") && delta["content"].is_string()) {
                         auto content = delta["content"].get<std::string>();
-                        auto finish = !finish_reason.empty();
+                        auto finish = !finish_reason.empty() && finish_reason != "tool_calls";
                         on_chunk(content, finish, false);
                     }
                 }
@@ -197,6 +197,7 @@ void OpenAiCompatibleAdapter::streamChat(
                     tc_ids.clear();
                     tc_names.clear();
                     tc_args.clear();
+                    on_chunk("", true, false);
                 }
             } catch (const std::exception& e) {
                 spdlog::error("SSE error: {} | line={}", e.what(), line);

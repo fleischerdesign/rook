@@ -43,6 +43,7 @@ public:
     void addMessage(std::string_view conv_id, ChatMessage message);
     void updateAssistantChunk(std::string_view conv_id, std::string_view chunk);
     void updateReasoningChunk(std::string_view conv_id, std::string_view chunk);
+    void setAssistantToolCalls(std::string_view conv_id, std::string json);
     void setTitle(std::string_view conv_id, std::string_view title);
     void setModel(std::string_view conv_id, std::string_view model);
     std::vector<ports::LlmMessage> buildLlmMessages(std::string_view conv_id) const;

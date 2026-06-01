@@ -214,15 +214,7 @@ bool AgentEngine::processPendingToolCalls(std::string_view chat_id) {
         tc_json.push_back(std::move(item));
     }
 
-    for (auto& msg : conv.messages) {
-        if (msg.role == "assistant" && msg.content.empty() && !msg.has_tool_calls) {
-            ChatMessage updated = msg;
-            updated.has_tool_calls = true;
-            updated.tool_calls_json = tc_json.dump();
-            m_conv.addMessage(chat_id, std::move(updated));
-            break;
-        }
-    }
+    m_conv.setAssistantToolCalls(chat_id, tc_json.dump());
 
     auto calls = std::move(m_pending_tool_calls);
     m_pending_tool_calls.clear();

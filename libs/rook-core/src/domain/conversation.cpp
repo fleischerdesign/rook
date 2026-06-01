@@ -130,6 +130,30 @@ void ConversationManager::updateReasoningChunk(
     it->messages.back().reasoning_content.append(chunk);
 }
 
+void ConversationManager::setAssistantToolCalls(std::string_view conv_id, std::string json) {
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](auto& c) { return c.id == conv_id; });
+    if (it == m_conversations.end()) return;
+
+    for (auto msg_it = it->messages.rbegin(); msg_it != it->messages.rend(); ++msg_it) {
+        if (msg_it->role == "assistant") {
+            msg_it->has_tool_calls = true;
+            msg_it->tool_calls_json = std::move(json);
+            if (m_store) saveActiveConversation();
+            return;
+        }
+    }
+
+    ChatMessage msg;
+    msg.id = generateId();
+    msg.role = "assistant";
+    msg.has_tool_calls = true;
+    msg.tool_calls_json = std::move(json);
+    msg.timestamp = std::chrono::system_clock::now();
+    it->messages.push_back(std::move(msg));
+    if (m_store) saveActiveConversation();
+}
+
 std::vector<ports::LlmMessage> ConversationManager::buildLlmMessages(
     std::string_view conv_id
 ) const {
