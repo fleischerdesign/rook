@@ -161,27 +161,27 @@ void OpenAiCompatibleAdapter::streamChat(
                 if (choice.contains("delta")) {
                     auto& delta = choice["delta"];
 
-                    if (delta.contains("reasoning_content") && !delta["reasoning_content"].is_null()) {
-                        on_chunk(delta.value("reasoning_content", ""), false, true);
+                    if (delta.contains("reasoning_content") && delta["reasoning_content"].is_string()) {
+                        on_chunk(delta["reasoning_content"].get<std::string>(), false, true);
                     }
 
                     if (delta.contains("tool_calls") && delta["tool_calls"].is_array()) {
                         for (auto& tc : delta["tool_calls"]) {
                             int idx = tc.value("index", 0);
-                            if (tc.contains("id") && !tc["id"].is_null())
-                                tc_ids[idx] = tc.value("id", "");
+                            if (tc.contains("id") && tc["id"].is_string())
+                                tc_ids[idx] = tc["id"].get<std::string>();
                             if (tc.contains("function")) {
                                 auto& fn = tc["function"];
-                                if (fn.contains("name") && !fn["name"].is_null())
-                                    tc_names[idx] = fn.value("name", "");
-                                if (fn.contains("arguments") && !fn["arguments"].is_null())
-                                    tc_args[idx] += fn.value("arguments", "");
+                                if (fn.contains("name") && fn["name"].is_string())
+                                    tc_names[idx] = fn["name"].get<std::string>();
+                                if (fn.contains("arguments") && fn["arguments"].is_string())
+                                    tc_args[idx] += fn["arguments"].get<std::string>();
                             }
                         }
                     }
 
-                    if (delta.contains("content") && !delta["content"].is_null()) {
-                        auto content = delta.value("content", "");
+                    if (delta.contains("content") && delta["content"].is_string()) {
+                        auto content = delta["content"].get<std::string>();
                         auto finish = !finish_reason.empty();
                         on_chunk(content, finish, false);
                     }
