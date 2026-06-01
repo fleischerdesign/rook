@@ -18,7 +18,8 @@ public:
         std::string_view chat_id,
         const std::vector<ports::LlmMessage>& messages,
         std::function<void(std::string_view chunk, bool is_final, bool is_reasoning)> on_chunk,
-        std::string_view model = ""
+        std::string_view model = "",
+        std::function<void(std::string_view name, std::string_view arguments, std::string_view call_id)> on_tool_call = nullptr
     ) override;
 
     std::vector<ports::LlmProviderConfig> listProviders() const override;

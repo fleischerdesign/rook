@@ -23,8 +23,10 @@ public:
         std::string_view /*chat_id*/,
         const std::vector<ports::LlmMessage>& messages,
         std::function<void(std::string_view, bool, bool)> on_chunk,
-        std::string_view model = ""
+        std::string_view model = "",
+        std::function<void(std::string_view, std::string_view, std::string_view)> on_tool_call = nullptr
     ) override {
+        (void)on_tool_call;
         nlohmann::json body;
         body["model"] = model.empty() ? m_model : std::string(model);
         body["stream"] = true;

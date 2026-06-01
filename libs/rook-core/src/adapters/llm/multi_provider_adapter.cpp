@@ -31,7 +31,8 @@ void MultiProviderLlmAdapter::streamChat(
     std::string_view chat_id,
     const std::vector<ports::LlmMessage>& messages,
     std::function<void(std::string_view chunk, bool is_final, bool is_reasoning)> on_chunk,
-    std::string_view model
+    std::string_view model,
+    std::function<void(std::string_view, std::string_view, std::string_view)> on_tool_call
 ) {
     std::string real_model;
     std::string provider_id;
@@ -52,7 +53,7 @@ void MultiProviderLlmAdapter::streamChat(
     }
 
     if (it != m_provider_adapters.end()) {
-        it->second->streamChat(chat_id, messages, std::move(on_chunk), real_model);
+        it->second->streamChat(chat_id, messages, std::move(on_chunk), real_model, std::move(on_tool_call));
     } else {
         spdlog::error("No adapters available -- streamChat aborted");
     }

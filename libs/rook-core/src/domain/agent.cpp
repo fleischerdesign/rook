@@ -61,7 +61,16 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
                 m_bus.publish(LlmCompleted{chat_id, 0});
             }
         },
-        model
+        model,
+        [this, chat_id](std::string_view name, std::string_view arguments,
+                         std::string_view call_id) {
+            m_bus.publish(ToolCallRequested{
+                .chat_id = chat_id,
+                .tool_name = std::string(name),
+                .arguments = std::string(arguments),
+                .call_id = std::string(call_id),
+            });
+        }
     );
 }
 

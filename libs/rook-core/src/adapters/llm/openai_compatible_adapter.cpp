@@ -90,7 +90,8 @@ void OpenAiCompatibleAdapter::streamChat(
     std::string_view /*chat_id*/,
     const std::vector<ports::LlmMessage>& messages,
     std::function<void(std::string_view, bool, bool)> on_chunk,
-    std::string_view model
+    std::string_view model,
+    std::function<void(std::string_view, std::string_view, std::string_view)> on_tool_call
 ) {
     auto body = buildRequestBody(messages);
     if (!model.empty()) {
@@ -107,11 +108,14 @@ void OpenAiCompatibleAdapter::streamChat(
 
     m_sse = SseParser{};
 
+    using TCall = std::function<void(std::string_view, std::string_view, std::string_view)>;
+    TCall tool_handler = std::move(on_tool_call);
+
     m_http->postStream(
         url,
         body,
         headers,
-        [&on_chunk, this](std::string_view line) {
+        [&on_chunk, &tool_handler, this](std::string_view line) {
             if (!line.starts_with("data: ")) return;
 
             auto data = line.substr(6);
@@ -128,6 +132,21 @@ void OpenAiCompatibleAdapter::streamChat(
 
                 if (delta.contains("reasoning_content") && !delta["reasoning_content"].is_null()) {
                     on_chunk(delta["reasoning_content"].get<std::string>(), false, true);
+                }
+
+                if (delta.contains("tool_calls") && delta["tool_calls"].is_array()) {
+                    for (auto& tc : delta["tool_calls"]) {
+                        std::string call_id = tc.value("id", "");
+                        std::string fn_name;
+                        std::string fn_args;
+                        if (tc.contains("function")) {
+                            fn_name = tc["function"].value("name", "");
+                            fn_args = tc["function"].value("arguments", "");
+                        }
+                        if (tool_handler && !fn_name.empty()) {
+                            tool_handler(fn_name, fn_args, call_id);
+                        }
+                    }
                 }
 
                 if (delta.contains("content") && !delta["content"].is_null()) {
