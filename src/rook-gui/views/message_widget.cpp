@@ -101,7 +101,24 @@ void MessageWidget::appendChunk(std::string_view chunk)
 
 void MessageWidget::appendReasoningChunk(std::string_view chunk)
 {
-    if (!m_reasoning_label) return;
+    if (!m_reasoning_expander) {
+        auto expander = Gtk::Expander::create("Thinking...");
+        expander->set_expanded(false);
+
+        auto rlabel = Gtk::Label::create("");
+        rlabel->set_wrap(true);
+        rlabel->set_xalign(0.0f);
+        rlabel->set_max_width_chars(80);
+        rlabel->add_css_class("dim-label");
+        rlabel->set_use_markup(true);
+
+        Gtk::Label *rlabel_ptr = rlabel;
+        expander->set_child(std::move(rlabel).release_floating_ptr());
+        m_reasoning_expander = expander;
+        m_reasoning_label = rlabel_ptr;
+        prepend(std::move(expander));
+    }
+
     auto current = std::string(m_reasoning_label->get_text());
     current.append(chunk);
     m_reasoning_label->set_label(current.c_str());
