@@ -281,6 +281,9 @@ void ChatView::doSend(std::string_view chat_id)
 
     auto *user_msg = MessageWidget::create("user", text).release_floating_ptr();
     m_message_list->append(user_msg);
+    auto *row = GTK_LIST_BOX_ROW(
+        gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(user_msg)));
+    if (row) gtk_list_box_row_set_activatable(row, FALSE);
 
     std::string model_id;
     auto idx = m_chat_model->get_selected();
@@ -309,6 +312,9 @@ void ChatView::onStreamChunk(const rook::domain::LlmStreamChunk &event)
             auto msg = MessageWidget::create("assistant", "");
             m_pending_assistant = std::move(msg).release_floating_ptr();
             m_message_list->append(m_pending_assistant);
+            auto *row = GTK_LIST_BOX_ROW(
+                gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(m_pending_assistant)));
+            if (row) gtk_list_box_row_set_activatable(row, FALSE);
         }
 
         if (!content.empty()) {
@@ -367,6 +373,9 @@ void ChatView::switchToChat(std::string_view chat_id)
 
         auto *user_msg = MessageWidget::create("user", text).release_floating_ptr();
         m_message_list->append(user_msg);
+        auto *row = GTK_LIST_BOX_ROW(
+            gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(user_msg)));
+        if (row) gtk_list_box_row_set_activatable(row, FALSE);
 
         std::string model_id;
         auto idx = m_chat_model->get_selected();
@@ -395,6 +404,9 @@ void ChatView::loadMessages(std::string_view chat_id)
             msg.role, msg.content, msg.reasoning_content)
             .release_floating_ptr();
         m_message_list->append(widget);
+        auto *row = GTK_LIST_BOX_ROW(
+            gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(widget)));
+        if (row) gtk_list_box_row_set_activatable(row, FALSE);
     }
 
     if (!conv.model.empty()) {
