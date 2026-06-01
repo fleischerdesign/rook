@@ -124,6 +124,7 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
     auto chat_page = Gtk::Box::create(Gtk::Orientation::VERTICAL, 0);
 
     auto msg_list = Gtk::ListBox::create();
+    msg_list->set_selection_mode(Gtk::SelectionMode::NONE);
     msg_list->set_hexpand(true);
     msg_list->set_vexpand(true);
     v->m_message_list = msg_list;
