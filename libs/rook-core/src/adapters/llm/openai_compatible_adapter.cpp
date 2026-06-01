@@ -155,7 +155,14 @@ void OpenAiCompatibleAdapter::streamChat(
 
                 spdlog::info("SSE raw: {}", data.substr(0, 200));
 
-                auto json = nlohmann::json::parse(data);
+                nlohmann::json json;
+                try {
+                    json = nlohmann::json::parse(data);
+                } catch (const std::exception& e) {
+                    spdlog::error("SSE parse@{}: {} | {}", __LINE__, e.what(), line);
+                    return;
+                }
+
                 if (!json.contains("choices") || json["choices"].empty()) return;
 
                 auto& choice = json["choices"][0];
@@ -164,29 +171,65 @@ void OpenAiCompatibleAdapter::streamChat(
                 if (choice.contains("delta")) {
                     auto& delta = choice["delta"];
 
-                    if (delta.contains("reasoning_content") && delta["reasoning_content"].is_string()) {
-                        on_chunk(delta["reasoning_content"].get<std::string>(), false, true);
+                    if (delta.contains("reasoning_content")) {
+                        bool r_is_str = false;
+                        try { r_is_str = delta["reasoning_content"].is_string(); }
+                        catch (const std::exception& e) { spdlog::error("SSE rc.is_string@{}: {} | {}", __LINE__, e.what(), line); }
+
+                        if (r_is_str) {
+                            try { on_chunk(delta["reasoning_content"].get<std::string>(), false, true); }
+                            catch (const std::exception& e) { spdlog::error("SSE rc.get@{}: {} | {}", __LINE__, e.what(), line); }
+                        }
                     }
 
                     if (delta.contains("tool_calls") && delta["tool_calls"].is_array()) {
                         for (auto& tc : delta["tool_calls"]) {
                             int idx = tc.value("index", 0);
-                            if (tc.contains("id") && tc["id"].is_string())
-                                tc_ids[idx] = tc["id"].get<std::string>();
+                            if (tc.contains("id")) {
+                                bool id_is_str = false;
+                                try { id_is_str = tc["id"].is_string(); }
+                                catch (const std::exception& e) { spdlog::error("SSE id.is_string@{}: {} | {}", __LINE__, e.what(), line); }
+                                if (id_is_str) {
+                                    try { tc_ids[idx] = tc["id"].get<std::string>(); }
+                                    catch (const std::exception& e) { spdlog::error("SSE id.get@{}: {} | {}", __LINE__, e.what(), line); }
+                                }
+                            }
                             if (tc.contains("function")) {
                                 auto& fn = tc["function"];
-                                if (fn.contains("name") && fn["name"].is_string())
-                                    tc_names[idx] = fn["name"].get<std::string>();
-                                if (fn.contains("arguments") && fn["arguments"].is_string())
-                                    tc_args[idx] += fn["arguments"].get<std::string>();
+                                if (fn.contains("name")) {
+                                    bool n_is_str = false;
+                                    try { n_is_str = fn["name"].is_string(); }
+                                    catch (const std::exception& e) { spdlog::error("SSE name.is_string@{}: {} | {}", __LINE__, e.what(), line); }
+                                    if (n_is_str) {
+                                        try { tc_names[idx] = fn["name"].get<std::string>(); }
+                                        catch (const std::exception& e) { spdlog::error("SSE name.get@{}: {} | {}", __LINE__, e.what(), line); }
+                                    }
+                                }
+                                if (fn.contains("arguments")) {
+                                    bool a_is_str = false;
+                                    try { a_is_str = fn["arguments"].is_string(); }
+                                    catch (const std::exception& e) { spdlog::error("SSE args.is_string@{}: {} | {}", __LINE__, e.what(), line); }
+                                    if (a_is_str) {
+                                        try { tc_args[idx] += fn["arguments"].get<std::string>(); }
+                                        catch (const std::exception& e) { spdlog::error("SSE args.get@{}: {} | {}", __LINE__, e.what(), line); }
+                                    }
+                                }
                             }
                         }
                     }
 
-                    if (delta.contains("content") && delta["content"].is_string()) {
-                        auto content = delta["content"].get<std::string>();
-                        auto finish = !finish_reason.empty();
-                        on_chunk(content, finish, false);
+                    if (delta.contains("content")) {
+                        bool c_is_str = false;
+                        try { c_is_str = delta["content"].is_string(); }
+                        catch (const std::exception& e) { spdlog::error("SSE c.is_string@{}: {} | {}", __LINE__, e.what(), line); }
+
+                        if (c_is_str) {
+                            try {
+                                auto content = delta["content"].get<std::string>();
+                                auto finish = !finish_reason.empty();
+                                on_chunk(content, finish, false);
+                            } catch (const std::exception& e) { spdlog::error("SSE c.get@{}: {} | {}", __LINE__, e.what(), line); }
+                        }
                     }
                 }
 
@@ -199,7 +242,7 @@ void OpenAiCompatibleAdapter::streamChat(
                     tc_args.clear();
                 }
             } catch (const std::exception& e) {
-                spdlog::error("SSE error: {} | line={}", e.what(), line);
+                spdlog::error("SSE outer: {} | line={}", e.what(), line);
             }
         },
         [&on_chunk](int32_t status) {
