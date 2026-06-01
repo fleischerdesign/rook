@@ -163,37 +163,27 @@ void OpenAiCompatibleAdapter::streamChat(
                     return;
                 }
 
-                bool has_choices = false;
-                try { has_choices = json.contains("choices") && !json["choices"].empty(); }
-                catch (const std::exception& e) { spdlog::error("SSE choices@{}: {} | {}", __LINE__, e.what(), line); }
-                if (!has_choices) return;
+                if (!json.contains("choices") || json["choices"].empty()) return;
 
-                nlohmann::json *choice = nullptr;
-                try { choice = &json["choices"][0]; }
-                catch (const std::exception& e) { spdlog::error("SSE choice[0]@{}: {} | {}", __LINE__, e.what(), line); }
-                if (!choice) return;
+                auto& choice = json["choices"][0];
+                auto finish_reason = choice.value("finish_reason", "");
 
-                auto finish_reason = choice->value("finish_reason", "");
+                if (choice.contains("delta")) {
+                    auto& delta = choice["delta"];
 
-                if (choice->contains("delta")) {
-                    nlohmann::json *delta = nullptr;
-                    try { delta = &(*choice)["delta"]; }
-                    catch (const std::exception& e) { spdlog::error("SSE delta@{}: {} | {}", __LINE__, e.what(), line); }
-                    if (!delta) return;
-
-                    if (delta->contains("reasoning_content")) {
+                    if (delta.contains("reasoning_content")) {
                         bool r_is_str = false;
-                        try { r_is_str = (*delta)["reasoning_content"].is_string(); }
+                        try { r_is_str = delta["reasoning_content"].is_string(); }
                         catch (const std::exception& e) { spdlog::error("SSE rc.is_string@{}: {} | {}", __LINE__, e.what(), line); }
 
                         if (r_is_str) {
-                            try { on_chunk((*delta)["reasoning_content"].get<std::string>(), false, true); }
+                            try { on_chunk(delta["reasoning_content"].get<std::string>(), false, true); }
                             catch (const std::exception& e) { spdlog::error("SSE rc.get@{}: {} | {}", __LINE__, e.what(), line); }
                         }
                     }
 
-                    if (delta->contains("tool_calls") && (*delta)["tool_calls"].is_array()) {
-                        for (auto& tc : (*delta)["tool_calls"]) {
+                    if (delta.contains("tool_calls") && delta["tool_calls"].is_array()) {
+                        for (auto& tc : delta["tool_calls"]) {
                             int idx = tc.value("index", 0);
                             if (tc.contains("id")) {
                                 bool id_is_str = false;
@@ -228,14 +218,14 @@ void OpenAiCompatibleAdapter::streamChat(
                         }
                     }
 
-                    if (delta->contains("content")) {
+                    if (delta.contains("content")) {
                         bool c_is_str = false;
-                        try { c_is_str = (*delta)["content"].is_string(); }
+                        try { c_is_str = delta["content"].is_string(); }
                         catch (const std::exception& e) { spdlog::error("SSE c.is_string@{}: {} | {}", __LINE__, e.what(), line); }
 
                         if (c_is_str) {
                             try {
-                                auto content = (*delta)["content"].get<std::string>();
+                                auto content = delta["content"].get<std::string>();
                                 auto finish = !finish_reason.empty();
                                 on_chunk(content, finish, false);
                             } catch (const std::exception& e) { spdlog::error("SSE c.get@{}: {} | {}", __LINE__, e.what(), line); }
