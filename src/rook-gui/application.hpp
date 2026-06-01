@@ -41,6 +41,7 @@ class RookApplication final : public peel::Adw::Application
     rook::core::SettingsLoader m_settings;
     rook::domain::ConversationManager m_conversations;
     std::unique_ptr<rook::domain::AgentEngine> m_engine;
+    std::unique_ptr<rook::ports::ToolPort> m_tool_port;
     bool m_first_run = true;
 
 public:

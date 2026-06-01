@@ -6,6 +6,7 @@
 #include "rook/adapters/store/json_store.hpp"
 #include "rook/adapters/model/model_cache.hpp"
 #include "rook/adapters/model/model_discovery_factory.hpp"
+#include "rook/adapters/mcp/null_tool_port.hpp"
 #include <spdlog/spdlog.h>
 #include <future>
 
@@ -33,13 +34,15 @@ inline void RookApplication::init(Class *)
 
     m_llm = rook::adapters::llm::makeMultiProviderAdapter();
 
+    m_tool_port = rook::adapters::mcp::makeNullToolPort();
+
     m_first_run = !m_settings.load(*m_store, *m_llm, *m_secrets);
 
     m_conversations.start(m_bus, m_store.get());
     m_conversations.loadFromStore(*m_store);
 
     m_engine = std::make_unique<rook::domain::AgentEngine>(
-        m_bus, *m_llm, m_conversations);
+        m_bus, *m_llm, m_conversations, *m_tool_port);
     m_engine->start();
 
     auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);

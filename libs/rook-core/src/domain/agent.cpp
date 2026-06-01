@@ -3,10 +3,12 @@
 
 namespace rook::domain {
 
-AgentEngine::AgentEngine(EventBus& bus, ports::LlmPort& llm, ConversationManager& conv)
+AgentEngine::AgentEngine(EventBus& bus, ports::LlmPort& llm,
+                         ConversationManager& conv, ports::ToolPort& tool)
     : m_bus(bus)
     , m_llm(llm)
     , m_conv(conv)
+    , m_tool(tool)
 {}
 
 void AgentEngine::start() {
@@ -37,15 +39,17 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
     m_conv.setModel(event.chat_id, event.model);
     m_conv.addMessage(event.chat_id, std::move(msg));
 
-    auto messages = m_conv.buildLlmMessages(event.chat_id);
+    m_pending_tool_calls.clear();
+    runLlm(event.chat_id, event.model);
+}
 
-    m_bus.publish(LlmRequested{event.chat_id, ""});
+void AgentEngine::runLlm(std::string chat_id, std::string model) {
+    auto messages = m_conv.buildLlmMessages(chat_id);
 
-    std::string chat_id = event.chat_id;
-    std::string model = event.model;
+    m_bus.publish(LlmRequested{chat_id, ""});
 
     m_llm.streamChat(
-        event.chat_id,
+        chat_id,
         messages,
         [this, chat_id](std::string_view chunk, bool is_final, bool is_reasoning) {
             if (!chunk.empty()) {
@@ -64,12 +68,19 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
         model,
         [this, chat_id](std::string_view name, std::string_view arguments,
                          std::string_view call_id) {
+            ports::ToolCall call;
+            call.id = std::string(call_id);
+            call.name = std::string(name);
+            call.arguments = std::string(arguments);
+
             m_bus.publish(ToolCallRequested{
                 .chat_id = chat_id,
-                .tool_name = std::string(name),
-                .arguments = std::string(arguments),
-                .call_id = std::string(call_id),
+                .tool_name = call.name,
+                .arguments = call.arguments,
+                .call_id = call.id,
             });
+
+            m_pending_tool_calls.push_back(std::move(call));
         }
     );
 }
@@ -86,6 +97,8 @@ void AgentEngine::onLlmChunk(const LlmStreamChunk& chunk) {
 
 void AgentEngine::onLlmCompleted(const LlmCompleted& event) {
     spdlog::info("LLM response complete for chat {}", event.chat_id);
+
+    if (processPendingToolCalls(event.chat_id)) return;
 
     m_conv.saveActiveConversation();
 
@@ -148,6 +161,41 @@ void AgentEngine::onLlmCompleted(const LlmCompleted& event) {
         },
         model
     );
+}
+
+bool AgentEngine::processPendingToolCalls(std::string_view chat_id) {
+    if (m_pending_tool_calls.empty()) return false;
+
+    spdlog::info("Processing {} tool calls for chat {}", m_pending_tool_calls.size(), chat_id);
+
+    auto conv = m_conv.open(chat_id);
+    std::string model = conv.model;
+
+    auto calls = std::move(m_pending_tool_calls);
+    m_pending_tool_calls.clear();
+
+    for (auto& call : calls) {
+        auto result = m_tool.execute(call);
+
+        m_bus.publish(ToolCallCompleted{
+            .chat_id = std::string(chat_id),
+            .call_id = call.id,
+            .result = result.content,
+            .is_error = result.is_error,
+        });
+
+        ChatMessage tool_msg;
+        tool_msg.role = "tool";
+        tool_msg.content = result.content;
+        tool_msg.tool_call_id = call.id;
+        m_conv.addMessage(chat_id, std::move(tool_msg));
+
+        spdlog::info("Tool {} completed: {}", call.name,
+                     result.is_error ? "error" : "success");
+    }
+
+    runLlm(std::string(chat_id), std::move(model));
+    return true;
 }
 
 void AgentEngine::onLlmError(const LlmError& event) {
