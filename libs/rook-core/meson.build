@@ -21,6 +21,8 @@ librook_core_sources = files(
   'src/adapters/mcp/mcp_server_manager.cpp',
   'src/adapters/mcp/mcp_client_adapter.cpp',
   'src/adapters/mcp/null_tool_port.cpp',
+  'src/adapters/builtin/builtin_tool_port.cpp',
+  'src/adapters/composite/composite_tool_port.cpp',
 )
 
 librook_core_deps = [

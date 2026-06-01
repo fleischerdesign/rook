@@ -10,6 +10,8 @@
 #include "rook/adapters/mcp/mcp_server_manager.hpp"
 #include "rook/adapters/mcp/mcp_client_adapter.hpp"
 #include "rook/adapters/mcp/stdio_transport.hpp"
+#include "rook/adapters/builtin/builtin_tool_port.hpp"
+#include "rook/adapters/composite/composite_tool_port.hpp"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <future>
@@ -38,7 +40,8 @@ inline void RookApplication::init(Class *)
 
     m_llm = rook::adapters::llm::makeMultiProviderAdapter();
 
-    m_tool_port = rook::adapters::mcp::makeNullToolPort();
+    auto composite = std::make_unique<rook::adapters::composite::CompositeToolPort>();
+    composite->addPort(rook::adapters::builtin::makeBuiltinToolPort());
 
     m_mcp_manager = std::make_unique<rook::adapters::mcp::McpServerManager>();
 
@@ -68,8 +71,10 @@ inline void RookApplication::init(Class *)
 
     if (m_mcp_manager->serverCount() > 0) {
         m_mcp_manager->startAll();
-        m_tool_port = rook::adapters::mcp::makeMcpToolPort(*m_mcp_manager);
+        composite->addPort(rook::adapters::mcp::makeMcpToolPort(*m_mcp_manager));
     }
+
+    m_tool_port = std::move(composite);
 
     m_first_run = !m_settings.load(*m_store, *m_llm, *m_secrets);
 
