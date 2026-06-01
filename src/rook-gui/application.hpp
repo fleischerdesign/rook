@@ -14,6 +14,8 @@
 #include "rook/ports/store_port.hpp"
 #include "rook/adapters/secret_store.hpp"
 #include "rook/core/settings.hpp"
+#include "rook/adapters/mcp/mcp_server_manager.hpp"
+#include "rook/adapters/mcp/mcp_client_adapter.hpp"
 
 namespace rook::gui {
 
@@ -42,6 +44,7 @@ class RookApplication final : public peel::Adw::Application
     rook::domain::ConversationManager m_conversations;
     std::unique_ptr<rook::domain::AgentEngine> m_engine;
     std::unique_ptr<rook::ports::ToolPort> m_tool_port;
+    std::unique_ptr<rook::adapters::mcp::McpServerManager> m_mcp_manager;
     bool m_first_run = true;
 
 public:

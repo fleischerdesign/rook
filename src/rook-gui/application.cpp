@@ -7,6 +7,10 @@
 #include "rook/adapters/model/model_cache.hpp"
 #include "rook/adapters/model/model_discovery_factory.hpp"
 #include "rook/adapters/mcp/null_tool_port.hpp"
+#include "rook/adapters/mcp/mcp_server_manager.hpp"
+#include "rook/adapters/mcp/mcp_client_adapter.hpp"
+#include "rook/adapters/mcp/stdio_transport.hpp"
+#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <future>
 
@@ -35,6 +39,37 @@ inline void RookApplication::init(Class *)
     m_llm = rook::adapters::llm::makeMultiProviderAdapter();
 
     m_tool_port = rook::adapters::mcp::makeNullToolPort();
+
+    m_mcp_manager = std::make_unique<rook::adapters::mcp::McpServerManager>();
+
+    auto config_json = m_store->loadConfig();
+    if (!config_json.empty() && config_json != "{}") {
+        try {
+            auto j = nlohmann::json::parse(config_json);
+            if (j.contains("mcp_servers") && j["mcp_servers"].is_array()) {
+                for (auto& s : j["mcp_servers"]) {
+                    rook::adapters::mcp::McpServerConfig cfg;
+                    cfg.id = s.value("id", "");
+                    cfg.command = s.value("command", "");
+                    cfg.enabled = s.value("enabled", true);
+                    if (s.contains("args") && s["args"].is_array()) {
+                        for (auto& a : s["args"])
+                            cfg.args.push_back(a.get<std::string>());
+                    }
+                    if (!cfg.id.empty() && !cfg.command.empty()) {
+                        m_mcp_manager->addServer(std::move(cfg));
+                    }
+                }
+            }
+        } catch (const std::exception& e) {
+            spdlog::error("Failed to parse MCP config: {}", e.what());
+        }
+    }
+
+    if (m_mcp_manager->serverCount() > 0) {
+        m_mcp_manager->startAll();
+        m_tool_port = rook::adapters::mcp::makeMcpToolPort(*m_mcp_manager);
+    }
 
     m_first_run = !m_settings.load(*m_store, *m_llm, *m_secrets);
 
@@ -112,10 +147,12 @@ inline void RookApplication::vfunc_activate()
 
 inline void RookApplication::vfunc_dispose()
 {
+    if (m_mcp_manager) m_mcp_manager->stopAll();
     m_llm.reset();
     m_store.reset();
     m_secrets.reset();
     m_engine.reset();
+    m_mcp_manager.reset();
     m_bus.~EventBus();
     parent_vfunc_dispose<RookApplication>();
 }
@@ -157,6 +194,15 @@ void RookApplication::startModelDiscovery(RookWindow &window)
 void RookApplication::saveConfig()
 {
     m_settings.save(*m_store, *m_llm, *m_secrets);
+
+    auto config_json = m_store->loadConfig();
+    nlohmann::json j;
+    if (!config_json.empty() && config_json != "{}") {
+        try {
+            j = nlohmann::json::parse(config_json);
+        } catch (...) {}
+    }
+
     spdlog::info("Config saved to {}", m_data_dir);
 }
 
