@@ -48,35 +48,6 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
     v->m_conv = &conv;
     v->m_llm = &llm;
 
-    v->m_chunk_handler = bus.subscribe<rook::domain::LlmStreamChunk>(
-        [v](const rook::domain::LlmStreamChunk &event) {
-            v->onStreamChunk(event);
-        });
-    v->m_completed_handler = bus.subscribe<rook::domain::LlmCompleted>(
-        [v](const rook::domain::LlmCompleted &event) {
-            v->onLlmCompleted(event);
-        });
-    v->m_locked_handler = bus.subscribe<rook::domain::LlmRequested>(
-        [v](const rook::domain::LlmRequested &event) {
-            if (event.chat_id == v->m_chat_id) v->setProcessing(true);
-        });
-    v->m_unlock_handler = bus.subscribe<rook::domain::LlmCompleted>(
-        [v](const rook::domain::LlmCompleted &event) {
-            if (event.chat_id == v->m_chat_id) v->setProcessing(false);
-        });
-    v->m_error_unlock_handler = bus.subscribe<rook::domain::LlmError>(
-        [v](const rook::domain::LlmError &event) {
-            if (event.chat_id == v->m_chat_id) v->setProcessing(false);
-        });
-    v->m_chat_selected_handler = bus.subscribe<rook::domain::ChatSelected>(
-        [v](const rook::domain::ChatSelected &event) {
-            v->onChatSelected(event);
-        });
-    v->m_chat_deleted_handler = bus.subscribe<rook::domain::ChatDeleted>(
-        [v](const rook::domain::ChatDeleted &event) {
-            v->onChatDeleted(event);
-        });
-
     auto stack = Gtk::Stack::create();
     stack->set_vexpand(true);
 
@@ -174,6 +145,35 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
     v->append(std::move(stack));
 
     v->populateModelDropdown();
+
+    v->m_chunk_handler = bus.subscribe<rook::domain::LlmStreamChunk>(
+        [v](const rook::domain::LlmStreamChunk &event) {
+            v->onStreamChunk(event);
+        });
+    v->m_completed_handler = bus.subscribe<rook::domain::LlmCompleted>(
+        [v](const rook::domain::LlmCompleted &event) {
+            v->onLlmCompleted(event);
+        });
+    v->m_locked_handler = bus.subscribe<rook::domain::LlmRequested>(
+        [v](const rook::domain::LlmRequested &event) {
+            if (event.chat_id == v->m_chat_id) v->setProcessing(true);
+        });
+    v->m_unlock_handler = bus.subscribe<rook::domain::LlmCompleted>(
+        [v](const rook::domain::LlmCompleted &event) {
+            if (event.chat_id == v->m_chat_id) v->setProcessing(false);
+        });
+    v->m_error_unlock_handler = bus.subscribe<rook::domain::LlmError>(
+        [v](const rook::domain::LlmError &event) {
+            if (event.chat_id == v->m_chat_id) v->setProcessing(false);
+        });
+    v->m_chat_selected_handler = bus.subscribe<rook::domain::ChatSelected>(
+        [v](const rook::domain::ChatSelected &event) {
+            v->onChatSelected(event);
+        });
+    v->m_chat_deleted_handler = bus.subscribe<rook::domain::ChatDeleted>(
+        [v](const rook::domain::ChatDeleted &event) {
+            v->onChatDeleted(event);
+        });
 
     return view;
 }
