@@ -120,7 +120,6 @@ void OpenAiCompatibleAdapter::streamChat(
     std::string_view tools_json
 ) {
     auto body = buildRequestBody(messages, tools_json);
-    spdlog::info("SSE request body (first 500): {}", body.substr(0, 500));
     if (!model.empty()) {
         auto j = nlohmann::json::parse(body);
         j["model"] = std::string(model);
@@ -152,8 +151,6 @@ void OpenAiCompatibleAdapter::streamChat(
 
                 auto data = line.substr(6);
                 if (data == "[DONE]") return;
-
-                spdlog::info("SSE raw: {}", data.substr(0, 200));
 
                 auto json = nlohmann::json::parse(data);
                 if (!json.contains("choices") || json["choices"].empty()) return;
