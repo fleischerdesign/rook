@@ -151,53 +151,78 @@ void OpenAiCompatibleAdapter::streamChat(
             auto data = line.substr(6);
             if (data == "[DONE]") return;
 
+            nlohmann::json json;
             try {
-                auto json = nlohmann::json::parse(data);
-                if (!json.contains("choices") || json["choices"].empty()) return;
+                json = nlohmann::json::parse(data);
+            } catch (const std::exception& e) {
+                spdlog::warn("SSE json parse: {} | raw={}", e.what(), data);
+                return;
+            }
 
-                auto& choice = json["choices"][0];
+            if (!json.contains("choices") || json["choices"].empty()) return;
 
-                auto finish_reason = choice.value("finish_reason", "");
+            auto& choice = json["choices"][0];
+            auto finish_reason = choice.value("finish_reason", "");
 
-                if (choice.contains("delta")) {
-                    auto& delta = choice["delta"];
+            if (choice.contains("delta")) {
+                auto& delta = choice["delta"];
 
-                    if (delta.contains("reasoning_content") && !delta["reasoning_content"].is_null()) {
+                if (delta.contains("reasoning_content") && !delta["reasoning_content"].is_null()) {
+                    try {
                         on_chunk(delta["reasoning_content"].get<std::string>(), false, true);
+                    } catch (const std::exception& e) {
+                        spdlog::error("SSE reasoning_content: {} | raw={}", e.what(), data);
                     }
+                }
 
-                    if (delta.contains("tool_calls") && delta["tool_calls"].is_array()) {
-                        for (auto& tc : delta["tool_calls"]) {
-                            int idx = tc.value("index", 0);
-                            if (tc.contains("id") && !tc["id"].is_null())
+                if (delta.contains("tool_calls") && delta["tool_calls"].is_array()) {
+                    for (auto& tc : delta["tool_calls"]) {
+                        int idx = tc.value("index", 0);
+                        if (tc.contains("id") && !tc["id"].is_null()) {
+                            try {
                                 tc_ids[idx] = tc["id"].get<std::string>();
-                            if (tc.contains("function")) {
-                                auto& fn = tc["function"];
-                                if (fn.contains("name") && !fn["name"].is_null())
+                            } catch (const std::exception& e) {
+                                spdlog::error("SSE tc.id: {} | raw={}", e.what(), data);
+                            }
+                        }
+                        if (tc.contains("function")) {
+                            auto& fn = tc["function"];
+                            if (fn.contains("name") && !fn["name"].is_null()) {
+                                try {
                                     tc_names[idx] = fn["name"].get<std::string>();
-                                if (fn.contains("arguments") && !fn["arguments"].is_null())
+                                } catch (const std::exception& e) {
+                                    spdlog::error("SSE tc.name: {} | raw={}", e.what(), data);
+                                }
+                            }
+                            if (fn.contains("arguments") && !fn["arguments"].is_null()) {
+                                try {
                                     tc_args[idx] += fn["arguments"].get<std::string>();
+                                } catch (const std::exception& e) {
+                                    spdlog::error("SSE tc.args: {} | raw={}", e.what(), data);
+                                }
                             }
                         }
                     }
+                }
 
-                    if (delta.contains("content") && !delta["content"].is_null()) {
+                if (delta.contains("content") && !delta["content"].is_null()) {
+                    try {
                         auto content = delta["content"].get<std::string>();
                         auto finish = !finish_reason.empty();
                         on_chunk(content, finish, false);
+                    } catch (const std::exception& e) {
+                        spdlog::error("SSE content: {} | raw={}", e.what(), data);
                     }
                 }
+            }
 
-                if (finish_reason == "tool_calls" && tool_handler) {
-                    for (auto& [idx, name] : tc_names) {
-                        tool_handler(name, tc_args[idx], tc_ids[idx]);
-                    }
-                    tc_ids.clear();
-                    tc_names.clear();
-                    tc_args.clear();
+            if (finish_reason == "tool_calls" && tool_handler) {
+                for (auto& [idx, name] : tc_names) {
+                    tool_handler(name, tc_args[idx], tc_ids[idx]);
                 }
-            } catch (const std::exception& e) {
-                spdlog::error("SSE parse error: {}", e.what());
+                tc_ids.clear();
+                tc_names.clear();
+                tc_args.clear();
             }
         },
         [&on_chunk](int32_t status) {
