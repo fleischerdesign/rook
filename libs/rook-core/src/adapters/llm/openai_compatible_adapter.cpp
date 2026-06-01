@@ -156,7 +156,10 @@ void OpenAiCompatibleAdapter::streamChat(
                 if (!json.contains("choices") || json["choices"].empty()) return;
 
                 auto& choice = json["choices"][0];
-                auto finish_reason = choice.value("finish_reason", "");
+                auto finish_reason = std::string{};
+                if (choice.contains("finish_reason") && choice["finish_reason"].is_string()) {
+                    finish_reason = choice["finish_reason"].get<std::string>();
+                }
 
                 if (choice.contains("delta")) {
                     auto& delta = choice["delta"];
