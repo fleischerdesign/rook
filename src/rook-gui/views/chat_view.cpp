@@ -21,6 +21,8 @@ inline void ChatView::init(Class *)
     gtk_orientable_set_orientation(
         GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
         GTK_ORIENTATION_VERTICAL);
+    new (&m_chat_id) std::string();
+    new (&m_pending_input) std::string();
 }
 
 inline void ChatView::vfunc_dispose()
