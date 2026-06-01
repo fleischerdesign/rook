@@ -17,6 +17,7 @@ librook_core_sources = files(
   'src/adapters/store/json_store.cpp',
   'src/adapters/secret_store.cpp',
   'src/adapters/mcp/stdio_transport.cpp',
+  'src/adapters/mcp/mcp_client.cpp',
 )
 
 librook_core_deps = [
