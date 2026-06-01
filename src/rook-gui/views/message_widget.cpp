@@ -18,10 +18,8 @@ inline void MessageWidget::init(Class *)
         GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
         GTK_ORIENTATION_VERTICAL);
     set_spacing(2);
-    set_margin_start(6);
-    set_margin_end(6);
-    set_margin_top(4);
-    set_margin_bottom(4);
+    set_margin_top(6);
+    set_margin_bottom(6);
 }
 
 FloatPtr<MessageWidget> MessageWidget::create(const std::string &role,
@@ -52,14 +50,23 @@ FloatPtr<MessageWidget> MessageWidget::create(const std::string &role,
 
     auto label = Gtk::Label::create(content.c_str());
     label->set_wrap(true);
-    label->set_xalign(0.0f);
-    label->set_max_width_chars(80);
     label->set_use_markup(true);
+
     if (role == "user") {
-        label->add_css_class("frame");
-        widget->add_css_class("message-user");
+        widget->set_halign(Gtk::Align::END);
+        widget->set_hexpand(false);
+        widget->set_margin_start(50);
+        widget->set_margin_end(12);
+        label->add_css_class("card");
+        label->set_xalign(0.0f);
+        label->set_max_width_chars(40);
     } else {
-        widget->add_css_class("message-assistant");
+        widget->set_halign(Gtk::Align::FILL);
+        widget->set_hexpand(true);
+        widget->set_margin_start(12);
+        widget->set_margin_end(12);
+        label->set_xalign(0.0f);
+        label->set_max_width_chars(80);
     }
     Gtk::Label *label_ptr = label;
     widget->m_label = label_ptr;
