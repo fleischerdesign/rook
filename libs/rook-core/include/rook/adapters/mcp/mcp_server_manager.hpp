@@ -10,6 +10,10 @@
 #include <unordered_map>
 #include <vector>
 
+namespace rook::ports {
+class SecurityPort;
+}
+
 namespace rook::adapters::mcp {
 
 struct McpServerConfig {
@@ -36,6 +40,8 @@ public:
 
     size_t serverCount() const;
 
+    void setSecurityPort(rook::ports::SecurityPort* port);
+
 private:
     struct ServerEntry {
         McpServerConfig config;
@@ -50,6 +56,7 @@ private:
     std::vector<ServerEntry> m_servers;
     std::unordered_map<std::string, size_t> m_tool_index;
     mutable std::mutex m_mutex;
+    rook::ports::SecurityPort* m_security = nullptr;
 };
 
 } // namespace rook::adapters::mcp

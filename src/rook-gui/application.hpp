@@ -16,6 +16,7 @@
 #include "rook/core/settings.hpp"
 #include "rook/adapters/mcp/mcp_server_manager.hpp"
 #include "rook/adapters/mcp/mcp_client_adapter.hpp"
+#include "rook/adapters/security/security_manager.hpp"
 
 namespace rook::gui {
 
@@ -45,6 +46,7 @@ class RookApplication final : public peel::Adw::Application
     std::unique_ptr<rook::domain::AgentEngine> m_engine;
     std::unique_ptr<rook::ports::ToolPort> m_tool_port;
     std::unique_ptr<rook::adapters::mcp::McpServerManager> m_mcp_manager;
+    std::unique_ptr<rook::adapters::security::SecurityManager> m_security;
     bool m_first_run = true;
 
 public:

@@ -23,6 +23,9 @@ librook_core_sources = files(
   'src/adapters/mcp/null_tool_port.cpp',
   'src/adapters/builtin/builtin_tool_port.cpp',
   'src/adapters/composite/composite_tool_port.cpp',
+  'src/adapters/security/capability.cpp',
+  'src/adapters/security/security_manager.cpp',
+  'src/adapters/security/security_guarded_tool_port.cpp',
 )
 
 librook_core_deps = [

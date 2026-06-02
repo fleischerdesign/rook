@@ -12,6 +12,7 @@
 #include "rook/adapters/mcp/stdio_transport.hpp"
 #include "rook/adapters/builtin/builtin_tool_port.hpp"
 #include "rook/adapters/composite/composite_tool_port.hpp"
+#include "rook/adapters/security/security_manager.hpp"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <future>
@@ -45,6 +46,8 @@ inline void RookApplication::init(Class *)
 
     m_mcp_manager = std::make_unique<rook::adapters::mcp::McpServerManager>();
 
+    m_security = std::make_unique<rook::adapters::security::SecurityManager>();
+
     auto config_json = m_store->loadConfig();
     if (!config_json.empty() && config_json != "{}") {
         try {
@@ -64,6 +67,10 @@ inline void RookApplication::init(Class *)
                     }
                 }
             }
+            if (j.contains("mcp_servers")) {
+                m_security->loadFromConfig(
+                    j["mcp_servers"].dump());
+            }
         } catch (const std::exception& e) {
             spdlog::error("Failed to parse MCP config: {}", e.what());
         }
@@ -71,6 +78,7 @@ inline void RookApplication::init(Class *)
 
     if (m_mcp_manager->serverCount() > 0) {
         m_mcp_manager->startAll();
+        m_mcp_manager->setSecurityPort(m_security.get());
         composite->addPort(rook::adapters::mcp::makeMcpToolPort(*m_mcp_manager));
     }
 

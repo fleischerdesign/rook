@@ -1,5 +1,6 @@
 #include "rook/adapters/mcp/mcp_server_manager.hpp"
 #include "rook/adapters/mcp/stdio_transport.hpp"
+#include "rook/ports/security_port.hpp"
 
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
@@ -177,6 +178,14 @@ rook::ports::ToolResult McpServerManager::executeTool(
         return result;
     }
 
+    if (m_security && !m_security->isAllowed(owner->config.id, call)) {
+        result.is_error = true;
+        result.content = std::string("permission denied: tool '")
+                       + call.name + "' not allowed on server '"
+                       + owner->config.id + "'";
+        return result;
+    }
+
     try {
         auto args = nlohmann::json::parse(call.arguments);
         auto response = owner->client->callTool(call.name, std::move(args));
@@ -209,6 +218,11 @@ size_t McpServerManager::serverCount() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_servers.size();
+}
+
+void McpServerManager::setSecurityPort(rook::ports::SecurityPort* port)
+{
+    m_security = port;
 }
 
 McpServerManager::ServerEntry*

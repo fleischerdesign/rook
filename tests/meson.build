@@ -10,6 +10,8 @@ if gtest_dep.found()
     'rook-tests',
     'unit/test_event_bus.cpp',
     'unit/test_conversation.cpp',
+    'unit/test_capability.cpp',
+    'unit/test_security_manager.cpp',
     dependencies: test_deps,
     build_by_default: false,
   )
