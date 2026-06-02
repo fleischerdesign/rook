@@ -233,6 +233,7 @@ bool AgentEngine::processPendingToolCalls(std::string_view chat_id) {
         tool_msg.role = "tool";
         tool_msg.content = result.content;
         tool_msg.tool_call_id = call.id;
+        tool_msg.tool_name = call.name;
         m_conv.addMessage(chat_id, std::move(tool_msg));
 
         spdlog::info("Tool {} completed: {}", call.name,

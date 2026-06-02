@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <map>
 #include "rook/domain/events.hpp"
 #include "rook/domain/event_bus.hpp"
 #include "rook/domain/conversation.hpp"
@@ -42,6 +43,7 @@ class ChatView final : public peel::Gtk::Box
     std::vector<std::string> m_chat_ids;
 
     MessageWidget *m_pending_assistant = nullptr;
+    std::map<std::string, peel::Gtk::Widget*> m_pending_tool_rows;
 
     rook::domain::EventBus::HandlerId m_chunk_handler;
     rook::domain::EventBus::HandlerId m_locked_handler;
@@ -50,6 +52,8 @@ class ChatView final : public peel::Gtk::Box
     rook::domain::EventBus::HandlerId m_chat_selected_handler;
     rook::domain::EventBus::HandlerId m_chat_deleted_handler;
     rook::domain::EventBus::HandlerId m_completed_handler;
+    rook::domain::EventBus::HandlerId m_tool_requested_handler;
+    rook::domain::EventBus::HandlerId m_tool_completed_handler;
 
     inline void init(Class *);
     inline void vfunc_dispose ();
@@ -58,6 +62,8 @@ class ChatView final : public peel::Gtk::Box
     void onMessageEntryActivated(peel::Gtk::Entry *);
     void onStreamChunk(const rook::domain::LlmStreamChunk &event);
     void onLlmCompleted(const rook::domain::LlmCompleted &event);
+    void onToolCallRequested(const rook::domain::ToolCallRequested &event);
+    void onToolCallCompleted(const rook::domain::ToolCallCompleted &event);
     void onChatSelected(const rook::domain::ChatSelected &event);
     void onChatDeleted(const rook::domain::ChatDeleted &event);
     void loadMessages(std::string_view chat_id);

@@ -1,5 +1,6 @@
 #include "chat_view.hpp"
 #include "message_widget.hpp"
+#include "tool_call_row.hpp"
 #include "rook/adapters/model/model_cache.hpp"
 #include "rook/ports/model_discovery_port.hpp"
 #include <spdlog/spdlog.h>
@@ -35,6 +36,8 @@ inline void ChatView::vfunc_dispose()
         m_bus->unsubscribe(m_error_unlock_handler);
         m_bus->unsubscribe(m_chat_selected_handler);
         m_bus->unsubscribe(m_chat_deleted_handler);
+        m_bus->unsubscribe(m_tool_requested_handler);
+        m_bus->unsubscribe(m_tool_completed_handler);
         m_bus = nullptr;
     }
     parent_vfunc_dispose<ChatView>();
@@ -77,6 +80,15 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
     v->m_chat_deleted_handler = bus.subscribe<rook::domain::ChatDeleted>(
         [v](const rook::domain::ChatDeleted &event) {
             v->onChatDeleted(event);
+        });
+
+    v->m_tool_requested_handler = bus.subscribe<rook::domain::ToolCallRequested>(
+        [v](const rook::domain::ToolCallRequested &event) {
+            v->onToolCallRequested(event);
+        });
+    v->m_tool_completed_handler = bus.subscribe<rook::domain::ToolCallCompleted>(
+        [v](const rook::domain::ToolCallCompleted &event) {
+            v->onToolCallCompleted(event);
         });
 
     auto stack = Gtk::Stack::create();
@@ -339,6 +351,39 @@ void ChatView::onLlmCompleted(const rook::domain::LlmCompleted &)
     });
 }
 
+void ChatView::onToolCallRequested(const rook::domain::ToolCallRequested &event)
+{
+    if (event.chat_id != m_chat_id) return;
+
+    GLib::idle_add_once([this, name = event.tool_name,
+                         call_id = event.call_id]() mutable {
+        auto row = ToolCallRow::createPending(name, call_id);
+        auto *ptr = std::move(row).release_floating_ptr();
+        m_message_list->append(ptr);
+        auto *list_row = GTK_LIST_BOX_ROW(
+            gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(ptr)));
+        if (list_row) gtk_list_box_row_set_activatable(list_row, FALSE);
+        m_pending_tool_rows[call_id] = ptr;
+    });
+}
+
+void ChatView::onToolCallCompleted(const rook::domain::ToolCallCompleted &event)
+{
+    if (event.chat_id != m_chat_id) return;
+
+    GLib::idle_add_once([this, call_id = event.call_id,
+                         result = event.result,
+                         is_error = event.is_error]() {
+        auto it = m_pending_tool_rows.find(call_id);
+        if (it != m_pending_tool_rows.end()) {
+            auto *row = static_cast<ToolCallRow*>(it->second);
+            if (row) {
+                row->setResult(result, is_error);
+            }
+        }
+    });
+}
+
 void ChatView::onChatSelected(const rook::domain::ChatSelected &event)
 {
     GLib::idle_add_once([this, id = event.chat_id]() {
@@ -398,10 +443,19 @@ void ChatView::loadMessages(std::string_view chat_id)
         m_message_list->remove(row);
     }
     m_pending_assistant = nullptr;
+    m_pending_tool_rows.clear();
 
     auto conv = m_conv->open(chat_id);
     for (const auto &msg : conv.messages) {
-        if (msg.role == "tool") continue;
+        if (msg.role == "tool") {
+            auto *row = ToolCallRow::createCompleted(
+                msg.tool_name, "", msg.content, false).release_floating_ptr();
+            m_message_list->append(row);
+            auto *list_row = GTK_LIST_BOX_ROW(
+                gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(row)));
+            if (list_row) gtk_list_box_row_set_activatable(list_row, FALSE);
+            continue;
+        }
         auto *widget = MessageWidget::create(
             msg.role, msg.content, msg.reasoning_content)
             .release_floating_ptr();

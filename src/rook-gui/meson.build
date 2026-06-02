@@ -4,6 +4,7 @@ rook_gui_sources = files(
   'window.cpp',
   'views/chat_view.cpp',
   'views/message_widget.cpp',
+  'views/tool_call_row.cpp',
   'views/chat_sidebar.cpp',
   'views/preferences_window.cpp',
   'views/llm_settings_page.cpp',

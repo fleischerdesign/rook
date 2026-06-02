@@ -14,6 +14,7 @@ inline void MessageWidget::Class::init()
 
 inline void MessageWidget::init(Class *)
 {
+    new (&m_role) std::string();
     gtk_orientable_set_orientation(
         GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
         GTK_ORIENTATION_VERTICAL);

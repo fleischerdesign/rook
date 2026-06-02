@@ -302,6 +302,7 @@ void ConversationManager::loadFromStore(ports::StorePort& store) {
                     msg.timestamp = std::chrono::system_clock::now();
                     msg.has_tool_calls = mj.value("has_tool_calls", false);
                     msg.tool_call_id = mj.value("tool_call_id", "");
+                    msg.tool_name = mj.value("tool_name", "");
                     msg.tool_calls_json = mj.value("tool_calls_json", "");
                     conv.messages.push_back(std::move(msg));
                 }
@@ -337,6 +338,7 @@ void ConversationManager::saveActiveConversation() {
         mj["reasoning_content"] = msg.reasoning_content;
         mj["has_tool_calls"] = msg.has_tool_calls;
         mj["tool_call_id"] = msg.tool_call_id;
+        mj["tool_name"] = msg.tool_name;
         mj["tool_calls_json"] = msg.tool_calls_json;
         messages.push_back(mj);
     }
