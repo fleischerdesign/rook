@@ -17,6 +17,7 @@ librook_core_sources = files(
   'src/adapters/store/json_store.cpp',
   'src/adapters/secret_store.cpp',
   'src/adapters/mcp/stdio_transport.cpp',
+  'src/adapters/mcp/http_sse_transport.cpp',
   'src/adapters/mcp/mcp_client.cpp',
   'src/adapters/mcp/mcp_server_manager.cpp',
   'src/adapters/mcp/mcp_client_adapter.cpp',
@@ -26,6 +27,8 @@ librook_core_sources = files(
   'src/adapters/security/capability.cpp',
   'src/adapters/security/security_manager.cpp',
   'src/adapters/security/security_guarded_tool_port.cpp',
+  'src/adapters/extension/extension_manifest.cpp',
+  'src/adapters/extension/extension_manager.cpp',
 )
 
 librook_core_deps = [

@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace rook::ports {
@@ -16,11 +17,20 @@ class SecurityPort;
 
 namespace rook::adapters::mcp {
 
+enum class McpTransportType {
+    Stdio,
+    HttpSse
+};
+
 struct McpServerConfig {
     std::string id;
+    McpTransportType transport_type = McpTransportType::Stdio;
     std::string command;
     std::vector<std::string> args;
+    std::string url;
+    std::vector<std::pair<std::string, std::string>> headers;
     bool enabled = true;
+    std::string source;
 };
 
 class McpServerManager {
@@ -39,6 +49,12 @@ public:
     rook::ports::ToolResult executeTool(const rook::ports::ToolCall& call);
 
     size_t serverCount() const;
+
+    std::vector<McpServerConfig> listServers() const;
+
+    size_t toolCountForServer(std::string_view id) const;
+
+    void setEnabled(std::string_view id, bool enabled);
 
     void setSecurityPort(rook::ports::SecurityPort* port);
 

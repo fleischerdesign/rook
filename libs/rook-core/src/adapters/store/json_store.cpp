@@ -22,6 +22,8 @@ public:
         j["created_at"] = std::chrono::system_clock::to_time_t(record.created_at);
         j["updated_at"] = std::chrono::system_clock::to_time_t(record.updated_at);
         j["messages"] = nlohmann::json::parse(record.messages_json.empty() ? "[]" : record.messages_json);
+        if (!record.active_skill_ids_json.empty())
+            j["active_skill_ids"] = nlohmann::json::parse(record.active_skill_ids_json);
 
         auto path = chatPath(record.id);
         std::ofstream out(path);
@@ -49,6 +51,8 @@ public:
         rec.updated_at = std::chrono::system_clock::from_time_t(ua);
 
         rec.messages_json = j["messages"].dump();
+        if (j.contains("active_skill_ids"))
+            rec.active_skill_ids_json = j["active_skill_ids"].dump();
 
         return rec;
     }

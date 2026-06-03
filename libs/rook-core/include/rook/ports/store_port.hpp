@@ -15,6 +15,7 @@ struct ChatRecord {
     std::chrono::system_clock::time_point created_at;
     std::chrono::system_clock::time_point updated_at;
     std::string messages_json;
+    std::string active_skill_ids_json;
 };
 
 class StorePort {

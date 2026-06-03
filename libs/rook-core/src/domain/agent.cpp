@@ -1,15 +1,20 @@
 #include "rook/domain/agent.hpp"
+#include "rook/ports/extension_port.hpp"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 namespace rook::domain {
 
 AgentEngine::AgentEngine(EventBus& bus, ports::LlmPort& llm,
-                         ConversationManager& conv, ports::ToolPort& tool)
+                         ConversationManager& conv, ports::ToolPort& tool,
+                         ports::ExtensionPort* extensions,
+                         std::vector<rook::adapters::extension::CustomSkill>* custom_skills)
     : m_bus(bus)
     , m_llm(llm)
     , m_conv(conv)
     , m_tool(tool)
+    , m_extensions(extensions)
+    , m_custom_skills(custom_skills)
 {}
 
 void AgentEngine::start() {
@@ -28,6 +33,12 @@ void AgentEngine::start() {
     m_tool_handler = m_bus.subscribe<ToolCallCompleted>(
         [this](const ToolCallCompleted& event) { onToolCallCompleted(event); });
 
+    m_skill_handler = m_bus.subscribe<SkillToggled>(
+        [this](const SkillToggled& event) { onSkillToggled(event); });
+
+    m_chat_selected_handler = m_bus.subscribe<ChatSelected>(
+        [this](const ChatSelected& event) { onChatSelected(event); });
+
     spdlog::info("AgentEngine started");
 }
 
@@ -38,7 +49,16 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
     msg.role = "user";
     msg.content = event.content;
     m_conv.setModel(event.chat_id, event.model);
+
+    auto conv = m_conv.open(event.chat_id);
+    bool is_first = conv.messages.empty();
     m_conv.addMessage(event.chat_id, std::move(msg));
+
+    if (is_first) {
+        injectSkillsOnFirstMessage(event.chat_id);
+    } else {
+        syncAlwaysOnSkills(event.chat_id);
+    }
 
     m_pending_tool_calls.clear();
     runLlm(event.chat_id, event.model);
@@ -250,6 +270,195 @@ void AgentEngine::onLlmError(const LlmError& event) {
 
 void AgentEngine::onToolCallCompleted(const ToolCallCompleted& /*event*/) {
     spdlog::info("Tool call completed");
+}
+
+std::string AgentEngine::buildSystemPrompt(std::string_view chat_id) {
+    std::string result;
+
+    auto active_ids = m_conv.activeSkillIds(chat_id);
+
+    auto append_skill = [&](const std::string& prompt,
+                             const std::string& name,
+                             const std::string& description) {
+        if (!result.empty()) result += "\n\n";
+        result += "[Skill: " + name;
+        if (!description.empty()) result += " — " + description;
+        result += "]\n\n" + prompt;
+    };
+
+    if (m_custom_skills) {
+        for (auto& skill : *m_custom_skills) {
+            if (skill.prompt.empty()) continue;
+            std::string sid = "custom:" + skill.name;
+            bool is_active = std::find(active_ids.begin(), active_ids.end(), sid)
+                          != active_ids.end();
+            if (!is_active) continue;
+            append_skill(skill.prompt, skill.name, skill.description);
+        }
+    }
+
+    if (m_extensions) {
+        for (auto& ext : m_extensions->listInstalled()) {
+            for (auto& skill : ext.skills) {
+                if (skill.prompt.empty()) continue;
+                std::string sid = "ext:" + ext.name + ":" + skill.name;
+                bool is_active = std::find(active_ids.begin(), active_ids.end(), sid)
+                              != active_ids.end();
+                if (!is_active) continue;
+                append_skill(skill.prompt, skill.name, skill.description);
+            }
+        }
+    }
+
+    if (m_extensions) {
+        std::string context_index;
+        for (auto& ext : m_extensions->listInstalled()) {
+            if (ext.context_files.empty()) continue;
+            context_index += "\nFrom " + ext.display_name
+                + " v" + ext.version + ":\n";
+            for (auto& cf : ext.context_files) {
+                context_index += "  " + ext.install_path
+                    + "/" + cf.path;
+                if (!cf.description.empty())
+                    context_index += " — " + cf.description;
+                context_index += "\n";
+            }
+        }
+        if (!context_index.empty()) {
+            if (!result.empty()) result += "\n\n";
+            result += "Available extension context files (use read_file to access):"
+                   + context_index;
+        }
+    }
+
+    return result;
+}
+
+void AgentEngine::injectSkillsOnFirstMessage(std::string_view chat_id) {
+    std::vector<std::string> active_ids;
+
+    if (m_custom_skills) {
+        for (auto& skill : *m_custom_skills) {
+            if (skill.prompt.empty()) continue;
+            if (skill.enabled)
+                active_ids.push_back("custom:" + skill.name);
+        }
+    }
+    if (m_extensions) {
+        for (auto& ext : m_extensions->listInstalled()) {
+            for (auto& skill : ext.skills) {
+                if (skill.prompt.empty()) continue;
+                if (skill.enabled)
+                    active_ids.push_back("ext:" + ext.name + ":" + skill.name);
+            }
+        }
+    }
+    m_conv.setActiveSkillIds(chat_id, active_ids);
+
+    for (auto& sid : active_ids) {
+        m_bus.publish(SkillToggled{
+            .chat_id = std::string(chat_id),
+            .skill_id = sid,
+            .active = true,
+        });
+    }
+
+    auto prompt = buildSystemPrompt(chat_id);
+    if (!prompt.empty()) {
+        m_conv.setSystemMessage(chat_id, prompt);
+    }
+}
+
+void AgentEngine::rebuildSystemMessage(std::string_view chat_id) {
+    auto prompt = buildSystemPrompt(chat_id);
+    if (prompt.empty()) return;
+    m_conv.updateSystemMessage(chat_id, prompt);
+}
+
+void AgentEngine::onSkillToggled(const SkillToggled& event) {
+    if (!m_extensions || event.chat_id.empty()) return;
+
+    auto active_ids = m_conv.activeSkillIds(event.chat_id);
+    if (event.active) {
+        if (std::find(active_ids.begin(), active_ids.end(), event.skill_id)
+            == active_ids.end())
+            active_ids.push_back(event.skill_id);
+    } else {
+        std::erase(active_ids, event.skill_id);
+    }
+    m_conv.setActiveSkillIds(event.chat_id, active_ids);
+
+    auto prompt = buildSystemPrompt(event.chat_id);
+    if (!prompt.empty()) {
+        m_conv.updateSystemMessage(event.chat_id, prompt);
+    }
+}
+
+void AgentEngine::onChatSelected(const ChatSelected& event) {
+    if (!event.chat_id.empty()) {
+        syncAlwaysOnSkills(event.chat_id);
+    }
+}
+
+void AgentEngine::syncAlwaysOnSkills(std::string_view chat_id) {
+    auto active_ids = m_conv.activeSkillIds(chat_id);
+    auto conv = m_conv.open(chat_id);
+    if (conv.messages.empty()) return;
+
+    auto erase_if_stale = [&](const std::string& sid) -> bool {
+        if (sid.starts_with("custom:")) {
+            if (!m_custom_skills) return true;
+            auto name = sid.substr(7);
+            return std::find_if(m_custom_skills->begin(),
+                m_custom_skills->end(),
+                [&](auto& s) { return s.name == name; })
+                == m_custom_skills->end();
+        }
+        if (sid.starts_with("ext:") && m_extensions) {
+            auto rest = sid.substr(4);
+            auto dot = rest.find(':');
+            if (dot == std::string::npos) return true;
+            auto ext_name = rest.substr(0, dot);
+            auto skill_name = rest.substr(dot + 1);
+            for (auto& ext : m_extensions->listInstalled()) {
+                if (ext.name == ext_name) {
+                    for (auto& s : ext.skills) {
+                        if (s.name == skill_name) return false;
+                    }
+                }
+            }
+            return true;
+        }
+        return false;
+    };
+
+    std::erase_if(active_ids, erase_if_stale);
+
+    auto add_if_missing = [&](const std::string& sid) {
+        if (std::find(active_ids.begin(), active_ids.end(), sid)
+            == active_ids.end()) {
+            active_ids.push_back(sid);
+        }
+    };
+
+    if (m_custom_skills) {
+        for (auto& skill : *m_custom_skills) {
+            if (skill.enabled && !skill.prompt.empty())
+                add_if_missing("custom:" + skill.name);
+        }
+    }
+    if (m_extensions) {
+        for (auto& ext : m_extensions->listInstalled()) {
+            for (auto& skill : ext.skills) {
+                if (skill.enabled && !skill.prompt.empty())
+                    add_if_missing("ext:" + ext.name + ":" + skill.name);
+            }
+        }
+    }
+
+    m_conv.setActiveSkillIds(chat_id, active_ids);
+    auto prompt = buildSystemPrompt(chat_id);
+    m_conv.updateSystemMessage(chat_id, prompt.empty() ? "" : prompt);
 }
 
 } // namespace rook::domain

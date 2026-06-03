@@ -28,6 +28,7 @@ struct Conversation {
     std::string title;
     std::string model;
     std::vector<ChatMessage> messages;
+    std::vector<std::string> active_skill_ids;
     std::chrono::system_clock::time_point created_at;
     std::chrono::system_clock::time_point updated_at;
     int32_t context_window = 8192;
@@ -49,6 +50,12 @@ public:
     void setModel(std::string_view conv_id, std::string_view model);
     std::vector<ports::LlmMessage> buildLlmMessages(std::string_view conv_id) const;
     int32_t estimateTokens(std::string_view conv_id) const;
+    void setSystemMessage(std::string_view conv_id, std::string_view content);
+    void updateSystemMessage(std::string_view conv_id, std::string_view content);
+
+    void setActiveSkillIds(std::string_view conv_id,
+                           std::vector<std::string> ids);
+    std::vector<std::string> activeSkillIds(std::string_view conv_id) const;
 
     std::optional<Conversation> active() const;
     void setActive(std::string_view id);

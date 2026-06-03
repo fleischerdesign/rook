@@ -108,6 +108,12 @@ struct TaskCompleted {
     std::string result;
 };
 
+struct SkillToggled {
+    std::string chat_id;
+    std::string skill_id;
+    bool active;
+};
+
 using DomainEvent = std::variant<
     UserInputReceived,
     LlmStreamChunk,
@@ -128,7 +134,8 @@ using DomainEvent = std::variant<
     SettingsChanged,
     SyncStateReceived,
     TaskDelegated,
-    TaskCompleted
+    TaskCompleted,
+    SkillToggled
 >;
 
 } // namespace rook::domain

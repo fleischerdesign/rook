@@ -135,7 +135,11 @@ nlohmann::json McpClient::initialize(
     auto result = sendRequest("initialize", std::move(params));
     m_initialized = true;
 
-    sendRequest("notifications/initialized", nullptr);
+    nlohmann::json notification = {
+        {"jsonrpc", "2.0"},
+        {"method", "notifications/initialized"}
+    };
+    m_transport->send(notification.dump());
 
     spdlog::info("McpClient: initialized with server {} {}",
         result.value("serverInfo", nlohmann::json::object())

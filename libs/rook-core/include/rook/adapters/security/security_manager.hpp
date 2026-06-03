@@ -19,6 +19,8 @@ public:
 
     const Capability* findCapability(std::string_view server_id) const;
 
+    void setCapability(std::string server_id, Capability cap);
+
 private:
     std::map<std::string, Capability, std::less<>> m_capabilities;
 };

@@ -19,6 +19,7 @@ struct ToolDefinition {
     std::string name;
     std::string description;
     std::vector<ToolParameter> parameters;
+    std::string source;
 };
 
 struct ToolCall {

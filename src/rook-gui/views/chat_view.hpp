@@ -12,6 +12,11 @@
 #include "rook/domain/event_bus.hpp"
 #include "rook/domain/conversation.hpp"
 #include "rook/ports/llm_port.hpp"
+#include "rook/adapters/extension/extension_manifest.hpp"
+
+namespace rook::ports {
+class ExtensionPort;
+}
 
 namespace rook::gui {
 
@@ -24,6 +29,8 @@ class ChatView final : public peel::Gtk::Box
     rook::domain::EventBus *m_bus = nullptr;
     rook::domain::ConversationManager *m_conv = nullptr;
     rook::ports::LlmPort *m_llm = nullptr;
+    rook::ports::ExtensionPort *m_extensions = nullptr;
+    std::vector<rook::adapters::extension::CustomSkill> *m_custom_skills = nullptr;
 
     std::string m_chat_id;
     std::string m_pending_input;
@@ -41,6 +48,7 @@ class ChatView final : public peel::Gtk::Box
 
     std::vector<std::string> m_welcome_ids;
     std::vector<std::string> m_chat_ids;
+    std::vector<std::string> m_welcome_pending_skills;
 
     MessageWidget *m_pending_assistant = nullptr;
     std::map<std::string, peel::Gtk::Widget*> m_pending_tool_rows;
@@ -54,6 +62,14 @@ class ChatView final : public peel::Gtk::Box
     rook::domain::EventBus::HandlerId m_completed_handler;
     rook::domain::EventBus::HandlerId m_tool_requested_handler;
     rook::domain::EventBus::HandlerId m_tool_completed_handler;
+
+    rook::domain::EventBus::HandlerId m_skill_handler;
+
+    peel::Gtk::MenuButton *m_skills_btn = nullptr;
+    peel::Gtk::MenuButton *m_welcome_skills_btn = nullptr;
+    peel::Gtk::Popover *m_skills_popover = nullptr;
+    peel::FloatPtr<peel::Gtk::Popover> m_command_popover;
+    peel::Gtk::ListBox *m_command_listbox = nullptr;
 
     inline void init(Class *);
     inline void vfunc_dispose ();
@@ -76,11 +92,15 @@ class ChatView final : public peel::Gtk::Box
         peel::Gtk::Entry *&entry_out,
         peel::Gtk::Button *&button_out,
         std::vector<std::string> &ids_out);
+    void buildSkillsPopover(peel::Gtk::MenuButton *target = nullptr);
+    void onChatEntryChanged();
 
 public:
     static peel::FloatPtr<ChatView> create(rook::domain::EventBus &bus,
-                                             rook::domain::ConversationManager &conv,
-                                             rook::ports::LlmPort &llm);
+                                              rook::domain::ConversationManager &conv,
+                                              rook::ports::LlmPort &llm,
+                                              rook::ports::ExtensionPort *extensions = nullptr,
+                                              std::vector<rook::adapters::extension::CustomSkill> *custom_skills = nullptr);
 
     void populateModelDropdown();
     void setChatId(std::string_view id);

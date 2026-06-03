@@ -12,6 +12,7 @@ if gtest_dep.found()
     'unit/test_conversation.cpp',
     'unit/test_capability.cpp',
     'unit/test_security_manager.cpp',
+    'unit/test_extension.cpp',
     dependencies: test_deps,
     build_by_default: false,
   )

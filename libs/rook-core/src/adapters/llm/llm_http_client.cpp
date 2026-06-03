@@ -171,6 +171,44 @@ public:
         curl_easy_cleanup(handle);
     }
 
+    void getStream(
+        std::string_view url,
+        const std::vector<std::pair<std::string, std::string>>& headers,
+        std::function<void(std::string_view)> on_line,
+        std::function<void(int32_t)> on_error
+    ) override {
+        auto* handle = curl_easy_init();
+        if (!handle) {
+            spdlog::error("curl_easy_init failed for getStream");
+            return;
+        }
+
+        m_abort.store(false);
+        StreamContext ctx;
+        ctx.on_line = std::move(on_line);
+
+        curl_easy_setopt(handle, CURLOPT_URL, url.data());
+        curl_easy_setopt(handle, CURLOPT_HTTPGET, 1L);
+        curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, streamCallback);
+        curl_easy_setopt(handle, CURLOPT_WRITEDATA, &ctx);
+        curl_easy_setopt(handle, CURLOPT_XFERINFOFUNCTION, progressCallback);
+        curl_easy_setopt(handle, CURLOPT_XFERINFODATA, &m_abort);
+
+        auto* hlist = buildHeaders(headers);
+        curl_easy_setopt(handle, CURLOPT_HTTPHEADER, hlist);
+
+        auto res = curl_easy_perform(handle);
+        if (res != CURLE_OK) {
+            int32_t status = 0;
+            curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &status);
+            spdlog::error("CURL error: {} (HTTP {})", curl_easy_strerror(res), status);
+            on_error(status);
+        }
+
+        curl_slist_free_all(hlist);
+        curl_easy_cleanup(handle);
+    }
+
 private:
     std::atomic<bool> m_abort{false};
 };

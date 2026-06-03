@@ -24,9 +24,10 @@ public:
     const std::vector<std::string>& readPaths() const { return m_read_paths; }
     const std::vector<std::string>& writePaths() const { return m_write_paths; }
 
-private:
+
     Capability() = default;
 
+private:
     static bool matchesPath(std::string_view prefix,
                             std::string_view path);
 

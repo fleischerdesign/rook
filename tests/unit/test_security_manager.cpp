@@ -125,6 +125,43 @@ TEST(SecurityManagerTest, EmptyConfigDoesNothing)
     EXPECT_EQ(cap, nullptr);
 }
 
+TEST(SecurityManagerTest, SetCapability)
+{
+    SecurityManager mgr;
+
+    auto cap = Capability::grant()
+        .read("/tmp")
+        .write("/tmp")
+        .build();
+
+    mgr.setCapability("filesystem", std::move(cap));
+
+    auto* found = mgr.findCapability("filesystem");
+    ASSERT_NE(found, nullptr);
+    EXPECT_TRUE(found->allowsRead("/tmp/foo"));
+    EXPECT_TRUE(found->allowsWrite("/tmp/bar"));
+    EXPECT_FALSE(found->allowsNetwork());
+}
+
+TEST(SecurityManagerTest, ConfigRoundtrip)
+{
+    SecurityManager mgr;
+
+    auto cap = Capability::grant()
+        .read("/home/user")
+        .allowNetwork()
+        .maxCpuTime(std::chrono::seconds(30))
+        .build();
+
+    mgr.setCapability("test", cap);
+
+    auto* found = mgr.findCapability("test");
+    ASSERT_NE(found, nullptr);
+    EXPECT_TRUE(found->allowsRead("/home/user/projects"));
+    EXPECT_TRUE(found->allowsNetwork());
+    EXPECT_EQ(found->maxCpuTimeSecs(), 30);
+}
+
 TEST(SecurityManagerTest, InvalidJsonDoesNotCrash)
 {
     SecurityManager mgr;

@@ -27,4 +27,8 @@ std::unique_ptr<McpTransport> makeStdioTransport(
     std::string command,
     std::vector<std::string> args);
 
+std::unique_ptr<McpTransport> makeHttpSseTransport(
+    std::string url,
+    std::vector<std::pair<std::string, std::string>> headers);
+
 } // namespace rook::adapters::mcp

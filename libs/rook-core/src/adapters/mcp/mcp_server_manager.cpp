@@ -1,5 +1,6 @@
 #include "rook/adapters/mcp/mcp_server_manager.hpp"
 #include "rook/adapters/mcp/stdio_transport.hpp"
+#include "rook/adapters/mcp/http_sse_transport.hpp"
 #include "rook/ports/security_port.hpp"
 
 #include <nlohmann/json.hpp>
@@ -72,8 +73,18 @@ void McpServerManager::startAll(
         if (!entry.config.enabled) continue;
 
         try {
-            auto transport = makeStdioTransport(
-                entry.config.command, entry.config.args);
+            std::unique_ptr<McpTransport> transport;
+            switch (entry.config.transport_type) {
+            case McpTransportType::HttpSse:
+                transport = makeHttpSseTransport(
+                    entry.config.url, entry.config.headers);
+                break;
+            case McpTransportType::Stdio:
+            default:
+                transport = makeStdioTransport(
+                    entry.config.command, entry.config.args);
+                break;
+            }
 
             auto client = makeMcpClient(std::move(transport));
             client->start();
@@ -86,6 +97,7 @@ void McpServerManager::startAll(
                     rook::ports::ToolDefinition def;
                     def.name = t["name"].get<std::string>();
                     def.description = t.value("description", "");
+                    def.source = "mcp:" + entry.config.id;
 
                     if (t.contains("inputSchema") &&
                         t["inputSchema"].contains("properties")) {
@@ -223,6 +235,36 @@ size_t McpServerManager::serverCount() const
 void McpServerManager::setSecurityPort(rook::ports::SecurityPort* port)
 {
     m_security = port;
+}
+
+std::vector<McpServerConfig> McpServerManager::listServers() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    std::vector<McpServerConfig> result;
+    for (const auto& entry : m_servers) {
+        result.push_back(entry.config);
+    }
+    return result;
+}
+
+size_t McpServerManager::toolCountForServer(std::string_view id) const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (const auto& entry : m_servers) {
+        if (entry.config.id == id) return entry.tools.size();
+    }
+    return 0;
+}
+
+void McpServerManager::setEnabled(std::string_view id, bool enabled)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (auto& entry : m_servers) {
+        if (entry.config.id == id) {
+            entry.config.enabled = enabled;
+            return;
+        }
+    }
 }
 
 McpServerManager::ServerEntry*

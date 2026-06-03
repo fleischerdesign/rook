@@ -3,6 +3,7 @@
 #include "tool_call_row.hpp"
 #include "rook/adapters/model/model_cache.hpp"
 #include "rook/ports/model_discovery_port.hpp"
+#include "rook/ports/extension_port.hpp"
 #include <spdlog/spdlog.h>
 #include <gtk/gtk.h>
 
@@ -38,6 +39,7 @@ inline void ChatView::vfunc_dispose()
         m_bus->unsubscribe(m_chat_deleted_handler);
         m_bus->unsubscribe(m_tool_requested_handler);
         m_bus->unsubscribe(m_tool_completed_handler);
+        m_bus->unsubscribe(m_skill_handler);
         m_bus = nullptr;
     }
     parent_vfunc_dispose<ChatView>();
@@ -45,13 +47,17 @@ inline void ChatView::vfunc_dispose()
 
 FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
                                       rook::domain::ConversationManager &conv,
-                                      rook::ports::LlmPort &llm)
+                                      rook::ports::LlmPort &llm,
+                                      rook::ports::ExtensionPort *extensions,
+                                      std::vector<rook::adapters::extension::CustomSkill> *custom_skills)
 {
     auto view = Object::create<ChatView>();
     ChatView *v = view;
     v->m_bus = &bus;
     v->m_conv = &conv;
     v->m_llm = &llm;
+    v->m_extensions = extensions;
+    v->m_custom_skills = custom_skills;
 
     v->m_chunk_handler = bus.subscribe<rook::domain::LlmStreamChunk>(
         [v](const rook::domain::LlmStreamChunk &event) {
@@ -91,6 +97,13 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
             v->onToolCallCompleted(event);
         });
 
+    v->m_skill_handler = bus.subscribe<rook::domain::SkillToggled>(
+        [v](const rook::domain::SkillToggled& event) {
+            if (event.chat_id == v->m_chat_id) {
+                GLib::idle_add_once([v]() { v->buildSkillsPopover(); });
+            }
+        });
+
     auto stack = Gtk::Stack::create();
     stack->set_vexpand(true);
 
@@ -106,6 +119,14 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
     welcome_bar->set_margin_bottom(12);
 
     {
+        auto skills_btn = Gtk::MenuButton::create();
+        skills_btn->set_tooltip_text("Skills");
+        skills_btn->set_icon_name("applications-engineering-symbolic");
+        skills_btn->set_margin_end(4);
+        v->m_welcome_skills_btn = skills_btn;
+        welcome_bar->append(std::move(skills_btn));
+    }
+    {
         const char *loading[] = {"Loading...", nullptr};
         auto model = Gtk::DropDown::create_from_strings(loading);
         model->set_margin_end(6);
@@ -117,6 +138,55 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
         entry->set_hexpand(true);
         entry->set_placeholder_text("Type a message...");
         entry->connect_activate([v](Gtk::Entry *) { v->onMessageEntryActivated(nullptr); });
+        entry->connect_changed([v](Gtk::Editable *) { v->onChatEntryChanged(); });
+
+        auto* key_ctrl = gtk_event_controller_key_new();
+        gtk_event_controller_key_set_im_context(
+            GTK_EVENT_CONTROLLER_KEY(key_ctrl), FALSE);
+        gtk_widget_add_controller(GTK_WIDGET(entry),
+            GTK_EVENT_CONTROLLER(key_ctrl));
+        g_signal_connect(key_ctrl, "key-pressed",
+            G_CALLBACK(+[](GtkEventControllerKey*, guint keyval, guint,
+                            GdkModifierType, gpointer data) -> gboolean {
+                auto self = static_cast<ChatView*>(data);
+                if (!self->m_command_popover) return GDK_EVENT_PROPAGATE;
+                if (keyval == GDK_KEY_Down || keyval == GDK_KEY_Up) {
+                    auto* popover = GTK_WIDGET(
+                        self->m_command_popover.operator Gtk::Popover*());
+                    if (!popover) return GDK_EVENT_PROPAGATE;
+                    auto* content = gtk_widget_get_last_child(popover);
+                    if (!content) return GDK_EVENT_PROPAGATE;
+                    auto* list_widget = gtk_widget_get_last_child(content);
+                    if (!list_widget) return GDK_EVENT_PROPAGATE;
+                    if (!GTK_IS_LIST_BOX(list_widget)) return GDK_EVENT_PROPAGATE;
+                    auto* listbox = GTK_LIST_BOX(list_widget);
+                    auto* sel = gtk_list_box_get_selected_row(listbox);
+                    int idx = sel ? gtk_list_box_row_get_index(sel) : -1;
+                    idx += (keyval == GDK_KEY_Down) ? 1 : -1;
+                    auto* row = gtk_list_box_get_row_at_index(listbox, idx);
+                    if (row) gtk_list_box_select_row(listbox, row);
+                    return GDK_EVENT_STOP;
+                }
+                if ((keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter)
+                    && self->m_command_listbox) {
+                    spdlog::info("key_ctrl(welcome) Enter: popover={} listbox={} extensions={}",
+                        (bool)self->m_command_popover, true, (bool)self->m_extensions);
+                    auto* listbox = reinterpret_cast<::GtkListBox*>(
+                        self->m_command_listbox);
+                    auto* sel = gtk_list_box_get_selected_row(listbox);
+                    spdlog::info("key_ctrl(welcome) Enter: sel={}", sel != nullptr);
+                    if (sel) {
+                        auto* child = gtk_list_box_row_get_child(sel);
+                        spdlog::info("key_ctrl(welcome) Enter: child={} is_action={}",
+                            child != nullptr, child ? ADW_IS_ACTION_ROW(child) : false);
+                        if (ADW_IS_ACTION_ROW(child))
+                            adw_action_row_activate(ADW_ACTION_ROW(child));
+                    }
+                    return GDK_EVENT_STOP;
+                }
+                return GDK_EVENT_PROPAGATE;
+            }), v);
+
         v->m_welcome_entry = entry;
         welcome_bar->append(std::move(entry));
     }
@@ -155,6 +225,14 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
     chat_bar->set_margin_bottom(12);
 
     {
+        auto skills_btn = Gtk::MenuButton::create();
+        skills_btn->set_tooltip_text("Skills");
+        skills_btn->set_icon_name("applications-engineering-symbolic");
+        skills_btn->set_margin_end(4);
+        v->m_skills_btn = skills_btn;
+        chat_bar->append(std::move(skills_btn));
+    }
+    {
         const char *loading[] = {"Loading...", nullptr};
         auto model = Gtk::DropDown::create_from_strings(loading);
         model->set_margin_end(6);
@@ -166,6 +244,55 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
         entry->set_hexpand(true);
         entry->set_placeholder_text("Type a message...");
         entry->connect_activate([v](Gtk::Entry *) { v->onMessageEntryActivated(nullptr); });
+        entry->connect_changed([v](Gtk::Editable *) { v->onChatEntryChanged(); });
+
+        auto* key_ctrl2 = gtk_event_controller_key_new();
+        gtk_event_controller_key_set_im_context(
+            GTK_EVENT_CONTROLLER_KEY(key_ctrl2), FALSE);
+        gtk_widget_add_controller(GTK_WIDGET(entry),
+            GTK_EVENT_CONTROLLER(key_ctrl2));
+        g_signal_connect(key_ctrl2, "key-pressed",
+            G_CALLBACK(+[](GtkEventControllerKey*, guint keyval, guint,
+                            GdkModifierType, gpointer data) -> gboolean {
+                auto self = static_cast<ChatView*>(data);
+                if (!self->m_command_popover) return GDK_EVENT_PROPAGATE;
+                if (keyval == GDK_KEY_Down || keyval == GDK_KEY_Up) {
+                    auto* popover = GTK_WIDGET(
+                        self->m_command_popover.operator Gtk::Popover*());
+                    if (!popover) return GDK_EVENT_PROPAGATE;
+                    auto* content = gtk_widget_get_last_child(popover);
+                    if (!content) return GDK_EVENT_PROPAGATE;
+                    auto* list_widget = gtk_widget_get_last_child(content);
+                    if (!list_widget) return GDK_EVENT_PROPAGATE;
+                    if (!GTK_IS_LIST_BOX(list_widget)) return GDK_EVENT_PROPAGATE;
+                    auto* listbox = GTK_LIST_BOX(list_widget);
+                    auto* sel = gtk_list_box_get_selected_row(listbox);
+                    int idx = sel ? gtk_list_box_row_get_index(sel) : -1;
+                    idx += (keyval == GDK_KEY_Down) ? 1 : -1;
+                    auto* row = gtk_list_box_get_row_at_index(listbox, idx);
+                    if (row) gtk_list_box_select_row(listbox, row);
+                    return GDK_EVENT_STOP;
+                }
+                if ((keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter)
+                    && self->m_command_listbox) {
+                    spdlog::info("key_ctrl(chat) Enter: popover={} listbox={} extensions={}",
+                        (bool)self->m_command_popover, true, (bool)self->m_extensions);
+                    auto* listbox = reinterpret_cast<::GtkListBox*>(
+                        self->m_command_listbox);
+                    auto* sel = gtk_list_box_get_selected_row(listbox);
+                    spdlog::info("key_ctrl(chat) Enter: sel={}", sel != nullptr);
+                    if (sel) {
+                        auto* child = gtk_list_box_row_get_child(sel);
+                        spdlog::info("key_ctrl(chat) Enter: child={} is_action={}",
+                            child != nullptr, child ? ADW_IS_ACTION_ROW(child) : false);
+                        if (ADW_IS_ACTION_ROW(child))
+                            adw_action_row_activate(ADW_ACTION_ROW(child));
+                    }
+                    return GDK_EVENT_STOP;
+                }
+                return GDK_EVENT_PROPAGATE;
+            }), v);
+
         v->m_chat_entry = entry;
         chat_bar->append(std::move(entry));
     }
@@ -188,6 +315,8 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
     v->append(std::move(stack));
 
     v->populateModelDropdown();
+    v->buildSkillsPopover();
+    v->buildSkillsPopover(v->m_welcome_skills_btn);
 
     return view;
 }
@@ -293,7 +422,34 @@ void ChatView::doSend(std::string_view chat_id)
 
     m_chat_entry->set_text("");
 
-    auto *user_msg = MessageWidget::create("user", text).release_floating_ptr();
+    std::string display_text = text;
+
+    if (m_extensions && text.starts_with("/")) {
+        auto space_pos = text.find(' ');
+        auto cmd_name = space_pos != std::string::npos
+            ? text.substr(1, space_pos - 1)
+            : text.substr(1);
+        auto remainder = space_pos != std::string::npos
+            ? text.substr(space_pos + 1)
+            : std::string{};
+
+        for (auto& ext : m_extensions->listInstalled()) {
+            for (auto& cmd : ext.commands) {
+                if (cmd.name == cmd_name) {
+                    if (!remainder.empty())
+                        text = cmd.prompt + "\n\nUser input: " + remainder;
+                    else
+                        text = cmd.prompt;
+
+                    spdlog::info("ChatView: dispatched slash command /{}", cmd_name);
+                    goto dispatch;
+                }
+            }
+        }
+    }
+
+dispatch:
+    auto *user_msg = MessageWidget::create("user", display_text).release_floating_ptr();
     m_message_list->append(user_msg);
     auto *row = GTK_LIST_BOX_ROW(
         gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(user_msg)));
@@ -313,6 +469,26 @@ void ChatView::doSend(std::string_view chat_id)
 
 void ChatView::onMessageEntryActivated(Gtk::Entry *)
 {
+    spdlog::info("onMessageEntryActivated: popover={} listbox={} extensions={}",
+        (bool)m_command_popover, (bool)m_command_listbox, (bool)m_extensions);
+
+    if (m_command_popover && m_command_listbox && m_extensions) {
+        auto* listbox = reinterpret_cast<::GtkListBox*>(m_command_listbox);
+        auto* sel = gtk_list_box_get_selected_row(listbox);
+        spdlog::info("onMessageEntryActivated: sel={}", sel != nullptr);
+        if (sel) {
+            auto* child = gtk_list_box_row_get_child(sel);
+            spdlog::info("onMessageEntryActivated: child={} is_action={}",
+                child != nullptr, child ? ADW_IS_ACTION_ROW(child) : false);
+            if (ADW_IS_ACTION_ROW(child)) {
+                spdlog::info("onMessageEntryActivated: calling adw_action_row_activate");
+                adw_action_row_activate(ADW_ACTION_ROW(child));
+            }
+            return;
+        }
+    }
+
+    spdlog::info("onMessageEntryActivated: falling through to onSendClicked");
     onSendClicked(nullptr);
 }
 
@@ -413,6 +589,17 @@ void ChatView::switchToChat(std::string_view chat_id)
     m_stack->set_visible_child_name("chat");
     loadMessages(chat_id);
 
+    for (auto& sid : m_welcome_pending_skills) {
+        m_bus->publish(rook::domain::SkillToggled{
+            .chat_id = m_chat_id,
+            .skill_id = sid,
+            .active = true,
+        });
+    }
+    m_welcome_pending_skills.clear();
+
+    buildSkillsPopover();
+
     if (!m_pending_input.empty()) {
         m_chat_entry->set_text(m_pending_input.c_str());
         auto text = m_pending_input;
@@ -447,6 +634,7 @@ void ChatView::loadMessages(std::string_view chat_id)
 
     auto conv = m_conv->open(chat_id);
     for (const auto &msg : conv.messages) {
+        if (msg.role == "system") continue;
         if (msg.role == "tool") {
             auto *row = ToolCallRow::createCompleted(
                 msg.tool_name, "", msg.content, false).release_floating_ptr();
@@ -490,6 +678,256 @@ void ChatView::setProcessing(bool active)
         m_welcome_send->set_label(label);
         m_chat_send->set_label(label);
     });
+}
+
+void ChatView::buildSkillsPopover(Gtk::MenuButton *target)
+{
+    if (!target) target = m_skills_btn;
+    if (!target) return;
+
+    auto popover = Gtk::Popover::create();
+    auto content = Gtk::Box::create(Gtk::Orientation::VERTICAL, 4);
+    content->set_margin_start(12);
+    content->set_margin_end(12);
+    content->set_margin_top(8);
+    content->set_margin_bottom(8);
+
+    auto heading = Gtk::Label::create("Skills for this chat");
+    heading->set_xalign(0.0f);
+    heading->set_use_markup(true);
+    heading->set_markup("<span weight=\"bold\">Skills for this chat</span>");
+    content->append(std::move(heading));
+
+    auto sep = Gtk::Separator::create(Gtk::Orientation::HORIZONTAL);
+    content->append(std::move(sep));
+
+    auto list = Gtk::ListBox::create();
+    list->set_selection_mode(Gtk::SelectionMode::NONE);
+    list->add_css_class("rich-list");
+
+    auto active_ids = m_chat_id.empty()
+        ? std::vector<std::string>{}
+        : m_conv->activeSkillIds(m_chat_id);
+
+    if (m_chat_id.empty()) {
+        if (m_custom_skills) {
+            for (auto& s : *m_custom_skills)
+                if (s.enabled && !s.prompt.empty())
+                    active_ids.push_back("custom:" + s.name);
+        }
+        if (m_extensions) {
+            for (auto& ext : m_extensions->listInstalled())
+                for (auto& s : ext.skills)
+                    if (s.enabled && !s.prompt.empty())
+                        active_ids.push_back("ext:" + ext.name + ":" + s.name);
+        }
+        for (auto& sid : m_welcome_pending_skills)
+            if (std::find(active_ids.begin(), active_ids.end(), sid) == active_ids.end())
+                active_ids.push_back(sid);
+    }
+
+    if (m_custom_skills) {
+        for (auto& skill : *m_custom_skills) {
+            if (skill.prompt.empty()) continue;
+
+            auto row = Adw::ActionRow::create();
+            row->set_title(skill.name.c_str());
+            if (!skill.description.empty())
+                row->set_subtitle(skill.description.c_str());
+
+            std::string sid = "custom:" + skill.name;
+            auto check = Gtk::CheckButton::create();
+            check->set_active(std::find(active_ids.begin(), active_ids.end(), sid)
+                           != active_ids.end());
+
+            ChatView *raw_v = this;
+            check->connect_toggled([raw_v, sid](Gtk::CheckButton *cb) {
+                if (raw_v->m_chat_id.empty()) {
+                    if (cb->get_active())
+                        raw_v->m_welcome_pending_skills.push_back(sid);
+                    else
+                        std::erase(raw_v->m_welcome_pending_skills, sid);
+                    return;
+                }
+                raw_v->m_bus->publish(rook::domain::SkillToggled{
+                    .chat_id = raw_v->m_chat_id,
+                    .skill_id = sid,
+                    .active = cb->get_active(),
+                });
+            });
+
+            row->add_prefix(std::move(check).release_floating_ptr());
+            list->append(std::move(row).release_floating_ptr());
+        }
+    }
+
+    if (m_extensions) {
+        auto installed = m_extensions->listInstalled();
+        for (auto& ext : installed) {
+            for (auto& skill : ext.skills) {
+                if (skill.prompt.empty()) continue;
+
+                auto row = Adw::ActionRow::create();
+                row->set_title(skill.name.c_str());
+                std::string subtitle = "via " + ext.display_name;
+                row->set_subtitle(subtitle.c_str());
+
+                std::string sid = "ext:" + ext.name + ":" + skill.name;
+
+                auto check = Gtk::CheckButton::create();
+                check->set_active(std::find(active_ids.begin(), active_ids.end(), sid)
+                               != active_ids.end());
+
+                ChatView *raw_v = this;
+                check->connect_toggled([raw_v, sid](Gtk::CheckButton *cb) {
+                    if (raw_v->m_chat_id.empty()) {
+                        if (cb->get_active())
+                            raw_v->m_welcome_pending_skills.push_back(sid);
+                        else
+                            std::erase(raw_v->m_welcome_pending_skills, sid);
+                        return;
+                    }
+                    raw_v->m_bus->publish(rook::domain::SkillToggled{
+                        .chat_id = raw_v->m_chat_id,
+                        .skill_id = sid,
+                        .active = cb->get_active(),
+                    });
+                });
+
+                row->add_prefix(std::move(check).release_floating_ptr());
+                list->append(std::move(row).release_floating_ptr());
+            }
+        }
+    }
+
+    content->append(std::move(list));
+    popover->set_child(std::move(content).release_floating_ptr());
+
+    m_skills_popover = popover;
+    target->set_popover(std::move(popover));
+}
+
+void ChatView::onChatEntryChanged()
+{
+    auto* entry = m_stack->get_visible_child_name() == std::string("welcome")
+        ? m_welcome_entry : m_chat_entry;
+    if (!entry) return;
+
+    auto text = std::string(entry->get_text());
+    if (!text.starts_with("/")) {
+        if (m_command_popover) {
+            gtk_popover_popdown(GTK_POPOVER(
+                m_command_popover.operator Gtk::Popover*()));
+        }
+        return;
+    }
+
+    auto prefix = text.substr(1);
+
+    auto installed = m_extensions ? m_extensions->listInstalled()
+        : std::vector<rook::adapters::extension::InstalledExtension>{};
+    std::vector<std::pair<std::string, std::string>> matches;
+    for (auto& ext : installed) {
+        for (auto& cmd : ext.commands) {
+            if (prefix.empty() || cmd.name.starts_with(prefix)) {
+                matches.emplace_back(cmd.name,
+                    cmd.description + " (" + ext.display_name + ")");
+            }
+        }
+    }
+
+    if (matches.empty()) {
+        if (m_command_popover) {
+            gtk_popover_popdown(GTK_POPOVER(
+                m_command_popover.operator Gtk::Popover*()));
+        }
+        return;
+    }
+
+    if (m_command_popover) {
+        auto* pw = GTK_WIDGET(
+            m_command_popover.operator Gtk::Popover*());
+        if (gtk_widget_get_parent(pw) != GTK_WIDGET(entry)) {
+            gtk_popover_popdown(
+                GTK_POPOVER(m_command_popover.operator Gtk::Popover*()));
+            m_command_popover = {};
+            m_command_listbox = nullptr;
+        }
+    }
+
+    if (!m_command_popover) {
+        m_command_popover = Gtk::Popover::create();
+        gtk_widget_set_parent(
+            GTK_WIDGET(m_command_popover.operator Gtk::Popover*()),
+            GTK_WIDGET(entry));
+        gtk_popover_set_autohide(
+            GTK_POPOVER(m_command_popover.operator Gtk::Popover*()), FALSE);
+        gtk_popover_set_has_arrow(
+            GTK_POPOVER(m_command_popover.operator Gtk::Popover*()), FALSE);
+
+        auto content = Gtk::Box::create(Gtk::Orientation::VERTICAL, 2);
+        content->set_margin_start(4);
+        content->set_margin_end(4);
+        content->set_margin_top(4);
+        content->set_margin_bottom(4);
+
+        auto list = Gtk::ListBox::create();
+        m_command_listbox = list;
+        list->set_selection_mode(Gtk::SelectionMode::SINGLE);
+        list->add_css_class("rich-list");
+        content->append(std::move(list));
+
+        m_command_popover->set_child(
+            std::move(content).release_floating_ptr());
+    }
+
+    while (auto* row = m_command_listbox->get_row_at_index(0))
+        m_command_listbox->remove(row);
+
+    ChatView* raw_v = this;
+    for (auto& [name, desc] : matches) {
+        auto row = Adw::ActionRow::create();
+        row->set_title(("/" + name).c_str());
+        row->set_subtitle(desc.c_str());
+        std::string cmd_text = "/" + name + " ";
+        row->connect_activated([raw_v, cmd_text](Adw::ActionRow*) {
+            auto* entry = raw_v->m_stack->get_visible_child_name()
+                == std::string("welcome")
+                ? raw_v->m_welcome_entry : raw_v->m_chat_entry;
+            if (!entry) return;
+            entry->set_text(cmd_text.c_str());
+            entry->set_position(-1);
+            if (raw_v->m_command_popover) {
+                gtk_popover_popdown(GTK_POPOVER(
+                    raw_v->m_command_popover.operator Gtk::Popover*()));
+            }
+        });
+
+        auto* row_ptr = row.operator Adw::ActionRow*();
+        auto* gesture = gtk_gesture_click_new();
+        gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 1);
+        g_signal_connect(gesture, "released",
+            G_CALLBACK(+[](GtkGestureClick*, int, double, double,
+                           gpointer ptr) {
+                adw_action_row_activate(ADW_ACTION_ROW(ptr));
+            }), row_ptr);
+        gtk_widget_add_controller(
+            GTK_WIDGET(row_ptr), GTK_EVENT_CONTROLLER(gesture));
+
+        m_command_listbox->append(std::move(row).release_floating_ptr());
+    }
+
+    gtk_popover_set_position(
+        GTK_POPOVER(m_command_popover.operator Gtk::Popover*()),
+        entry == m_chat_entry ? GTK_POS_TOP : GTK_POS_BOTTOM);
+
+    auto* raw_popover = GTK_POPOVER(
+        m_command_popover.operator Gtk::Popover*());
+    if (!gtk_widget_is_visible(GTK_WIDGET(raw_popover))) {
+        gtk_popover_popup(raw_popover);
+    } else {
+        gtk_popover_present(raw_popover);
+    }
 }
 
 } // namespace rook::gui

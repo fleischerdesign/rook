@@ -9,12 +9,22 @@
 #include "rook/ports/llm_port.hpp"
 #include "rook/ports/tool_port.hpp"
 
+namespace rook::adapters::extension {
+struct CustomSkill;
+}
+
+namespace rook::ports {
+class ExtensionPort;
+}
+
 namespace rook::domain {
 
 class AgentEngine {
 public:
     AgentEngine(EventBus& bus, ports::LlmPort& llm,
-                ConversationManager& conv, ports::ToolPort& tool);
+                ConversationManager& conv, ports::ToolPort& tool,
+                ports::ExtensionPort* extensions = nullptr,
+                std::vector<rook::adapters::extension::CustomSkill>* custom_skills = nullptr);
 
     void start();
 
@@ -23,15 +33,23 @@ private:
     ports::LlmPort& m_llm;
     ConversationManager& m_conv;
     ports::ToolPort& m_tool;
+    ports::ExtensionPort* m_extensions = nullptr;
+    std::vector<rook::adapters::extension::CustomSkill>* m_custom_skills = nullptr;
 
     void onUserInput(const UserInputReceived& event);
     void onLlmChunk(const LlmStreamChunk& chunk);
     void onLlmCompleted(const LlmCompleted& event);
     void onLlmError(const LlmError& event);
     void onToolCallCompleted(const ToolCallCompleted& event);
+    void onSkillToggled(const SkillToggled& event);
+    void onChatSelected(const ChatSelected& event);
 
     void runLlm(std::string chat_id, std::string model);
     bool processPendingToolCalls(std::string_view chat_id);
+    void injectSkillsOnFirstMessage(std::string_view chat_id);
+    void syncAlwaysOnSkills(std::string_view chat_id);
+    void rebuildSystemMessage(std::string_view chat_id);
+    std::string buildSystemPrompt(std::string_view chat_id);
 
     std::vector<ports::ToolCall> m_pending_tool_calls;
 
@@ -40,6 +58,8 @@ private:
     EventBus::HandlerId m_completed_handler;
     EventBus::HandlerId m_error_handler;
     EventBus::HandlerId m_tool_handler;
+    EventBus::HandlerId m_skill_handler;
+    EventBus::HandlerId m_chat_selected_handler;
 };
 
 } // namespace rook::domain

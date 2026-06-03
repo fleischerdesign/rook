@@ -311,6 +311,18 @@ void ConversationManager::loadFromStore(ports::StorePort& store) {
             }
         }
 
+        if (!opt->active_skill_ids_json.empty()) {
+            try {
+                auto j = nlohmann::json::parse(opt->active_skill_ids_json);
+                if (j.is_array()) {
+                    for (auto& s : j) {
+                        if (s.is_string())
+                            conv.active_skill_ids.push_back(s.get<std::string>());
+                    }
+                }
+            } catch (...) {}
+        }
+
         m_conversations.push_back(std::move(conv));
     }
 
@@ -344,7 +356,68 @@ void ConversationManager::saveActiveConversation() {
     }
 
     record.messages_json = messages.dump();
+
+    nlohmann::json active_skills = nlohmann::json::array();
+    for (auto& sid : conv->active_skill_ids) active_skills.push_back(sid);
+    record.active_skill_ids_json = active_skills.dump();
+
     m_store->saveChat(record);
+}
+
+void ConversationManager::setSystemMessage(
+    std::string_view conv_id,
+    std::string_view content)
+{
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](auto& c) { return c.id == conv_id; });
+    if (it == m_conversations.end()) return;
+
+    ChatMessage sys;
+    sys.role = "system";
+    sys.content = std::string(content);
+    sys.id = generateId();
+    sys.timestamp = std::chrono::system_clock::now();
+    it->messages.insert(it->messages.begin(), std::move(sys));
+
+    if (m_store) saveActiveConversation();
+}
+
+void ConversationManager::updateSystemMessage(
+    std::string_view conv_id,
+    std::string_view content)
+{
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](auto& c) { return c.id == conv_id; });
+    if (it == m_conversations.end()) return;
+
+    for (auto& msg : it->messages) {
+        if (msg.role == "system") {
+            msg.content = std::string(content);
+            if (m_store) saveActiveConversation();
+            return;
+        }
+    }
+
+    setSystemMessage(conv_id, content);
+}
+
+void ConversationManager::setActiveSkillIds(
+    std::string_view conv_id,
+    std::vector<std::string> ids)
+{
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](auto& c) { return c.id == conv_id; });
+    if (it == m_conversations.end()) return;
+    it->active_skill_ids = std::move(ids);
+}
+
+std::vector<std::string> ConversationManager::activeSkillIds(
+    std::string_view conv_id) const
+{
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](auto& c) { return c.id == conv_id; });
+    if (it != m_conversations.end()) return it->active_skill_ids;
+    return {};
 }
 
 } // namespace rook::domain

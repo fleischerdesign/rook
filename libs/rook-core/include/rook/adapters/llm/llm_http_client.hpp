@@ -31,6 +31,13 @@ public:
         std::function<void(int32_t status_code)> on_error
     ) = 0;
 
+    virtual void getStream(
+        std::string_view url,
+        const std::vector<std::pair<std::string, std::string>>& headers,
+        std::function<void(std::string_view line)> on_line,
+        std::function<void(int32_t status_code)> on_error
+    ) = 0;
+
     virtual HttpResponse get(
         std::string_view url,
         const std::vector<std::pair<std::string, std::string>>& headers

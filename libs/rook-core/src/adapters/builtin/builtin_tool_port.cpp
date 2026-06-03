@@ -18,28 +18,31 @@ std::vector<rook::ports::ToolDefinition> BuiltinToolPort::listTools()
 {
     return {
         {
-            "read_file",
-            "Read the contents of a file at the given path",
-            {
+            .name = "read_file",
+            .description = "Read the contents of a file at the given path",
+            .parameters = {
                 {"path", "string", "Absolute path to the file", true},
                 {"offset", "integer", "Line number to start reading from (optional)", false},
                 {"limit", "integer", "Maximum number of lines to read (optional)", false},
-            }
+            },
+            .source = "builtin",
         },
         {
-            "write_file",
-            "Create or overwrite a file at the given path with the given content",
-            {
+            .name = "write_file",
+            .description = "Create or overwrite a file at the given path with the given content",
+            .parameters = {
                 {"path", "string", "Absolute path to the file", true},
                 {"content", "string", "Content to write", true},
-            }
+            },
+            .source = "builtin",
         },
         {
-            "list_directory",
-            "List files and directories at the given path",
-            {
+            .name = "list_directory",
+            .description = "List files and directories at the given path",
+            .parameters = {
                 {"path", "string", "Absolute path to the directory", true},
-            }
+            },
+            .source = "builtin",
         },
     };
 }

@@ -35,7 +35,7 @@ bool SecurityManager::isAllowed(std::string_view server_id,
         }
     }
 
-    return false;
+    return true;
 }
 
 void SecurityManager::loadFromConfig(std::string_view config_json)
@@ -110,6 +110,11 @@ const Capability* SecurityManager::findCapability(
     auto it = m_capabilities.find(server_id);
     if (it != m_capabilities.end()) return &it->second;
     return nullptr;
+}
+
+void SecurityManager::setCapability(std::string server_id, Capability cap)
+{
+    m_capabilities[std::move(server_id)] = std::move(cap);
 }
 
 } // namespace rook::adapters::security

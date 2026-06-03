@@ -25,17 +25,25 @@ RookWindow *RookWindow::create(Gtk::Application *app,
                                 rook::domain::EventBus &bus,
                                 rook::ports::LlmPort &llm,
                                 rook::domain::ConversationManager &conv,
+                                rook::adapters::mcp::McpServerManager *mcp,
+                                rook::adapters::security::SecurityManager *security,
+                                rook::ports::ExtensionPort *extensions,
+                                std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
                                 std::function<void()> save_fn)
 {
     auto *win = Object::create<RookWindow>(prop_application(), app);
     win->m_save_fn = std::move(save_fn);
     win->m_llm = &llm;
+    win->m_mcp = mcp;
+    win->m_security = security;
+    win->m_extensions = extensions;
+    win->m_custom_skills = custom_skills;
 
     auto sidebar = ChatSidebar::create(bus, conv);
     sidebar->loadConversations(conv.list());
     win->m_sidebar = std::move(sidebar).release_floating_ptr();
 
-    auto chat = ChatView::create(bus, conv, llm);
+    auto chat = ChatView::create(bus, conv, llm, extensions, custom_skills);
     win->m_chat_view = std::move(chat).release_floating_ptr();
 
     win->m_header = Adw::HeaderBar::create();
@@ -82,7 +90,8 @@ void RookWindow::refreshModels()
 
 void RookWindow::onPreferences()
 {
-    auto prefs = PreferencesWindow::create(*m_llm, m_save_fn);
+    auto prefs = PreferencesWindow::create(*m_llm, m_mcp, m_security,
+                                            m_extensions, m_custom_skills, m_save_fn);
     prefs->present(this);
 }
 
