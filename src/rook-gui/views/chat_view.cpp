@@ -400,34 +400,7 @@ void ChatView::doSend(std::string_view chat_id)
 
     m_chat_entry->set_text("");
 
-    std::string display_text = text;
-
-    if (m_extensions && text.starts_with("/")) {
-        auto space_pos = text.find(' ');
-        auto cmd_name = space_pos != std::string::npos
-            ? text.substr(1, space_pos - 1)
-            : text.substr(1);
-        auto remainder = space_pos != std::string::npos
-            ? text.substr(space_pos + 1)
-            : std::string{};
-
-        for (auto& ext : m_extensions->listInstalled()) {
-            for (auto& cmd : ext.commands) {
-                if (cmd.name == cmd_name) {
-                    if (!remainder.empty())
-                        text = cmd.prompt + "\n\nUser input: " + remainder;
-                    else
-                        text = cmd.prompt;
-
-                    spdlog::info("ChatView: dispatched slash command /{}", cmd_name);
-                    goto dispatch;
-                }
-            }
-        }
-    }
-
-dispatch:
-    auto *user_msg = MessageWidget::create("user", display_text).release_floating_ptr();
+    auto *user_msg = MessageWidget::create("user", text).release_floating_ptr();
     m_message_list->append(user_msg);
     auto *row = GTK_LIST_BOX_ROW(
         gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(user_msg)));
@@ -447,7 +420,9 @@ dispatch:
 
 void ChatView::onMessageEntryActivated(Gtk::Entry *)
 {
-    if (m_command_popover && m_command_listbox && m_extensions) {
+    if (m_command_popover && m_command_listbox && m_extensions
+        && gtk_widget_is_visible(GTK_WIDGET(
+            m_command_popover.operator Gtk::Popover*()))) {
         auto* listbox = reinterpret_cast<::GtkListBox*>(m_command_listbox);
         auto* sel = gtk_list_box_get_selected_row(listbox);
         if (sel) {
@@ -786,6 +761,8 @@ void ChatView::onChatEntryChanged()
         if (m_command_popover) {
             gtk_popover_popdown(GTK_POPOVER(
                 m_command_popover.operator Gtk::Popover*()));
+            m_command_popover = {};
+            m_command_listbox = nullptr;
         }
         return;
     }
@@ -808,6 +785,8 @@ void ChatView::onChatEntryChanged()
         if (m_command_popover) {
             gtk_popover_popdown(GTK_POPOVER(
                 m_command_popover.operator Gtk::Popover*()));
+            m_command_popover = {};
+            m_command_listbox = nullptr;
         }
         return;
     }

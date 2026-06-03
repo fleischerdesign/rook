@@ -95,6 +95,36 @@ static std::string buildToolsJson(const std::vector<ports::ToolDefinition>& tool
 void AgentEngine::runLlm(std::string chat_id, std::string model) {
     auto messages = m_conv.buildLlmMessages(chat_id);
 
+    if (m_extensions) {
+        for (auto& msg : messages) {
+            if (msg.role == "user" && msg.content.starts_with("/")) {
+                auto space_pos = msg.content.find(' ');
+                auto cmd_name = space_pos != std::string::npos
+                    ? msg.content.substr(1, space_pos - 1)
+                    : msg.content.substr(1);
+                auto remainder = space_pos != std::string::npos
+                    ? msg.content.substr(space_pos + 1)
+                    : std::string{};
+
+                bool found = false;
+                for (auto& ext : m_extensions->listInstalled()) {
+                    for (auto& cmd : ext.commands) {
+                        if (cmd.name == cmd_name) {
+                            spdlog::info("AgentEngine: expanding command /{}", cmd_name);
+                            if (!remainder.empty())
+                                msg.content = cmd.prompt + "\n\nUser input: " + remainder;
+                            else
+                                msg.content = cmd.prompt;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) break;
+                }
+            }
+        }
+    }
+
     auto tools = m_tool.listTools();
     auto tools_json = buildToolsJson(tools);
 
