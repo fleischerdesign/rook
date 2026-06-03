@@ -149,17 +149,11 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
             G_CALLBACK(+[](GtkEventControllerKey*, guint keyval, guint,
                             GdkModifierType, gpointer data) -> gboolean {
                 auto self = static_cast<ChatView*>(data);
-                if (!self->m_command_popover) return GDK_EVENT_PROPAGATE;
+                if (!self->m_command_listbox) return GDK_EVENT_PROPAGATE;
+
                 if (keyval == GDK_KEY_Down || keyval == GDK_KEY_Up) {
-                    auto* popover = GTK_WIDGET(
-                        self->m_command_popover.operator Gtk::Popover*());
-                    if (!popover) return GDK_EVENT_PROPAGATE;
-                    auto* content = gtk_widget_get_last_child(popover);
-                    if (!content) return GDK_EVENT_PROPAGATE;
-                    auto* list_widget = gtk_widget_get_last_child(content);
-                    if (!list_widget) return GDK_EVENT_PROPAGATE;
-                    if (!GTK_IS_LIST_BOX(list_widget)) return GDK_EVENT_PROPAGATE;
-                    auto* listbox = GTK_LIST_BOX(list_widget);
+                    auto* listbox = reinterpret_cast<::GtkListBox*>(
+                        self->m_command_listbox);
                     auto* sel = gtk_list_box_get_selected_row(listbox);
                     int idx = sel ? gtk_list_box_row_get_index(sel) : -1;
                     idx += (keyval == GDK_KEY_Down) ? 1 : -1;
@@ -167,23 +161,18 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
                     if (row) gtk_list_box_select_row(listbox, row);
                     return GDK_EVENT_STOP;
                 }
-                if ((keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter)
-                    && self->m_command_listbox) {
-                    spdlog::info("key_ctrl(welcome) Enter: popover={} listbox={} extensions={}",
-                        (bool)self->m_command_popover, true, (bool)self->m_extensions);
+
+                if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) {
                     auto* listbox = reinterpret_cast<::GtkListBox*>(
                         self->m_command_listbox);
                     auto* sel = gtk_list_box_get_selected_row(listbox);
-                    spdlog::info("key_ctrl(welcome) Enter: sel={}", sel != nullptr);
                     if (sel) {
-                        auto* child = gtk_list_box_row_get_child(sel);
-                        spdlog::info("key_ctrl(welcome) Enter: child={} is_action={}",
-                            child != nullptr, child ? ADW_IS_ACTION_ROW(child) : false);
-                        if (ADW_IS_ACTION_ROW(child))
-                            adw_action_row_activate(ADW_ACTION_ROW(child));
+                        if (ADW_IS_ACTION_ROW(sel))
+                            adw_action_row_activate(ADW_ACTION_ROW(sel));
                     }
                     return GDK_EVENT_STOP;
                 }
+
                 return GDK_EVENT_PROPAGATE;
             }), v);
 
@@ -255,17 +244,11 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
             G_CALLBACK(+[](GtkEventControllerKey*, guint keyval, guint,
                             GdkModifierType, gpointer data) -> gboolean {
                 auto self = static_cast<ChatView*>(data);
-                if (!self->m_command_popover) return GDK_EVENT_PROPAGATE;
+                if (!self->m_command_listbox) return GDK_EVENT_PROPAGATE;
+
                 if (keyval == GDK_KEY_Down || keyval == GDK_KEY_Up) {
-                    auto* popover = GTK_WIDGET(
-                        self->m_command_popover.operator Gtk::Popover*());
-                    if (!popover) return GDK_EVENT_PROPAGATE;
-                    auto* content = gtk_widget_get_last_child(popover);
-                    if (!content) return GDK_EVENT_PROPAGATE;
-                    auto* list_widget = gtk_widget_get_last_child(content);
-                    if (!list_widget) return GDK_EVENT_PROPAGATE;
-                    if (!GTK_IS_LIST_BOX(list_widget)) return GDK_EVENT_PROPAGATE;
-                    auto* listbox = GTK_LIST_BOX(list_widget);
+                    auto* listbox = reinterpret_cast<::GtkListBox*>(
+                        self->m_command_listbox);
                     auto* sel = gtk_list_box_get_selected_row(listbox);
                     int idx = sel ? gtk_list_box_row_get_index(sel) : -1;
                     idx += (keyval == GDK_KEY_Down) ? 1 : -1;
@@ -273,23 +256,18 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
                     if (row) gtk_list_box_select_row(listbox, row);
                     return GDK_EVENT_STOP;
                 }
-                if ((keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter)
-                    && self->m_command_listbox) {
-                    spdlog::info("key_ctrl(chat) Enter: popover={} listbox={} extensions={}",
-                        (bool)self->m_command_popover, true, (bool)self->m_extensions);
+
+                if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) {
                     auto* listbox = reinterpret_cast<::GtkListBox*>(
                         self->m_command_listbox);
                     auto* sel = gtk_list_box_get_selected_row(listbox);
-                    spdlog::info("key_ctrl(chat) Enter: sel={}", sel != nullptr);
                     if (sel) {
-                        auto* child = gtk_list_box_row_get_child(sel);
-                        spdlog::info("key_ctrl(chat) Enter: child={} is_action={}",
-                            child != nullptr, child ? ADW_IS_ACTION_ROW(child) : false);
-                        if (ADW_IS_ACTION_ROW(child))
-                            adw_action_row_activate(ADW_ACTION_ROW(child));
+                        if (ADW_IS_ACTION_ROW(sel))
+                            adw_action_row_activate(ADW_ACTION_ROW(sel));
                     }
                     return GDK_EVENT_STOP;
                 }
+
                 return GDK_EVENT_PROPAGATE;
             }), v);
 
@@ -469,26 +447,16 @@ dispatch:
 
 void ChatView::onMessageEntryActivated(Gtk::Entry *)
 {
-    spdlog::info("onMessageEntryActivated: popover={} listbox={} extensions={}",
-        (bool)m_command_popover, (bool)m_command_listbox, (bool)m_extensions);
-
     if (m_command_popover && m_command_listbox && m_extensions) {
         auto* listbox = reinterpret_cast<::GtkListBox*>(m_command_listbox);
         auto* sel = gtk_list_box_get_selected_row(listbox);
-        spdlog::info("onMessageEntryActivated: sel={}", sel != nullptr);
         if (sel) {
-            auto* child = gtk_list_box_row_get_child(sel);
-            spdlog::info("onMessageEntryActivated: child={} is_action={}",
-                child != nullptr, child ? ADW_IS_ACTION_ROW(child) : false);
-            if (ADW_IS_ACTION_ROW(child)) {
-                spdlog::info("onMessageEntryActivated: calling adw_action_row_activate");
-                adw_action_row_activate(ADW_ACTION_ROW(child));
-            }
+            if (ADW_IS_ACTION_ROW(sel))
+                adw_action_row_activate(ADW_ACTION_ROW(sel));
             return;
         }
     }
 
-    spdlog::info("onMessageEntryActivated: falling through to onSendClicked");
     onSendClicked(nullptr);
 }
 
@@ -845,44 +813,35 @@ void ChatView::onChatEntryChanged()
     }
 
     if (m_command_popover) {
-        auto* pw = GTK_WIDGET(
-            m_command_popover.operator Gtk::Popover*());
-        if (gtk_widget_get_parent(pw) != GTK_WIDGET(entry)) {
-            gtk_popover_popdown(
-                GTK_POPOVER(m_command_popover.operator Gtk::Popover*()));
-            m_command_popover = {};
-            m_command_listbox = nullptr;
-        }
+        gtk_popover_popdown(GTK_POPOVER(
+            m_command_popover.operator Gtk::Popover*()));
+        m_command_popover = {};
+        m_command_listbox = nullptr;
     }
 
-    if (!m_command_popover) {
-        m_command_popover = Gtk::Popover::create();
-        gtk_widget_set_parent(
-            GTK_WIDGET(m_command_popover.operator Gtk::Popover*()),
-            GTK_WIDGET(entry));
-        gtk_popover_set_autohide(
-            GTK_POPOVER(m_command_popover.operator Gtk::Popover*()), FALSE);
-        gtk_popover_set_has_arrow(
-            GTK_POPOVER(m_command_popover.operator Gtk::Popover*()), FALSE);
+    m_command_popover = Gtk::Popover::create();
+    gtk_widget_set_parent(
+        GTK_WIDGET(m_command_popover.operator Gtk::Popover*()),
+        GTK_WIDGET(entry));
+    gtk_popover_set_autohide(
+        GTK_POPOVER(m_command_popover.operator Gtk::Popover*()), FALSE);
+    gtk_popover_set_has_arrow(
+        GTK_POPOVER(m_command_popover.operator Gtk::Popover*()), FALSE);
 
-        auto content = Gtk::Box::create(Gtk::Orientation::VERTICAL, 2);
-        content->set_margin_start(4);
-        content->set_margin_end(4);
-        content->set_margin_top(4);
-        content->set_margin_bottom(4);
+    auto content = Gtk::Box::create(Gtk::Orientation::VERTICAL, 2);
+    content->set_margin_start(4);
+    content->set_margin_end(4);
+    content->set_margin_top(4);
+    content->set_margin_bottom(4);
 
-        auto list = Gtk::ListBox::create();
-        m_command_listbox = list;
-        list->set_selection_mode(Gtk::SelectionMode::SINGLE);
-        list->add_css_class("rich-list");
-        content->append(std::move(list));
+    auto list = Gtk::ListBox::create();
+    m_command_listbox = list;
+    list->set_selection_mode(Gtk::SelectionMode::SINGLE);
+    list->add_css_class("rich-list");
+    content->append(std::move(list));
 
-        m_command_popover->set_child(
-            std::move(content).release_floating_ptr());
-    }
-
-    while (auto* row = m_command_listbox->get_row_at_index(0))
-        m_command_listbox->remove(row);
+    m_command_popover->set_child(
+        std::move(content).release_floating_ptr());
 
     ChatView* raw_v = this;
     for (auto& [name, desc] : matches) {
@@ -921,13 +880,8 @@ void ChatView::onChatEntryChanged()
         GTK_POPOVER(m_command_popover.operator Gtk::Popover*()),
         entry == m_chat_entry ? GTK_POS_TOP : GTK_POS_BOTTOM);
 
-    auto* raw_popover = GTK_POPOVER(
-        m_command_popover.operator Gtk::Popover*());
-    if (!gtk_widget_is_visible(GTK_WIDGET(raw_popover))) {
-        gtk_popover_popup(raw_popover);
-    } else {
-        gtk_popover_present(raw_popover);
-    }
+    gtk_popover_popup(GTK_POPOVER(
+        m_command_popover.operator Gtk::Popover*()));
 }
 
 } // namespace rook::gui
