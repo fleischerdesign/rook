@@ -52,6 +52,7 @@ class RookApplication final : public peel::Adw::Application
     std::unique_ptr<rook::adapters::extension::ExtensionManager> m_extensions;
     std::vector<rook::adapters::extension::CustomSkill> m_custom_skills;
     bool m_first_run = true;
+    bool m_css_loaded = false;
 
 public:
     static peel::RefPtr<RookApplication> create();

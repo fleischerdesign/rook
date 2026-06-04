@@ -11,11 +11,14 @@ class MessageWidget final : public peel::Gtk::Box
     PEEL_SIMPLE_CLASS(MessageWidget, peel::Gtk::Box)
 
     std::string m_role;
-    peel::Gtk::Label *m_label = nullptr;
+    std::string m_raw_content;
+    ::GtkBox *m_content_box = nullptr;
     peel::Gtk::Expander *m_reasoning_expander = nullptr;
     peel::Gtk::Label *m_reasoning_label = nullptr;
 
     inline void init(Class *);
+
+    void rebuildContent();
 
 public:
     static peel::FloatPtr<MessageWidget> create(const std::string &role,

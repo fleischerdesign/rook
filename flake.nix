@@ -46,6 +46,7 @@
             piper-tts
             whisper-cpp
             ollama
+            cmark-gfm
           ];
 
           env = {

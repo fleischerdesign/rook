@@ -27,15 +27,21 @@ void ThreadedLlmAdapter::streamChat(
     std::string_view tools_json
 ) {
     auto self = std::this_thread::get_id();
+    spdlog::info("ThreadedLlm: streamChat chat={} joinable={} same_thread={}",
+        chat_id, m_thread.joinable(),
+        m_thread.joinable() ? (m_thread.get_id() == self) : false);
 
     if (m_thread.joinable()) {
         if (m_thread.get_id() == self) {
+            spdlog::info("ThreadedLlm: same thread, direct call");
             m_stop_source.request_stop();
             m_inner->streamChat(chat_id, messages, std::move(on_chunk), model, std::move(on_tool_call), tools_json);
             return;
         }
+        spdlog::info("ThreadedLlm: stopping old thread...");
         m_stop_source.request_stop();
         m_thread.join();
+        spdlog::info("ThreadedLlm: old thread joined");
     }
 
     m_stop_source = std::stop_source();

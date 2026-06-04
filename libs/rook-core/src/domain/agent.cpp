@@ -52,6 +52,9 @@ void AgentEngine::onUserInput(const UserInputReceived& event) {
 
     auto conv = m_conv.open(event.chat_id);
     bool is_first = conv.messages.empty();
+    size_t msg_count = conv.messages.size();
+    spdlog::info("onUserInput: chat={} messages_before={} is_first={}",
+        event.chat_id, msg_count, is_first);
     m_conv.addMessage(event.chat_id, std::move(msg));
 
     if (is_first) {
@@ -93,7 +96,10 @@ static std::string buildToolsJson(const std::vector<ports::ToolDefinition>& tool
 }
 
 void AgentEngine::runLlm(std::string chat_id, std::string model) {
+    spdlog::info("runLlm: start chat={} model={}", chat_id, model);
+
     auto messages = m_conv.buildLlmMessages(chat_id);
+    spdlog::info("runLlm: {} messages", messages.size());
 
     if (m_extensions) {
         for (auto& msg : messages) {
@@ -128,6 +134,8 @@ void AgentEngine::runLlm(std::string chat_id, std::string model) {
     auto tools = m_tool.listTools();
     auto tools_json = buildToolsJson(tools);
 
+    spdlog::info("runLlm: {} tools, calling streamChat", tools.size());
+
     m_bus.publish(LlmRequested{chat_id, ""});
 
     m_llm.streamChat(
@@ -144,6 +152,7 @@ void AgentEngine::runLlm(std::string chat_id, std::string model) {
             }
 
             if (is_final && !is_reasoning) {
+                spdlog::info("AgentEngine: publishing LlmCompleted for {}", chat_id);
                 m_bus.publish(LlmCompleted{chat_id, 0});
             }
         },
@@ -166,6 +175,8 @@ void AgentEngine::runLlm(std::string chat_id, std::string model) {
         },
         tools_json
     );
+
+    spdlog::info("runLlm: streamChat returned for chat {}", chat_id);
 }
 
 void AgentEngine::onLlmChunk(const LlmStreamChunk& chunk) {

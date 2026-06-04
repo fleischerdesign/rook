@@ -138,6 +138,7 @@ public:
         std::function<void(std::string_view)> on_line,
         std::function<void(int32_t)> on_error
     ) override {
+        spdlog::info("CurlHttp: postStream url={}", url);
         auto* handle = curl_easy_init();
         if (!handle) {
             spdlog::error("curl_easy_init failed for postStream");
@@ -159,11 +160,17 @@ public:
         auto* hlist = buildHeaders(headers);
         curl_easy_setopt(handle, CURLOPT_HTTPHEADER, hlist);
 
+        spdlog::info("CurlHttp: performing postStream...");
         auto res = curl_easy_perform(handle);
+        int32_t status = 0;
+        curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &status);
+        spdlog::info("CurlHttp: postStream done res={} http={}", static_cast<int>(res), status);
+
         if (res != CURLE_OK) {
-            int32_t status = 0;
-            curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &status);
             spdlog::error("CURL error: {} (HTTP {})", curl_easy_strerror(res), status);
+            on_error(status);
+        } else if (status >= 400) {
+            spdlog::error("CurlHttp: HTTP error {}", status);
             on_error(status);
         }
 
@@ -198,10 +205,15 @@ public:
         curl_easy_setopt(handle, CURLOPT_HTTPHEADER, hlist);
 
         auto res = curl_easy_perform(handle);
+        int32_t status = 0;
+        curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &status);
+        spdlog::info("CurlHttp: postStream done res={} http={}", static_cast<int>(res), status);
+
         if (res != CURLE_OK) {
-            int32_t status = 0;
-            curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &status);
             spdlog::error("CURL error: {} (HTTP {})", curl_easy_strerror(res), status);
+            on_error(status);
+        } else if (status >= 400) {
+            spdlog::error("CurlHttp: HTTP error {}", status);
             on_error(status);
         }
 

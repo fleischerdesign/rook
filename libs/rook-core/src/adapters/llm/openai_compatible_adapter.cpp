@@ -80,10 +80,7 @@ std::string OpenAiCompatibleAdapter::buildRequestBody(
     for (const auto& msg : messages) {
         nlohmann::json m;
         m["role"] = msg.role;
-
-        if (!msg.content.empty()) {
-            m["content"] = msg.content;
-        }
+        m["content"] = msg.content;
 
         if (!msg.tool_call_id.empty()) {
             m["tool_call_id"] = msg.tool_call_id;
@@ -119,12 +116,17 @@ void OpenAiCompatibleAdapter::streamChat(
     std::function<void(std::string_view, std::string_view, std::string_view)> on_tool_call,
     std::string_view tools_json
 ) {
+    spdlog::info("OpenAI-compat: streamChat url={}", m_base_url);
     auto body = buildRequestBody(messages, tools_json);
     if (!model.empty()) {
         auto j = nlohmann::json::parse(body);
         j["model"] = std::string(model);
         body = j.dump();
     }
+    spdlog::info("OpenAI request: {} bytes, {} chars preview: {}",
+        body.size(),
+        body.size() > 200 ? 200 : body.size(),
+        body.size() > 200 ? body.substr(0, 200) + "..." : body);
     auto url = m_base_url + "/v1/chat/completions";
 
     std::vector<std::pair<std::string, std::string>> headers = {
@@ -146,11 +148,16 @@ void OpenAiCompatibleAdapter::streamChat(
         body,
         headers,
         [&on_chunk, &tool_handler, &tc_ids, &tc_names, &tc_args, this](std::string_view line) {
+            spdlog::info("OpenAI SSE line: {}", line);
             try {
                 if (!line.starts_with("data: ")) return;
 
                 auto data = line.substr(6);
-                if (data == "[DONE]") return;
+                if (data == "[DONE]") {
+                    spdlog::info("OpenAI SSE: [DONE]");
+                    on_chunk("", true, false);
+                    return;
+                }
 
                 auto json = nlohmann::json::parse(data);
                 if (!json.contains("choices") || json["choices"].empty()) return;
@@ -191,6 +198,7 @@ void OpenAiCompatibleAdapter::streamChat(
                 }
 
                 if (finish_reason == "tool_calls" && tool_handler) {
+                    spdlog::info("OpenAI SSE: tool_calls finish");
                     for (auto& [idx, name] : tc_names) {
                         tool_handler(name, tc_args[idx], tc_ids[idx]);
                     }
@@ -205,6 +213,7 @@ void OpenAiCompatibleAdapter::streamChat(
         },
         [&on_chunk](int32_t status) {
             spdlog::error("LLM HTTP error: {}", status);
+            on_chunk("", true, false);
         }
     );
 }

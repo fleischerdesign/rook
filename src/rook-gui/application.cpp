@@ -182,6 +182,32 @@ inline void RookApplication::vfunc_activate()
     parent_vfunc_activate<RookApplication>();
     if (get_active_window() != nullptr) return;
 
+    if (!m_css_loaded) {
+        auto* provider = gtk_css_provider_new();
+        gtk_css_provider_load_from_string(provider,
+            ".code-block frame {"
+            "  background-color: alpha(currentColor, 0.06);"
+            "  border-radius: 6px;"
+            "}"
+            ".code-block textview {"
+            "  font-family: monospace;"
+            "}"
+            ".code-block textview text {"
+            "  background-color: transparent;"
+            "}"
+            ".blockquote {"
+            "  border-left: 3px solid alpha(currentColor, 0.2);"
+            "  padding-left: 8px;"
+            "  opacity: 0.85;"
+            "}");
+        gtk_style_context_add_provider_for_display(
+            gdk_display_get_default(),
+            GTK_STYLE_PROVIDER(provider),
+            GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+        g_object_unref(provider);
+        m_css_loaded = true;
+    }
+
     auto *window = RookWindow::create(this, m_bus, *m_llm, m_conversations,
         m_mcp_manager.get(), m_security.get(), m_extensions.get(),
         &m_custom_skills,
