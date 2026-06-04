@@ -5,6 +5,7 @@
 #include <variant>
 #include <vector>
 #include <cstdint>
+#include "rook/ports/llm_port.hpp"
 
 namespace rook::domain {
 
@@ -143,6 +144,23 @@ struct ToolCallTimedOut {
     std::string request_uuid;
 };
 
+struct SnapshotConversation {
+    std::string id;
+    std::string title;
+    std::string model;
+    std::vector<ports::LlmMessage> messages;
+    std::vector<std::string> active_skill_ids;
+    bool pinned = false;
+    uint64_t pinned_at = 0;
+    uint64_t updated_at = 0;
+    bool has_messages = false;
+};
+
+struct SnapshotReady {
+    std::vector<SnapshotConversation> conversations;
+    std::string active_chat_id;
+};
+
 using DomainEvent = std::variant<
     UserInputReceived,
     LlmStreamChunk,
@@ -168,7 +186,8 @@ using DomainEvent = std::variant<
     ChatPinned,
     ToolCallPermissionRequest,
     ToolCallPermissionDecision,
-    ToolCallTimedOut
+    ToolCallTimedOut,
+    SnapshotReady
 >;
 
 } // namespace rook::domain

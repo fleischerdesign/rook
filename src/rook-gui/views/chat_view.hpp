@@ -32,7 +32,6 @@ class ChatView final : public peel::Gtk::Box
 
     rook::core::DomainActor *m_actor = nullptr;
     rook::domain::EventBus *m_bus = nullptr;
-    rook::domain::ConversationManager *m_conv = nullptr;
     rook::ports::LlmPort *m_llm = nullptr;
     rook::ports::ExtensionPort *m_extensions = nullptr;
     std::vector<rook::adapters::extension::CustomSkill> *m_custom_skills = nullptr;
@@ -72,6 +71,7 @@ class ChatView final : public peel::Gtk::Box
 
     rook::domain::EventBus::HandlerId m_perm_request_handler;
     rook::domain::EventBus::HandlerId m_perm_timeout_handler;
+    rook::domain::EventBus::HandlerId m_snapshot_handler;
 
     peel::Gtk::MenuButton *m_skills_btn = nullptr;
     peel::Gtk::MenuButton *m_welcome_skills_btn = nullptr;
@@ -83,6 +83,7 @@ class ChatView final : public peel::Gtk::Box
     PermissionBanner *m_active_banner = nullptr;
     rook::ports::ToolPermissionPort *m_permission_port = nullptr;
     guint m_banner_timeout_id = 0;
+    rook::domain::SnapshotReady m_snapshot;
 
     inline void init(Class *);
     inline void vfunc_dispose ();
@@ -97,6 +98,7 @@ class ChatView final : public peel::Gtk::Box
     void onChatDeleted(const rook::domain::ChatDeleted &event);
     void onPermissionRequest(const rook::domain::ToolCallPermissionRequest &event);
     void onPermissionTimeout(const rook::domain::ToolCallTimedOut &event);
+    void onSnapshot(const rook::domain::SnapshotReady &event);
     void loadMessages(std::string_view chat_id);
     void setProcessing(bool active);
     void switchToChat(std::string_view chat_id);
@@ -113,13 +115,10 @@ class ChatView final : public peel::Gtk::Box
 public:
     static peel::FloatPtr<ChatView> create(rook::core::DomainActor *actor,
                                                rook::domain::EventBus &bus,
-                                               rook::domain::ConversationManager &conv,
                                                rook::ports::LlmPort &llm,
                                                rook::ports::ExtensionPort *extensions = nullptr,
                                                std::vector<rook::adapters::extension::CustomSkill> *custom_skills = nullptr,
                                                rook::ports::ToolPermissionPort *permission_port = nullptr);
-
-    void setConv(rook::domain::ConversationManager *conv) { m_conv = conv; }
 
     void populateModelDropdown();
     void setChatId(std::string_view id);

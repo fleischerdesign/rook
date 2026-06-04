@@ -162,7 +162,8 @@ inline void RookApplication::init(Class *)
             GLib::idle_add_once([this, ev = std::move(event)]() {
                 m_bus.publish(ev);
             });
-        });
+        },
+        m_extensions.get(), &m_custom_skills);
 
     auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);
     prefs_action->connect_activate(
@@ -298,10 +299,11 @@ inline void RookApplication::vfunc_dispose()
     m_llm.reset();
     m_store.reset();
     m_secrets.reset();
+    m_permission_port.reset();
     m_actor.reset();
     m_mcp_manager.reset();
-    m_bus.~EventBus();
     parent_vfunc_dispose<RookApplication>();
+    m_bus.~EventBus();
 }
 
 void RookApplication::startModelDiscovery(RookWindow &window)

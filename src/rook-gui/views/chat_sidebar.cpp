@@ -17,6 +17,7 @@ inline void ChatSidebar::Class::init()
 
 inline void ChatSidebar::init(Class *)
 {
+    new (&m_snapshot) rook::domain::SnapshotReady();
     gtk_orientable_set_orientation(
         GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
         GTK_ORIENTATION_VERTICAL);
@@ -92,19 +93,19 @@ inline void ChatSidebar::vfunc_dispose()
         m_bus->unsubscribe(m_updated_handler);
         m_bus->unsubscribe(m_selected_handler);
         m_bus->unsubscribe(m_pinned_handler);
+        m_bus->unsubscribe(m_snapshot_handler);
         m_bus = nullptr;
     }
+    m_snapshot.~SnapshotReady();
     parent_vfunc_dispose<ChatSidebar>();
 }
 
 FloatPtr<ChatSidebar> ChatSidebar::create(rook::domain::EventBus &bus,
-                                           rook::domain::ConversationManager &conv,
                                            rook::core::DomainActor *actor)
 {
     auto sidebar = Object::create<ChatSidebar>();
     auto *s = static_cast<ChatSidebar*>(sidebar);
     s->m_bus = &bus;
-    s->m_conv = &conv;
     s->m_actor = actor;
 
     s->m_created_handler = bus.subscribe<rook::domain::ChatCreated>(
@@ -117,6 +118,8 @@ FloatPtr<ChatSidebar> ChatSidebar::create(rook::domain::EventBus &bus,
         [s](const rook::domain::ChatSelected &event) { s->onChatSelected(event); });
     s->m_pinned_handler = bus.subscribe<rook::domain::ChatPinned>(
         [s](const rook::domain::ChatPinned &event) { s->onChatPinned(event); });
+    s->m_snapshot_handler = bus.subscribe<rook::domain::SnapshotReady>(
+        [s](const rook::domain::SnapshotReady &event) { s->onSnapshot(event); });
 
     return sidebar;
 }
@@ -288,7 +291,10 @@ void ChatSidebar::onContextGesture(GtkGestureClick *, int /*n_press*/,
 void ChatSidebar::showContextMenu(::GtkWidget *parent,
                                    std::string_view chat_id)
 {
-    bool is_pinned = m_conv->isPinned(chat_id);
+    auto it = std::find_if(m_snapshot.conversations.begin(),
+        m_snapshot.conversations.end(),
+        [&](auto& c) { return c.id == chat_id; });
+    bool is_pinned = it != m_snapshot.conversations.end() && it->pinned;
     std::string cid(chat_id);
 
     auto popover = Gtk::Popover::create();
@@ -509,6 +515,15 @@ void ChatSidebar::onChatPinned(const rook::domain::ChatPinned &event)
     });
 }
 
+void ChatSidebar::onSnapshot(const rook::domain::SnapshotReady &event)
+{
+    GLib::idle_add_once([this, snap = event]() {
+        m_snapshot = snap;
+        rebuildList();
+        if (m_search) { m_search->set_text(""); onSearchChanged(); }
+    });
+}
+
 // --- Rebuild ---
 
 void ChatSidebar::rebuildList()
@@ -518,11 +533,11 @@ void ChatSidebar::rebuildList()
 
     m_rename_row = nullptr;
 
-    auto chats = m_conv->list();
+    auto chats = m_snapshot.conversations;
 
     std::sort(chats.begin(), chats.end(),
-        [](const rook::domain::Conversation &a,
-           const rook::domain::Conversation &b) {
+        [](const rook::domain::SnapshotConversation &a,
+           const rook::domain::SnapshotConversation &b) {
             if (a.pinned != b.pinned) return a.pinned > b.pinned;
             if (a.pinned && b.pinned)
                 return a.pinned_at > b.pinned_at;

@@ -58,7 +58,7 @@ void ThreadedLlmAdapter::streamChat(
          model_str, tool_callback = std::move(tool_callback), tools](
             std::stop_token token
         ) mutable {
-            (void)token;
+            if (token.stop_requested()) return;
             m_inner->streamChat(chat, msgs, std::move(callback), model_str, std::move(tool_callback), tools);
         });
 }

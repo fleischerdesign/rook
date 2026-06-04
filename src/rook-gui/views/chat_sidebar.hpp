@@ -17,8 +17,8 @@ class ChatSidebar final : public peel::Gtk::Box
     PEEL_SIMPLE_CLASS(ChatSidebar, peel::Gtk::Box)
 
     rook::domain::EventBus *m_bus = nullptr;
-    rook::domain::ConversationManager *m_conv = nullptr;
     rook::core::DomainActor *m_actor = nullptr;
+    rook::domain::SnapshotReady m_snapshot;
 
     peel::Gtk::SearchEntry *m_search = nullptr;
     peel::Gtk::ListBox *m_list = nullptr;
@@ -31,6 +31,7 @@ class ChatSidebar final : public peel::Gtk::Box
     rook::domain::EventBus::HandlerId m_updated_handler;
     rook::domain::EventBus::HandlerId m_selected_handler;
     rook::domain::EventBus::HandlerId m_pinned_handler;
+    rook::domain::EventBus::HandlerId m_snapshot_handler;
 
     inline void init(Class *);
     inline void vfunc_dispose ();
@@ -44,6 +45,7 @@ class ChatSidebar final : public peel::Gtk::Box
     void onChatUpdated(const rook::domain::ChatUpdated &event);
     void onChatSelected(const rook::domain::ChatSelected &event);
     void onChatPinned(const rook::domain::ChatPinned &event);
+    void onSnapshot(const rook::domain::SnapshotReady &event);
 
     void rebuildList();
     peel::Gtk::ListBoxRow* buildChatRow(std::string_view id, std::string title,
@@ -60,12 +62,9 @@ class ChatSidebar final : public peel::Gtk::Box
 
 public:
     static peel::FloatPtr<ChatSidebar> create(rook::domain::EventBus &bus,
-                                               rook::domain::ConversationManager &conv,
                                                rook::core::DomainActor *actor);
 
     void loadConversations(const std::vector<rook::domain::Conversation> &chats);
-
-    void setConv(rook::domain::ConversationManager *conv) { m_conv = conv; }
 };
 
 } // namespace rook::gui

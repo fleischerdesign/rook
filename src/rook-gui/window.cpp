@@ -42,11 +42,10 @@ RookWindow *RookWindow::create(Gtk::Application *app,
     win->m_custom_skills = custom_skills;
     win->m_permission_port = permission_port;
 
-    auto sidebar = ChatSidebar::create(bus, actor->conv(), actor);
-    sidebar->loadConversations(actor->conv().list());
+    auto sidebar = ChatSidebar::create(bus, actor);
     win->m_sidebar = std::move(sidebar).release_floating_ptr();
 
-    auto chat = ChatView::create(actor, bus, actor->conv(), llm, extensions, custom_skills,
+    auto chat = ChatView::create(actor, bus, llm, extensions, custom_skills,
                                   permission_port);
     win->m_chat_view = std::move(chat).release_floating_ptr();
 

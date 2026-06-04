@@ -26,7 +26,6 @@ std::string generateId() {
 } // namespace
 
 Conversation ConversationManager::open(std::string_view id) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [id](const auto& c) { return c.id == id; });
 
@@ -39,12 +38,10 @@ Conversation ConversationManager::open(std::string_view id) {
 }
 
 std::vector<Conversation> ConversationManager::list() const {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     return m_conversations;
 }
 
 Conversation ConversationManager::create(std::string_view title, std::string_view model) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     Conversation conv;
     conv.id = generateId();
     conv.title = std::string(title);
@@ -60,7 +57,6 @@ Conversation ConversationManager::create(std::string_view title, std::string_vie
 }
 
 void ConversationManager::remove(std::string_view id) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     std::erase_if(m_conversations,
         [id](const auto& c) { return c.id == id; });
 
@@ -70,14 +66,12 @@ void ConversationManager::remove(std::string_view id) {
 }
 
 void ConversationManager::close(std::string_view id) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (m_active_id == id) {
         m_active_id.clear();
     }
 }
 
 void ConversationManager::addMessage(std::string_view conv_id, ChatMessage message) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
 
@@ -94,7 +88,6 @@ void ConversationManager::updateAssistantChunk(
     std::string_view conv_id,
     std::string_view chunk
 ) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
 
@@ -115,7 +108,6 @@ void ConversationManager::updateReasoningChunk(
     std::string_view conv_id,
     std::string_view chunk
 ) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
 
@@ -133,7 +125,6 @@ void ConversationManager::updateReasoningChunk(
 }
 
 void ConversationManager::setAssistantToolCalls(std::string_view conv_id, std::string json) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it == m_conversations.end()) return;
@@ -158,7 +149,6 @@ void ConversationManager::setAssistantToolCalls(std::string_view conv_id, std::s
 std::vector<ports::LlmMessage> ConversationManager::buildLlmMessages(
     std::string_view conv_id
 ) const {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](const auto& c) { return c.id == conv_id; });
 
@@ -179,7 +169,6 @@ std::vector<ports::LlmMessage> ConversationManager::buildLlmMessages(
 }
 
 int32_t ConversationManager::estimateTokens(std::string_view conv_id) const {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](const auto& c) { return c.id == conv_id; });
 
@@ -194,7 +183,6 @@ int32_t ConversationManager::estimateTokens(std::string_view conv_id) const {
 }
 
 std::optional<Conversation> ConversationManager::active() const {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [this](const auto& c) { return c.id == m_active_id; });
 
@@ -203,24 +191,10 @@ std::optional<Conversation> ConversationManager::active() const {
 }
 
 void ConversationManager::setActive(std::string_view id) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     m_active_id = id;
 }
 
-std::string ConversationManager::generateTitle(const Conversation& conv) const {
-    (void)conv;
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
-    if (!conv.messages.empty()) {
-        auto& msg = conv.messages[0];
-        auto title = msg.content.substr(0, 50);
-        if (msg.content.size() > 50) title += "...";
-        return title;
-    }
-    return "New Chat";
-}
-
 void ConversationManager::setTitle(std::string_view conv_id, std::string_view title) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
 
@@ -230,7 +204,6 @@ void ConversationManager::setTitle(std::string_view conv_id, std::string_view ti
 }
 
 void ConversationManager::setModel(std::string_view conv_id, std::string_view model) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
 
@@ -239,7 +212,6 @@ void ConversationManager::setModel(std::string_view conv_id, std::string_view mo
 }
 
 void ConversationManager::togglePin(std::string_view conv_id) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it == m_conversations.end()) return;
@@ -252,7 +224,6 @@ void ConversationManager::togglePin(std::string_view conv_id) {
 }
 
 bool ConversationManager::isPinned(std::string_view conv_id) const {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](const auto& c) { return c.id == conv_id; });
     return it != m_conversations.end() && it->pinned;
@@ -260,7 +231,6 @@ bool ConversationManager::isPinned(std::string_view conv_id) const {
 
 bool ConversationManager::isToolWhitelisted(std::string_view conv_id,
                                              std::string_view tool) const {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](const auto& c) { return c.id == conv_id; });
     if (it == m_conversations.end()) return false;
@@ -270,7 +240,6 @@ bool ConversationManager::isToolWhitelisted(std::string_view conv_id,
 
 void ConversationManager::addWhitelistedTool(std::string_view conv_id,
                                               std::string_view tool) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it == m_conversations.end()) return;
@@ -281,7 +250,6 @@ void ConversationManager::addWhitelistedTool(std::string_view conv_id,
 }
 
 void ConversationManager::loadFromStore(ports::StorePort& store) {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto chat_ids = store.listChats();
     for (const auto& record : chat_ids) {
         auto opt = store.loadChat(record.id);
@@ -347,7 +315,6 @@ void ConversationManager::loadFromStore(ports::StorePort& store) {
 }
 
 void ConversationManager::saveActiveConversation() {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (!m_store) return;
 
     auto it = std::ranges::find_if(m_conversations,
@@ -393,7 +360,6 @@ void ConversationManager::setSystemMessage(
     std::string_view conv_id,
     std::string_view content)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it == m_conversations.end()) return;
@@ -410,7 +376,6 @@ void ConversationManager::updateSystemMessage(
     std::string_view conv_id,
     std::string_view content)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it == m_conversations.end()) return;
@@ -429,7 +394,6 @@ void ConversationManager::setActiveSkillIds(
     std::string_view conv_id,
     std::vector<std::string> ids)
 {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it == m_conversations.end()) return;
@@ -439,7 +403,6 @@ void ConversationManager::setActiveSkillIds(
 std::vector<std::string> ConversationManager::activeSkillIds(
     std::string_view conv_id) const
 {
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it != m_conversations.end()) return it->active_skill_ids;

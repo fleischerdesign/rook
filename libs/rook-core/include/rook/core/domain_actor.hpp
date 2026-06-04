@@ -18,11 +18,17 @@ class LlmPort;
 class ToolPort;
 class ToolPermissionPort;
 class StorePort;
+class ExtensionPort;
+}
+
+namespace rook::adapters::extension {
+struct CustomSkill;
 }
 
 namespace rook::core {
 
 template <typename T> class MpMcQueue;
+class WorkerPool;
 
 } // namespace rook::core
 
@@ -47,7 +53,9 @@ public:
                ports::ToolPort& tool,
                ports::ToolPermissionPort* permission_port,
                ports::StorePort* store,
-               domain::UiEventFn on_ui_event);
+               domain::UiEventFn on_ui_event,
+               ports::ExtensionPort* extensions = nullptr,
+               std::vector<rook::adapters::extension::CustomSkill>* custom_skills = nullptr);
 
     void stop();
 
@@ -82,17 +90,25 @@ private:
     void processTools(std::string chat_id, std::string model);
     void executeTool(const std::string& chat_id, const ports::ToolCall& call);
     std::string buildToolsJson();
+    std::string buildSystemPrompt(std::string_view chat_id);
+    void injectSkillsOnFirstMessage(std::string_view chat_id);
+    void rebuildSystemMessage(std::string_view chat_id);
     void saveActiveConv();
     void emitUiEvent(domain::DomainEvent event);
-    void syncSkills(std::string_view chat_id);
+    void emitSnapshot();
+    void syncAlwaysOnSkills(std::string_view chat_id);
 
     std::unique_ptr<domain::ConversationManager> m_conv;
     ports::LlmPort* m_llm = nullptr;
     ports::ToolPort* m_tool_port = nullptr;
     ports::ToolPermissionPort* m_perm_port = nullptr;
     ports::StorePort* m_store = nullptr;
+    ports::ExtensionPort* m_extensions = nullptr;
+    std::vector<rook::adapters::extension::CustomSkill>* m_custom_skills = nullptr;
 
     domain::UiEventFn m_ui_event_fn;
+
+    std::unique_ptr<WorkerPool> m_pool;
 
     using Queue = MpMcQueue<domain::ActorMessage>;
     std::unique_ptr<Queue> m_inbox;

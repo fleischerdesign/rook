@@ -6,7 +6,6 @@
 #include <optional>
 #include <chrono>
 #include <cstdint>
-#include <mutex>
 #include "rook/ports/llm_port.hpp"
 #include "rook/ports/store_port.hpp"
 
@@ -76,11 +75,8 @@ public:
 private:
     std::vector<Conversation> m_conversations;
     std::string m_active_id;
-    mutable std::recursive_mutex m_mutex;
 
     ports::StorePort* m_store = nullptr;
-
-    std::string generateTitle(const Conversation& conv) const;
 };
 
 } // namespace rook::domain

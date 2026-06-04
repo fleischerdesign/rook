@@ -28,6 +28,7 @@ inline void ChatView::init(Class *)
         GTK_ORIENTATION_VERTICAL);
     new (&m_chat_id) std::string();
     new (&m_pending_input) std::string();
+    new (&m_snapshot) rook::domain::SnapshotReady();
 }
 
 inline void ChatView::vfunc_dispose()
@@ -45,14 +46,15 @@ inline void ChatView::vfunc_dispose()
         m_bus->unsubscribe(m_skill_handler);
         m_bus->unsubscribe(m_perm_request_handler);
         m_bus->unsubscribe(m_perm_timeout_handler);
+        m_bus->unsubscribe(m_snapshot_handler);
         m_bus = nullptr;
     }
+    m_snapshot.~SnapshotReady();
     parent_vfunc_dispose<ChatView>();
 }
 
 FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
                                        rook::domain::EventBus &bus,
-                                       rook::domain::ConversationManager &conv,
                                        rook::ports::LlmPort &llm,
                                        rook::ports::ExtensionPort *extensions,
                                        std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
@@ -62,7 +64,6 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
     ChatView *v = view;
     v->m_actor = actor;
     v->m_bus = &bus;
-    v->m_conv = &conv;
     v->m_llm = &llm;
     v->m_extensions = extensions;
     v->m_custom_skills = custom_skills;
@@ -121,6 +122,11 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
     v->m_perm_timeout_handler = bus.subscribe<rook::domain::ToolCallTimedOut>(
         [v](const rook::domain::ToolCallTimedOut& event) {
             GLib::idle_add_once([v, event]() { v->onPermissionTimeout(event); });
+        });
+
+    v->m_snapshot_handler = bus.subscribe<rook::domain::SnapshotReady>(
+        [v](const rook::domain::SnapshotReady& event) {
+            GLib::idle_add_once([v, snap = event]() { v->onSnapshot(snap); });
         });
 
     auto stack = Gtk::Stack::create();
@@ -542,12 +548,16 @@ void ChatView::onChatSelected(const rook::domain::ChatSelected &event)
 void ChatView::onChatDeleted(const rook::domain::ChatDeleted &)
 {
     GLib::idle_add_once([this]() {
-        auto chats = m_conv->list();
-        if (chats.empty()) {
+        if (m_snapshot.conversations.empty()) {
             m_chat_id.clear();
             m_stack->set_visible_child_name("welcome");
         }
     });
+}
+
+void ChatView::onSnapshot(const rook::domain::SnapshotReady& event)
+{
+    m_snapshot = event;
 }
 
 void ChatView::switchToChat(std::string_view chat_id)
@@ -600,12 +610,16 @@ void ChatView::loadMessages(std::string_view chat_id)
     m_pending_assistant = nullptr;
     m_pending_tool_rows.clear();
 
-    auto conv = m_conv->open(chat_id);
-    for (const auto &msg : conv.messages) {
+    auto it = std::find_if(m_snapshot.conversations.begin(),
+        m_snapshot.conversations.end(),
+        [&](const auto& c) { return c.id == chat_id; });
+    if (it == m_snapshot.conversations.end()) return;
+
+    for (const auto &msg : it->messages) {
         if (msg.role == "system") continue;
         if (msg.role == "tool") {
             auto *row = ToolCallRow::createCompleted(
-                msg.tool_name, "", msg.content, false).release_floating_ptr();
+                msg.tool_call_id, "", msg.content, false).release_floating_ptr();
             m_message_list->append(row);
             auto *list_row = GTK_LIST_BOX_ROW(
                 gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(row)));
@@ -613,7 +627,7 @@ void ChatView::loadMessages(std::string_view chat_id)
             continue;
         }
         auto *widget = MessageWidget::create(
-            msg.role, msg.content, msg.reasoning_content)
+            msg.role, msg.content, "")
             .release_floating_ptr();
         m_message_list->append(widget);
         auto *row = GTK_LIST_BOX_ROW(
@@ -621,9 +635,9 @@ void ChatView::loadMessages(std::string_view chat_id)
         if (row) gtk_list_box_row_set_activatable(row, FALSE);
     }
 
-    if (!conv.model.empty()) {
+    if (!it->model.empty()) {
         for (size_t i = 0; i < m_chat_ids.size(); ++i) {
-            if (m_chat_ids[i] == conv.model) {
+            if (m_chat_ids[i] == it->model) {
                 m_chat_model->set_selected(i);
                 break;
             }
@@ -673,9 +687,14 @@ void ChatView::buildSkillsPopover(Gtk::MenuButton *target)
     list->set_selection_mode(Gtk::SelectionMode::NONE);
     list->add_css_class("rich-list");
 
-    auto active_ids = m_chat_id.empty()
-        ? std::vector<std::string>{}
-        : m_conv->activeSkillIds(m_chat_id);
+    std::vector<std::string> active_ids;
+    if (!m_chat_id.empty()) {
+        auto it = std::find_if(m_snapshot.conversations.begin(),
+            m_snapshot.conversations.end(),
+            [&](auto& c) { return c.id == m_chat_id; });
+        if (it != m_snapshot.conversations.end())
+            active_ids = it->active_skill_ids;
+    }
 
     if (m_chat_id.empty()) {
         if (m_custom_skills) {

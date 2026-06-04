@@ -1,39 +1,47 @@
 #include "rook/core/domain_actor.hpp"
 #include "rook/core/actor_messages.hpp"
 #include "rook/core/lockfree_queue.hpp"
+#include "rook/core/worker_pool.hpp"
 #include "rook/domain/conversation.hpp"
 #include "rook/domain/events.hpp"
 #include "rook/ports/llm_port.hpp"
 #include "rook/ports/tool_port.hpp"
 #include "rook/ports/store_port.hpp"
+#include "rook/ports/extension_port.hpp"
+#include "rook/adapters/extension/extension_manifest.hpp"
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
 #include <random>
 #include <sstream>
-#include <future>
 
 namespace rook::core {
 
 DomainActor::DomainActor()
     : m_conv(std::make_unique<domain::ConversationManager>())
+    , m_pool(std::make_unique<WorkerPool>(4))
     , m_inbox(std::make_unique<Queue>(4096))
 {}
 
 DomainActor::~DomainActor() {
     stop();
+    m_pool.reset();
 }
 
 void DomainActor::start(ports::LlmPort& llm,
                         ports::ToolPort& tool,
                         ports::ToolPermissionPort* permission_port,
                         ports::StorePort* store,
-                        domain::UiEventFn on_ui_event)
+                        domain::UiEventFn on_ui_event,
+                        ports::ExtensionPort* extensions,
+                        std::vector<rook::adapters::extension::CustomSkill>* custom_skills)
 {
     m_llm = &llm;
     m_tool_port = &tool;
     m_perm_port = permission_port;
     m_store = store;
     m_ui_event_fn = std::move(on_ui_event);
+    m_extensions = extensions;
+    m_custom_skills = custom_skills;
 
     m_conv->setStore(store);
     m_conv->loadFromStore(*store);
@@ -42,6 +50,7 @@ void DomainActor::start(ports::LlmPort& llm,
     m_thread = std::jthread([this](std::stop_token token) { run(token); });
 
     spdlog::info("DomainActor started");
+    emitSnapshot();
 }
 
 void DomainActor::stop() {
@@ -49,11 +58,13 @@ void DomainActor::stop() {
         m_thread.request_stop();
         m_thread.join();
     }
-    m_running.store(false, std::memory_order_release);
+    m_pool->stop();
 }
 
 void DomainActor::post(domain::ActorMessage msg) {
-    m_inbox->push(std::move(msg));
+    if (!m_inbox->push(std::move(msg))) {
+        spdlog::warn("DomainActor: inbox full, dropping message");
+    }
 }
 
 void DomainActor::run(std::stop_token token) {
@@ -113,6 +124,27 @@ void DomainActor::emitUiEvent(domain::DomainEvent event) {
         m_ui_event_fn(std::move(event));
 }
 
+void DomainActor::emitSnapshot() {
+    domain::SnapshotReady snap;
+    for (auto& c : m_conv->list()) {
+        domain::SnapshotConversation sc;
+        sc.id = c.id;
+        sc.title = c.title;
+        sc.model = c.model;
+        sc.pinned = c.pinned;
+        sc.pinned_at = c.pinned_at;
+        sc.has_messages = !c.messages.empty();
+        sc.active_skill_ids = c.active_skill_ids;
+        sc.updated_at = std::chrono::duration_cast<std::chrono::milliseconds>(
+            c.updated_at.time_since_epoch()).count();
+        sc.messages = m_conv->buildLlmMessages(c.id);
+        snap.conversations.push_back(std::move(sc));
+    }
+    auto active = m_conv->active();
+    if (active) snap.active_chat_id = active->id;
+    emitUiEvent(std::move(snap));
+}
+
 void DomainActor::handleUserInput(const domain::ActorUserInput& msg) {
     spdlog::info("Actor: UserInput chat={}", msg.chat_id);
 
@@ -128,7 +160,7 @@ void DomainActor::handleUserInput(const domain::ActorUserInput& msg) {
     saveActiveConv();
 
     if (is_first) {
-        syncSkills(msg.chat_id);
+        injectSkillsOnFirstMessage(msg.chat_id);
     }
 
     m_pending_tool_calls.clear();
@@ -245,7 +277,7 @@ void DomainActor::handleLlmDone(const domain::ActorLlmDone& msg) {
             }
 
             if (user_count == 1 && assistant_count == 1) {
-                auto future = std::async(std::launch::async,
+                m_pool->submit(
                     [this, chat_id = msg.chat_id, model = conv.model,
                      last_user, last_assistant]() {
                         auto title_id = "__title__" + chat_id;
@@ -394,7 +426,7 @@ void DomainActor::executeTool(const std::string& chat_id, const ports::ToolCall&
     auto* inbox = m_inbox.get();
     auto chat = chat_id;
 
-    std::thread([call, this, inbox, chat]() {
+    m_pool->submit([call, this, inbox, chat]() {
         auto result = m_tool_port->execute(call);
         inbox->push(domain::ActorToolResult{
             .chat_id = chat,
@@ -402,7 +434,7 @@ void DomainActor::executeTool(const std::string& chat_id, const ports::ToolCall&
             .result = result.content,
             .is_error = result.is_error,
         });
-    }).detach();
+    });
 }
 
 void DomainActor::handlePermissionRequest(const domain::ActorPermissionRequest& msg) {
@@ -485,6 +517,7 @@ void DomainActor::handleTitleReady(const domain::ActorTitleReady& msg) {
         .chat_id = msg.chat_id,
         .title = msg.title,
     });
+    emitSnapshot();
 }
 
 void DomainActor::handleCreateChat(const domain::ActorCreateChat& msg) {
@@ -494,6 +527,7 @@ void DomainActor::handleCreateChat(const domain::ActorCreateChat& msg) {
 
     emitUiEvent(domain::ChatCreated{.chat_id = conv.id});
     emitUiEvent(domain::ChatSelected{.chat_id = conv.id});
+    emitSnapshot();
 }
 
 void DomainActor::handleDeleteChat(const domain::ActorDeleteChat& msg) {
@@ -502,11 +536,16 @@ void DomainActor::handleDeleteChat(const domain::ActorDeleteChat& msg) {
     spdlog::info("Actor: deleted chat {}", msg.chat_id);
 
     emitUiEvent(domain::ChatDeleted{.chat_id = msg.chat_id});
+    emitSnapshot();
 }
 
 void DomainActor::handleSelectChat(const domain::ActorSelectChat& msg) {
     m_conv->setActive(msg.chat_id);
     emitUiEvent(domain::ChatSelected{.chat_id = msg.chat_id});
+
+    if (!msg.chat_id.empty()) {
+        syncAlwaysOnSkills(msg.chat_id);
+    }
 }
 
 void DomainActor::handleTogglePin(const domain::ActorTogglePin& msg) {
@@ -517,6 +556,7 @@ void DomainActor::handleTogglePin(const domain::ActorTogglePin& msg) {
         .chat_id = msg.chat_id,
         .pinned = m_conv->isPinned(msg.chat_id),
     });
+    emitSnapshot();
 }
 
 void DomainActor::handleRenameChat(const domain::ActorRenameChat& msg) {
@@ -527,6 +567,7 @@ void DomainActor::handleRenameChat(const domain::ActorRenameChat& msg) {
         .chat_id = msg.chat_id,
         .title = msg.title,
     });
+    emitSnapshot();
 }
 
 void DomainActor::handleToggleSkill(const domain::ActorToggleSkill& msg) {
@@ -540,11 +581,156 @@ void DomainActor::handleToggleSkill(const domain::ActorToggleSkill& msg) {
     }
 
     m_conv->setActiveSkillIds(msg.chat_id, ids);
+    rebuildSystemMessage(msg.chat_id);
 }
 
-void DomainActor::syncSkills(std::string_view chat_id) {
-    auto ids = m_conv->activeSkillIds(chat_id);
-    (void)ids;
+std::string DomainActor::buildSystemPrompt(std::string_view chat_id) {
+    std::string result;
+    auto active_ids = m_conv->activeSkillIds(chat_id);
+
+    auto append_skill = [&](const std::string& prompt,
+                             const std::string& name,
+                             const std::string& description) {
+        if (!result.empty()) result += "\n\n";
+        result += "[Skill: " + name;
+        if (!description.empty()) result += " — " + description;
+        result += "]\n\n" + prompt;
+    };
+
+    if (m_custom_skills) {
+        for (auto& skill : *m_custom_skills) {
+            if (skill.prompt.empty()) continue;
+            std::string sid = "custom:" + skill.name;
+            if (std::find(active_ids.begin(), active_ids.end(), sid) == active_ids.end())
+                continue;
+            append_skill(skill.prompt, skill.name, skill.description);
+        }
+    }
+
+    if (m_extensions) {
+        for (auto& ext : m_extensions->listInstalled()) {
+            for (auto& skill : ext.skills) {
+                if (skill.prompt.empty()) continue;
+                std::string sid = "ext:" + ext.name + ":" + skill.name;
+                if (std::find(active_ids.begin(), active_ids.end(), sid) == active_ids.end())
+                    continue;
+                append_skill(skill.prompt, skill.name, skill.description);
+            }
+        }
+    }
+
+    if (m_extensions) {
+        std::string context_index;
+        for (auto& ext : m_extensions->listInstalled()) {
+            if (ext.context_files.empty()) continue;
+            context_index += "\nFrom " + ext.display_name + " v" + ext.version + ":\n";
+            for (auto& cf : ext.context_files) {
+                context_index += "  " + ext.install_path + "/" + cf.path;
+                if (!cf.description.empty())
+                    context_index += " — " + cf.description;
+                context_index += "\n";
+            }
+        }
+        if (!context_index.empty()) {
+            if (!result.empty()) result += "\n\n";
+            result += "Available extension context files (use read_file to access):"
+                   + context_index;
+        }
+    }
+
+    return result;
+}
+
+void DomainActor::injectSkillsOnFirstMessage(std::string_view chat_id) {
+    std::vector<std::string> active_ids;
+
+    if (m_custom_skills) {
+        for (auto& skill : *m_custom_skills) {
+            if (skill.prompt.empty()) continue;
+            if (skill.enabled)
+                active_ids.push_back("custom:" + skill.name);
+        }
+    }
+    if (m_extensions) {
+        for (auto& ext : m_extensions->listInstalled()) {
+            for (auto& skill : ext.skills) {
+                if (skill.prompt.empty()) continue;
+                if (skill.enabled)
+                    active_ids.push_back("ext:" + ext.name + ":" + skill.name);
+            }
+        }
+    }
+    m_conv->setActiveSkillIds(chat_id, active_ids);
+
+    auto prompt = buildSystemPrompt(chat_id);
+    if (!prompt.empty()) {
+        m_conv->setSystemMessage(chat_id, prompt);
+    }
+}
+
+void DomainActor::rebuildSystemMessage(std::string_view chat_id) {
+    auto prompt = buildSystemPrompt(chat_id);
+    if (prompt.empty()) return;
+    m_conv->updateSystemMessage(chat_id, prompt);
+}
+
+void DomainActor::syncAlwaysOnSkills(std::string_view chat_id) {
+    auto active_ids = m_conv->activeSkillIds(chat_id);
+    auto conv = m_conv->open(chat_id);
+    if (conv.messages.empty()) return;
+
+    auto erase_if_stale = [&](const std::string& sid) -> bool {
+        if (sid.starts_with("custom:")) {
+            if (!m_custom_skills) return true;
+            auto name = sid.substr(7);
+            return std::find_if(m_custom_skills->begin(), m_custom_skills->end(),
+                [&](auto& s) { return s.name == name; })
+                == m_custom_skills->end();
+        }
+        if (sid.starts_with("ext:") && m_extensions) {
+            auto rest = sid.substr(4);
+            auto dot = rest.find(':');
+            if (dot == std::string::npos) return true;
+            auto ext_name = rest.substr(0, dot);
+            auto skill_name = rest.substr(dot + 1);
+            for (auto& ext : m_extensions->listInstalled()) {
+                if (ext.name == ext_name) {
+                    for (auto& s : ext.skills) {
+                        if (s.name == skill_name) return false;
+                    }
+                }
+            }
+            return true;
+        }
+        return false;
+    };
+
+    std::erase_if(active_ids, erase_if_stale);
+
+    auto add_if_missing = [&](const std::string& sid) {
+        if (std::find(active_ids.begin(), active_ids.end(), sid)
+            == active_ids.end())
+            active_ids.push_back(sid);
+    };
+
+    if (m_custom_skills) {
+        for (auto& skill : *m_custom_skills) {
+            if (skill.enabled && !skill.prompt.empty())
+                add_if_missing("custom:" + skill.name);
+        }
+    }
+    if (m_extensions) {
+        for (auto& ext : m_extensions->listInstalled()) {
+            for (auto& skill : ext.skills) {
+                if (skill.enabled && !skill.prompt.empty())
+                    add_if_missing("ext:" + ext.name + ":" + skill.name);
+            }
+        }
+    }
+
+    m_conv->setActiveSkillIds(chat_id, active_ids);
+    auto prompt = buildSystemPrompt(chat_id);
+    m_conv->updateSystemMessage(chat_id, prompt.empty() ? "" : prompt);
 }
 
 void DomainActor::saveActiveConv() {
