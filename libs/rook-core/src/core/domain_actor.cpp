@@ -324,10 +324,10 @@ void DomainActor::handleLlmDone(const domain::ActorLlmDone& msg) {
                         );
                     });
         }
+    }
     } else {
         processTools(msg.chat_id, msg.model);
     }
-}
 }
 
 void DomainActor::handleLlmError(const domain::ActorLlmError& msg) {
