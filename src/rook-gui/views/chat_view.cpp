@@ -619,7 +619,8 @@ void ChatView::loadMessages(std::string_view chat_id)
         if (msg.role == "system") continue;
         if (msg.role == "tool") {
             auto *row = ToolCallRow::createCompleted(
-                msg.tool_call_id, "", msg.content, false).release_floating_ptr();
+                msg.tool_name.empty() ? msg.tool_call_id : msg.tool_name,
+                "", msg.content, false).release_floating_ptr();
             m_message_list->append(row);
             auto *list_row = GTK_LIST_BOX_ROW(
                 gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(row)));

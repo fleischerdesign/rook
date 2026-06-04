@@ -44,6 +44,7 @@ FloatPtr<PermissionBanner> PermissionBanner::create(
         auto check = Gtk::CheckButton::create();
         check->set_active(true);
         b->m_checkboxes.push_back(check);
+        b->m_call_ids.push_back(call.call_id);
         row->append(std::move(check));
 
         auto info = Gtk::Box::create(Gtk::Orientation::VERTICAL, 2);
@@ -83,9 +84,10 @@ FloatPtr<PermissionBanner> PermissionBanner::create(
     deny_btn->add_css_class("flat");
     deny_btn->connect_clicked([b](Gtk::Button *) {
         std::vector<rook::domain::ToolCallPermissionDecision::Result> results;
-        for (auto& chk : b->m_checkboxes) {
-            (void)chk;
+        for (size_t i = 0; i < b->m_checkboxes.size(); ++i) {
+            (void)b->m_checkboxes[i];
             rook::domain::ToolCallPermissionDecision::Result r;
+            r.call_id = b->m_call_ids[i];
             r.decision = 1; // Deny
             results.push_back(r);
         }
@@ -99,6 +101,7 @@ FloatPtr<PermissionBanner> PermissionBanner::create(
         std::vector<rook::domain::ToolCallPermissionDecision::Result> results;
         for (size_t i = 0; i < b->m_checkboxes.size(); ++i) {
             rook::domain::ToolCallPermissionDecision::Result r;
+            r.call_id = b->m_call_ids[i];
             r.decision = b->m_checkboxes[i]->get_active() ? 0 : 1;
             results.push_back(r);
         }
@@ -112,6 +115,7 @@ FloatPtr<PermissionBanner> PermissionBanner::create(
         std::vector<rook::domain::ToolCallPermissionDecision::Result> results;
         for (size_t i = 0; i < b->m_checkboxes.size(); ++i) {
             rook::domain::ToolCallPermissionDecision::Result r;
+            r.call_id = b->m_call_ids[i];
             r.decision = b->m_checkboxes[i]->get_active() ? 2 : 1;
             results.push_back(r);
         }

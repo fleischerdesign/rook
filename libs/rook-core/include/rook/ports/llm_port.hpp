@@ -24,6 +24,7 @@ struct LlmMessage {
     std::string role;
     std::string content;
     std::string tool_call_id;
+    std::string tool_name;
     std::string tool_calls; // JSON array of {"id":"...","type":"function","function":{"name":"...","arguments":"..."}}
 };
 

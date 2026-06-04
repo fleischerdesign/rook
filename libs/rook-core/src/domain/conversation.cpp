@@ -161,6 +161,7 @@ std::vector<ports::LlmMessage> ConversationManager::buildLlmMessages(
         lm.role = msg.role;
         lm.content = msg.content;
         lm.tool_call_id = msg.tool_call_id;
+        lm.tool_name = msg.tool_name;
         lm.tool_calls = msg.tool_calls_json;
         result.push_back(std::move(lm));
     }

@@ -20,6 +20,7 @@ class PermissionBanner final : public peel::Gtk::Box
 
     std::string m_request_uuid;
     std::vector<peel::Gtk::CheckButton*> m_checkboxes;
+    std::vector<std::string> m_call_ids;
 
     inline void init(Class *);
 
