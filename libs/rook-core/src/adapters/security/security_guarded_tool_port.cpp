@@ -5,16 +5,16 @@ namespace rook::adapters::security {
 
 SecurityGuardedToolPort::SecurityGuardedToolPort(
     const ports::SecurityPort& security,
-    ports::ToolPort& inner,
+    std::unique_ptr<ports::ToolPort> inner,
     std::string server_id)
     : m_security(security)
-    , m_inner(inner)
+    , m_inner(std::move(inner))
     , m_server_id(std::move(server_id))
 {}
 
 std::vector<ports::ToolDefinition> SecurityGuardedToolPort::listTools()
 {
-    return m_inner.listTools();
+    return m_inner->listTools();
 }
 
 ports::ToolResult SecurityGuardedToolPort::execute(
@@ -32,7 +32,7 @@ ports::ToolResult SecurityGuardedToolPort::execute(
         };
     }
 
-    return m_inner.execute(call);
+    return m_inner->execute(call);
 }
 
 } // namespace rook::adapters::security

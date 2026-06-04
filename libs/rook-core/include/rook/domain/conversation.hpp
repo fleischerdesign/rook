@@ -6,9 +6,9 @@
 #include <optional>
 #include <chrono>
 #include <cstdint>
+#include <mutex>
 #include "rook/ports/llm_port.hpp"
 #include "rook/ports/store_port.hpp"
-#include "rook/domain/event_bus.hpp"
 
 namespace rook::domain {
 
@@ -35,6 +35,8 @@ struct Conversation {
     int32_t context_window = 8192;
     bool pinned = false;
     uint64_t pinned_at = 0;
+    std::vector<std::string> whitelisted_tools;
+    bool title_is_manual = false;
 };
 
 class ConversationManager {
@@ -53,6 +55,8 @@ public:
     void setModel(std::string_view conv_id, std::string_view model);
     void togglePin(std::string_view conv_id);
     bool isPinned(std::string_view conv_id) const;
+    bool isToolWhitelisted(std::string_view conv_id, std::string_view tool) const;
+    void addWhitelistedTool(std::string_view conv_id, std::string_view tool);
     std::vector<ports::LlmMessage> buildLlmMessages(std::string_view conv_id) const;
     int32_t estimateTokens(std::string_view conv_id) const;
     void setSystemMessage(std::string_view conv_id, std::string_view content);
@@ -65,22 +69,18 @@ public:
     std::optional<Conversation> active() const;
     void setActive(std::string_view id);
 
-    void start(EventBus& bus, ports::StorePort* store = nullptr);
+    void setStore(ports::StorePort* store) { m_store = store; }
     void saveActiveConversation();
     void loadFromStore(ports::StorePort& store);
 
 private:
     std::vector<Conversation> m_conversations;
     std::string m_active_id;
+    mutable std::recursive_mutex m_mutex;
 
-    EventBus* m_bus = nullptr;
     ports::StorePort* m_store = nullptr;
-    EventBus::HandlerId m_chat_created_handler = 0;
-    EventBus::HandlerId m_chat_deleted_handler = 0;
 
     std::string generateTitle(const Conversation& conv) const;
-    void onChatCreated(const ChatCreated& event);
-    void onChatDeleted(const ChatDeleted& event);
 };
 
 } // namespace rook::domain

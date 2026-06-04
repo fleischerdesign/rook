@@ -2,19 +2,24 @@
 #include "rook/ports/extension_port.hpp"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include <random>
+#include <sstream>
+#include <future>
 
 namespace rook::domain {
 
 AgentEngine::AgentEngine(EventBus& bus, ports::LlmPort& llm,
                          ConversationManager& conv, ports::ToolPort& tool,
                          ports::ExtensionPort* extensions,
-                         std::vector<rook::adapters::extension::CustomSkill>* custom_skills)
+                         std::vector<rook::adapters::extension::CustomSkill>* custom_skills,
+                         ports::ToolPermissionPort* permission_port)
     : m_bus(bus)
     , m_llm(llm)
     , m_conv(conv)
     , m_tool(tool)
     , m_extensions(extensions)
     , m_custom_skills(custom_skills)
+    , m_permission_port(permission_port)
 {}
 
 void AgentEngine::start() {
@@ -39,11 +44,20 @@ void AgentEngine::start() {
     m_chat_selected_handler = m_bus.subscribe<ChatSelected>(
         [this](const ChatSelected& event) { onChatSelected(event); });
 
+    m_perm_decision_handler = m_bus.subscribe<ToolCallPermissionDecision>(
+        [this](const ToolCallPermissionDecision& event) {
+            onPermissionDecision(event); });
+    m_perm_timeout_handler = m_bus.subscribe<ToolCallTimedOut>(
+        [this](const ToolCallTimedOut& event) {
+            onPermissionTimeout(event); });
+
     spdlog::info("AgentEngine started");
 }
 
 void AgentEngine::onUserInput(const UserInputReceived& event) {
     spdlog::info("UserInput: chat={}, source={}", event.chat_id, event.source);
+
+    if (m_title_future.valid()) m_title_future.wait();
 
     ChatMessage msg;
     msg.role = "user";
@@ -138,10 +152,12 @@ void AgentEngine::runLlm(std::string chat_id, std::string model) {
 
     m_bus.publish(LlmRequested{chat_id, ""});
 
+    auto completed = std::make_shared<bool>(false);
+
     m_llm.streamChat(
         chat_id,
         messages,
-        [this, chat_id](std::string_view chunk, bool is_final, bool is_reasoning) {
+        [this, chat_id, completed](std::string_view chunk, bool is_final, bool is_reasoning) {
             if (!chunk.empty()) {
                 m_bus.publish(LlmStreamChunk{
                     .chat_id = chat_id,
@@ -151,7 +167,8 @@ void AgentEngine::runLlm(std::string chat_id, std::string model) {
                 });
             }
 
-            if (is_final && !is_reasoning) {
+            if (is_final && !is_reasoning && !*completed) {
+                *completed = true;
                 spdlog::info("AgentEngine: publishing LlmCompleted for {}", chat_id);
                 m_bus.publish(LlmCompleted{chat_id, 0});
             }
@@ -213,21 +230,21 @@ void AgentEngine::onLlmCompleted(const LlmCompleted& event) {
 
     spdlog::info("Generating title for chat {}", event.chat_id);
 
-    ports::LlmMessage sys_msg;
-    sys_msg.role = "system";
-    sys_msg.content = "You are a title generator. Reply with ONLY the raw title text, "
-                      "no quotes, no prefixes, no markdown, no explanation.";
+    std::string chat_id = event.chat_id;
+    std::string model = conv.model;
+    std::string title_id = "__title__" + chat_id;
 
-    ports::LlmMessage title_msg;
-    title_msg.role = "user";
-    title_msg.content = "Generate a short title (max 5 words) in the same language "
+    ports::LlmMessage t_sys_msg;
+    t_sys_msg.role = "system";
+    t_sys_msg.content = "You are a title generator. Reply with ONLY the raw title text, "
+                        "no quotes, no prefixes, no markdown, no explanation.";
+
+    ports::LlmMessage t_usr_msg;
+    t_usr_msg.role = "user";
+    t_usr_msg.content = "Generate a short title (max 5 words) in the same language "
                         "for this conversation:\n\n"
                         "User: " + last_user + "\n"
                         "Assistant: " + last_assistant;
-
-    std::string accumulated;
-    std::string chat_id = event.chat_id;
-    std::string model = conv.model;
 
     auto cleanTitle = [](std::string s) -> std::string {
         s.erase(0, s.find_first_not_of(" \t\n\r\"'"));
@@ -240,27 +257,40 @@ void AgentEngine::onLlmCompleted(const LlmCompleted& event) {
         return s;
     };
 
-    m_llm.streamChat(
-        chat_id,
-        {sys_msg, title_msg},
-        [this, chat_id, &accumulated, &cleanTitle](std::string_view chunk, bool is_final, bool is_reasoning) {
-            if (is_reasoning) return;
-            accumulated += std::string(chunk);
-            if (is_final && !accumulated.empty()) {
-                std::string title = cleanTitle(accumulated);
-                if (!title.empty()) {
-                    m_conv.setTitle(chat_id, std::move(title));
+    m_title_future = std::async(std::launch::async,
+        [this,
+         chat_id = std::move(chat_id),
+         title_id = std::move(title_id),
+         model = std::move(model),
+         t_sys_msg = std::move(t_sys_msg),
+         t_usr_msg = std::move(t_usr_msg),
+         cleanTitle = std::move(cleanTitle)]() {
+        auto accumulated = std::make_shared<std::string>();
+
+        m_llm.streamChat(
+            title_id,
+            {t_sys_msg, t_usr_msg},
+            [this, chat_id, accumulated, cleanTitle = std::move(cleanTitle)](
+                std::string_view chunk, bool is_final, bool is_reasoning) {
+                if (is_reasoning) return;
+                *accumulated += std::string(chunk);
+                if (is_final && !accumulated->empty()) {
+                    std::string title = cleanTitle(*accumulated);
+                    if (!title.empty()) {
+                        m_conv.setTitle(chat_id, std::move(title));
+                    }
                 }
-            }
-        },
-        model
-    );
+            },
+            model
+        );
+    });
 }
 
 bool AgentEngine::processPendingToolCalls(std::string_view chat_id) {
     if (m_pending_tool_calls.empty()) return false;
 
-    spdlog::info("Processing {} tool calls for chat {}", m_pending_tool_calls.size(), chat_id);
+    spdlog::info("Processing {} tool calls for chat {}",
+                 m_pending_tool_calls.size(), chat_id);
 
     auto conv = m_conv.open(chat_id);
     std::string model = conv.model;
@@ -280,29 +310,160 @@ bool AgentEngine::processPendingToolCalls(std::string_view chat_id) {
     auto calls = std::move(m_pending_tool_calls);
     m_pending_tool_calls.clear();
 
+    std::vector<ports::ToolCall> needs_permission;
+
     for (auto& call : calls) {
-        auto result = m_tool.execute(call);
+        if (m_permission_port
+            && m_permission_port->isWhitelisted(chat_id, call.name)) {
+            spdlog::info("Tool {} is whitelisted, executing immediately",
+                         call.name);
+            executeSingleTool(chat_id, call);
+        } else {
+            needs_permission.push_back(std::move(call));
+        }
+    }
 
-        m_bus.publish(ToolCallCompleted{
-            .chat_id = std::string(chat_id),
-            .call_id = call.id,
-            .result = result.content,
-            .is_error = result.is_error,
-        });
+    if (!needs_permission.empty()) {
+        std::random_device rd;
+        std::mt19937_64 gen(rd());
+        std::uniform_int_distribution<uint64_t> dis;
+        std::ostringstream uustr;
+        uustr << std::hex << dis(gen);
+        std::string uuid = uustr.str();
 
-        ChatMessage tool_msg;
-        tool_msg.role = "tool";
-        tool_msg.content = result.content;
-        tool_msg.tool_call_id = call.id;
-        tool_msg.tool_name = call.name;
-        m_conv.addMessage(chat_id, std::move(tool_msg));
+        ToolCallPermissionRequest req;
+        req.request_uuid = uuid;
+        req.chat_id = std::string(chat_id);
+        for (auto& c : needs_permission) {
+            ToolCallPermissionRequest::CallInfo info;
+            info.call_id = c.id;
+            info.tool_name = c.name;
+            info.arguments = c.arguments;
+            req.calls.push_back(std::move(info));
+        }
 
-        spdlog::info("Tool {} completed: {}", call.name,
-                     result.is_error ? "error" : "success");
+        m_pending_permissions[uuid] = {
+            std::string(chat_id),
+            std::move(model),
+            std::move(needs_permission),
+        };
+
+        m_bus.publish(std::move(req));
+        spdlog::info("Published ToolCallPermissionRequest uuid={}", uuid);
+        return true;
     }
 
     runLlm(std::string(chat_id), std::move(model));
     return true;
+}
+
+void AgentEngine::executeSingleTool(std::string_view chat_id,
+                                     const ports::ToolCall& call) {
+    auto result = m_tool.execute(call);
+
+    m_bus.publish(ToolCallCompleted{
+        .chat_id = std::string(chat_id),
+        .call_id = call.id,
+        .result = result.content,
+        .is_error = result.is_error,
+    });
+
+    ChatMessage tool_msg;
+    tool_msg.role = "tool";
+    tool_msg.content = result.content;
+    tool_msg.tool_call_id = call.id;
+    tool_msg.tool_name = call.name;
+    m_conv.addMessage(chat_id, std::move(tool_msg));
+
+    spdlog::info("Tool {} executed: {}", call.name,
+                 result.is_error ? "error" : "success");
+}
+
+void AgentEngine::onPermissionDecision(
+    const ToolCallPermissionDecision& event)
+{
+    spdlog::info("Permission decision received uuid={}", event.request_uuid);
+
+    auto it = m_pending_permissions.find(event.request_uuid);
+    if (it == m_pending_permissions.end()) {
+        spdlog::warn("Unknown permission uuid: {}", event.request_uuid);
+        return;
+    }
+
+    auto pending = std::move(it->second);
+    m_pending_permissions.erase(it);
+
+    std::unordered_map<std::string,
+        ports::ToolPermissionPort::Decision> decisions;
+    for (auto& r : event.results) {
+        decisions[r.call_id] =
+            static_cast<ports::ToolPermissionPort::Decision>(r.decision);
+    }
+
+    for (auto& call : pending.calls) {
+        auto d = decisions.find(call.id);
+        if (d != decisions.end()
+            && d->second != ports::ToolPermissionPort::Decision::Deny) {
+            if (d->second ==
+                ports::ToolPermissionPort::Decision::AllowAlways) {
+                if (m_permission_port)
+                    m_permission_port->addToWhitelist(pending.chat_id,
+                                                       call.name);
+            }
+            executeSingleTool(pending.chat_id, call);
+        } else {
+            ports::ToolResult denied;
+            denied.id = call.id;
+            denied.is_error = true;
+            denied.content = "Tool execution denied by user.";
+
+            m_bus.publish(ToolCallCompleted{
+                .chat_id = pending.chat_id,
+                .call_id = call.id,
+                .result = denied.content,
+                .is_error = true,
+            });
+
+            ChatMessage tool_msg;
+            tool_msg.role = "tool";
+            tool_msg.content = denied.content;
+            tool_msg.tool_call_id = call.id;
+            tool_msg.tool_name = call.name;
+            m_conv.addMessage(pending.chat_id, std::move(tool_msg));
+        }
+    }
+
+    runLlm(pending.chat_id, std::move(pending.model));
+}
+
+void AgentEngine::onPermissionTimeout(
+    const ToolCallTimedOut& event)
+{
+    spdlog::warn("Permission timed out uuid={}", event.request_uuid);
+
+    auto it = m_pending_permissions.find(event.request_uuid);
+    if (it == m_pending_permissions.end()) return;
+
+    auto pending = std::move(it->second);
+    m_pending_permissions.erase(it);
+
+    for (auto& call : pending.calls) {
+        m_bus.publish(ToolCallCompleted{
+            .chat_id = pending.chat_id,
+            .call_id = call.id,
+            .result = "Tool execution timed out (no response).",
+            .is_error = true,
+        });
+
+        ChatMessage tool_msg;
+        tool_msg.role = "tool";
+        tool_msg.content = "Tool execution timed out.";
+        tool_msg.tool_call_id = call.id;
+        tool_msg.tool_name = call.name;
+        m_conv.addMessage(pending.chat_id, std::move(tool_msg));
+    }
+
+    runLlm(pending.chat_id, std::move(pending.model));
 }
 
 void AgentEngine::onLlmError(const LlmError& event) {

@@ -8,6 +8,8 @@
 #include "rook/domain/event_bus.hpp"
 #include "rook/domain/conversation.hpp"
 
+namespace rook::core { class DomainActor; }
+
 namespace rook::gui {
 
 class ChatSidebar final : public peel::Gtk::Box
@@ -16,6 +18,7 @@ class ChatSidebar final : public peel::Gtk::Box
 
     rook::domain::EventBus *m_bus = nullptr;
     rook::domain::ConversationManager *m_conv = nullptr;
+    rook::core::DomainActor *m_actor = nullptr;
 
     peel::Gtk::SearchEntry *m_search = nullptr;
     peel::Gtk::ListBox *m_list = nullptr;
@@ -57,9 +60,12 @@ class ChatSidebar final : public peel::Gtk::Box
 
 public:
     static peel::FloatPtr<ChatSidebar> create(rook::domain::EventBus &bus,
-                                               rook::domain::ConversationManager &conv);
+                                               rook::domain::ConversationManager &conv,
+                                               rook::core::DomainActor *actor);
 
     void loadConversations(const std::vector<rook::domain::Conversation> &chats);
+
+    void setConv(rook::domain::ConversationManager *conv) { m_conv = conv; }
 };
 
 } // namespace rook::gui

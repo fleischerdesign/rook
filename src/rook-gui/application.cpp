@@ -2,6 +2,7 @@
 #include "window.hpp"
 #include "views/first_run_wizard.hpp"
 #include "views/tray_icon.hpp"
+#include "views/permission_port.hpp"
 #include "rook/adapters/llm/multi_provider_adapter.hpp"
 #include "rook/adapters/llm/llm_factory.hpp"
 #include "rook/adapters/store/json_store.hpp"
@@ -13,6 +14,7 @@
 #include "rook/adapters/mcp/stdio_transport.hpp"
 #include "rook/adapters/builtin/builtin_tool_port.hpp"
 #include "rook/adapters/composite/composite_tool_port.hpp"
+#include "rook/adapters/security/security_guarded_tool_port.hpp"
 #include "rook/adapters/security/security_manager.hpp"
 #include "rook/adapters/extension/extension_manager.hpp"
 #include <nlohmann/json.hpp>
@@ -44,7 +46,12 @@ inline void RookApplication::init(Class *)
     m_llm = rook::adapters::llm::makeMultiProviderAdapter();
 
     auto composite = std::make_unique<rook::adapters::composite::CompositeToolPort>();
-    composite->addPort(rook::adapters::builtin::makeBuiltinToolPort());
+    auto guarded_builtin =
+        std::make_unique<rook::adapters::security::SecurityGuardedToolPort>(
+            *m_security,
+            rook::adapters::builtin::makeBuiltinToolPort(),
+            "builtin");
+    composite->addPort(std::move(guarded_builtin));
 
     m_mcp_manager = std::make_unique<rook::adapters::mcp::McpServerManager>();
 
@@ -144,13 +151,18 @@ inline void RookApplication::init(Class *)
 
     m_first_run = !m_settings.load(*m_store, *m_llm, *m_secrets);
 
-    m_conversations.start(m_bus, m_store.get());
-    m_conversations.loadFromStore(*m_store);
+    m_actor = std::make_unique<rook::core::DomainActor>();
 
-    m_engine = std::make_unique<rook::domain::AgentEngine>(
-        m_bus, *m_llm, m_conversations, *m_tool_port, m_extensions.get(),
-        &m_custom_skills);
-    m_engine->start();
+    auto permission_port = std::make_unique<GtkPermissionPort>(*m_actor);
+    auto *perm_raw = permission_port.get();
+    m_permission_port = std::move(permission_port);
+
+    m_actor->start(*m_llm, *m_tool_port, perm_raw, m_store.get(),
+        [this](rook::domain::DomainEvent event) {
+            GLib::idle_add_once([this, ev = std::move(event)]() {
+                m_bus.publish(ev);
+            });
+        });
 
     auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);
     prefs_action->connect_activate(
@@ -219,10 +231,11 @@ inline void RookApplication::vfunc_activate()
         m_css_loaded = true;
     }
 
-    auto *window = RookWindow::create(this, m_bus, *m_llm, m_conversations,
+    auto *window = RookWindow::create(this, m_actor.get(), m_bus, *m_llm,
         m_mcp_manager.get(), m_security.get(), m_extensions.get(),
         &m_custom_skills,
-        [this]() { saveConfig(); });
+        [this]() { saveConfig(); },
+        m_permission_port.get());
     m_window = window;
     window->present();
 
@@ -280,11 +293,12 @@ inline void RookApplication::vfunc_activate()
 inline void RookApplication::vfunc_dispose()
 {
     m_tray_icon.reset();
+    if (m_actor) m_actor->stop();
     if (m_mcp_manager) m_mcp_manager->stopAll();
     m_llm.reset();
     m_store.reset();
     m_secrets.reset();
-    m_engine.reset();
+    m_actor.reset();
     m_mcp_manager.reset();
     m_bus.~EventBus();
     parent_vfunc_dispose<RookApplication>();

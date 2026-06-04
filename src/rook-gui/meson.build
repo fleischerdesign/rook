@@ -20,6 +20,7 @@ rook_gui_sources = files(
   'views/appearance_page.cpp',
   'views/first_run_wizard.cpp',
   'views/tray_icon.cpp',
+  'views/permission_banner.cpp',
 )
 
 rook_gui_deps = [

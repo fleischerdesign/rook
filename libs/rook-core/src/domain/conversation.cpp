@@ -3,7 +3,6 @@
 #include <chrono>
 #include <random>
 #include <sstream>
-#include <iomanip>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
@@ -27,23 +26,25 @@ std::string generateId() {
 } // namespace
 
 Conversation ConversationManager::open(std::string_view id) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [id](const auto& c) { return c.id == id; });
 
     if (it != m_conversations.end()) {
-        m_active_id = id;
         return *it;
     }
 
     spdlog::warn("Conversation not found: {}", id);
-    return create("New Chat", "default");
+    return Conversation{};
 }
 
 std::vector<Conversation> ConversationManager::list() const {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     return m_conversations;
 }
 
 Conversation ConversationManager::create(std::string_view title, std::string_view model) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     Conversation conv;
     conv.id = generateId();
     conv.title = std::string(title);
@@ -59,6 +60,7 @@ Conversation ConversationManager::create(std::string_view title, std::string_vie
 }
 
 void ConversationManager::remove(std::string_view id) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     std::erase_if(m_conversations,
         [id](const auto& c) { return c.id == id; });
 
@@ -68,12 +70,14 @@ void ConversationManager::remove(std::string_view id) {
 }
 
 void ConversationManager::close(std::string_view id) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (m_active_id == id) {
         m_active_id.clear();
     }
 }
 
 void ConversationManager::addMessage(std::string_view conv_id, ChatMessage message) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
 
@@ -84,16 +88,13 @@ void ConversationManager::addMessage(std::string_view conv_id, ChatMessage messa
 
     it->messages.push_back(std::move(message));
     it->updated_at = std::chrono::system_clock::now();
-
-    if (m_store) {
-        saveActiveConversation();
-    }
 }
 
 void ConversationManager::updateAssistantChunk(
     std::string_view conv_id,
     std::string_view chunk
 ) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
 
@@ -114,6 +115,7 @@ void ConversationManager::updateReasoningChunk(
     std::string_view conv_id,
     std::string_view chunk
 ) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
 
@@ -131,6 +133,7 @@ void ConversationManager::updateReasoningChunk(
 }
 
 void ConversationManager::setAssistantToolCalls(std::string_view conv_id, std::string json) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it == m_conversations.end()) return;
@@ -139,7 +142,6 @@ void ConversationManager::setAssistantToolCalls(std::string_view conv_id, std::s
         if (msg_it->role == "assistant") {
             msg_it->has_tool_calls = true;
             msg_it->tool_calls_json = std::move(json);
-            if (m_store) saveActiveConversation();
             return;
         }
     }
@@ -151,12 +153,12 @@ void ConversationManager::setAssistantToolCalls(std::string_view conv_id, std::s
     msg.tool_calls_json = std::move(json);
     msg.timestamp = std::chrono::system_clock::now();
     it->messages.push_back(std::move(msg));
-    if (m_store) saveActiveConversation();
 }
 
 std::vector<ports::LlmMessage> ConversationManager::buildLlmMessages(
     std::string_view conv_id
 ) const {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](const auto& c) { return c.id == conv_id; });
 
@@ -177,6 +179,7 @@ std::vector<ports::LlmMessage> ConversationManager::buildLlmMessages(
 }
 
 int32_t ConversationManager::estimateTokens(std::string_view conv_id) const {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](const auto& c) { return c.id == conv_id; });
 
@@ -191,6 +194,7 @@ int32_t ConversationManager::estimateTokens(std::string_view conv_id) const {
 }
 
 std::optional<Conversation> ConversationManager::active() const {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [this](const auto& c) { return c.id == m_active_id; });
 
@@ -199,47 +203,13 @@ std::optional<Conversation> ConversationManager::active() const {
 }
 
 void ConversationManager::setActive(std::string_view id) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     m_active_id = id;
 }
 
-void ConversationManager::start(EventBus& bus, ports::StorePort* store) {
-    m_bus = &bus;
-    m_store = store;
-
-    m_chat_created_handler = bus.subscribe<ChatCreated>(
-        [this](const ChatCreated& event) { onChatCreated(event); });
-
-    m_chat_deleted_handler = bus.subscribe<ChatDeleted>(
-        [this](const ChatDeleted& event) { onChatDeleted(event); });
-}
-
-void ConversationManager::onChatCreated(const ChatCreated& event) {
-    if (!event.chat_id.empty()) return;
-
-    auto conv = create("New Chat", "default");
-
-    if (m_store) {
-        saveActiveConversation();
-    }
-
-    if (m_bus) {
-        m_bus->publish(ChatCreated{
-            .chat_id = conv.id
-        });
-        m_bus->publish(ChatSelected{
-            .chat_id = conv.id
-        });
-    }
-}
-
-void ConversationManager::onChatDeleted(const ChatDeleted& event) {
-    if (m_store) {
-        m_store->deleteChat(event.chat_id);
-    }
-    remove(event.chat_id);
-}
-
 std::string ConversationManager::generateTitle(const Conversation& conv) const {
+    (void)conv;
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (!conv.messages.empty()) {
         auto& msg = conv.messages[0];
         auto title = msg.content.substr(0, 50);
@@ -250,26 +220,17 @@ std::string ConversationManager::generateTitle(const Conversation& conv) const {
 }
 
 void ConversationManager::setTitle(std::string_view conv_id, std::string_view title) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
 
     if (it == m_conversations.end()) return;
-
     it->title = title;
-
-    if (m_bus) {
-        m_bus->publish(ChatUpdated{
-            .chat_id = std::string(conv_id),
-            .title = std::string(title),
-        });
-    }
-
-    if (m_store) {
-        saveActiveConversation();
-    }
+    it->title_is_manual = true;
 }
 
 void ConversationManager::setModel(std::string_view conv_id, std::string_view model) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
 
@@ -278,6 +239,7 @@ void ConversationManager::setModel(std::string_view conv_id, std::string_view mo
 }
 
 void ConversationManager::togglePin(std::string_view conv_id) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it == m_conversations.end()) return;
@@ -287,24 +249,39 @@ void ConversationManager::togglePin(std::string_view conv_id) {
         ? std::chrono::duration_cast<std::chrono::milliseconds>(
               std::chrono::system_clock::now().time_since_epoch()).count()
         : 0;
-
-    if (m_bus) {
-        m_bus->publish(ChatPinned{
-            .chat_id = std::string(conv_id),
-            .pinned = it->pinned,
-        });
-    }
-
-    if (m_store) saveActiveConversation();
 }
 
 bool ConversationManager::isPinned(std::string_view conv_id) const {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](const auto& c) { return c.id == conv_id; });
     return it != m_conversations.end() && it->pinned;
 }
 
+bool ConversationManager::isToolWhitelisted(std::string_view conv_id,
+                                             std::string_view tool) const {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](const auto& c) { return c.id == conv_id; });
+    if (it == m_conversations.end()) return false;
+    return std::ranges::find(it->whitelisted_tools, tool)
+        != it->whitelisted_tools.end();
+}
+
+void ConversationManager::addWhitelistedTool(std::string_view conv_id,
+                                              std::string_view tool) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](auto& c) { return c.id == conv_id; });
+    if (it == m_conversations.end()) return;
+    auto t = std::string(tool);
+    if (std::ranges::find(it->whitelisted_tools, t)
+        == it->whitelisted_tools.end())
+        it->whitelisted_tools.push_back(std::move(t));
+}
+
 void ConversationManager::loadFromStore(ports::StorePort& store) {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto chat_ids = store.listChats();
     for (const auto& record : chat_ids) {
         auto opt = store.loadChat(record.id);
@@ -352,6 +329,17 @@ void ConversationManager::loadFromStore(ports::StorePort& store) {
             } catch (...) {}
         }
 
+        if (!opt->whitelisted_tools_json.empty()) {
+            try {
+                auto j = nlohmann::json::parse(opt->whitelisted_tools_json);
+                if (j.is_array()) {
+                    for (auto& t : j)
+                        if (t.is_string())
+                            conv.whitelisted_tools.push_back(t.get<std::string>());
+                }
+            } catch (...) {}
+        }
+
         m_conversations.push_back(std::move(conv));
     }
 
@@ -359,19 +347,25 @@ void ConversationManager::loadFromStore(ports::StorePort& store) {
 }
 
 void ConversationManager::saveActiveConversation() {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (!m_store) return;
-    auto conv = active();
-    if (!conv) return;
+
+    auto it = std::ranges::find_if(m_conversations,
+        [this](const auto& c) { return c.id == m_active_id; });
+
+    if (it == m_conversations.end()) return;
+
+    const auto& conv = *it;
 
     ports::ChatRecord record;
-    record.id = conv->id;
-    record.title = conv->title;
-    record.model = conv->model;
-    record.created_at = conv->created_at;
-    record.updated_at = conv->updated_at;
+    record.id = conv.id;
+    record.title = conv.title;
+    record.model = conv.model;
+    record.created_at = conv.created_at;
+    record.updated_at = conv.updated_at;
 
     nlohmann::json messages = nlohmann::json::array();
-    for (const auto& msg : conv->messages) {
+    for (const auto& msg : conv.messages) {
         nlohmann::json mj;
         mj["id"] = msg.id;
         mj["role"] = msg.role;
@@ -385,12 +379,12 @@ void ConversationManager::saveActiveConversation() {
     }
 
     record.messages_json = messages.dump();
-    record.pinned = conv->pinned;
-    record.pinned_at = conv->pinned_at;
+    record.pinned = conv.pinned;
+    record.pinned_at = conv.pinned_at;
 
-    nlohmann::json active_skills = nlohmann::json::array();
-    for (auto& sid : conv->active_skill_ids) active_skills.push_back(sid);
-    record.active_skill_ids_json = active_skills.dump();
+    nlohmann::json wl = nlohmann::json::array();
+    for (auto& t : conv.whitelisted_tools) wl.push_back(t);
+    record.whitelisted_tools_json = wl.dump();
 
     m_store->saveChat(record);
 }
@@ -399,6 +393,7 @@ void ConversationManager::setSystemMessage(
     std::string_view conv_id,
     std::string_view content)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it == m_conversations.end()) return;
@@ -409,14 +404,13 @@ void ConversationManager::setSystemMessage(
     sys.id = generateId();
     sys.timestamp = std::chrono::system_clock::now();
     it->messages.insert(it->messages.begin(), std::move(sys));
-
-    if (m_store) saveActiveConversation();
 }
 
 void ConversationManager::updateSystemMessage(
     std::string_view conv_id,
     std::string_view content)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it == m_conversations.end()) return;
@@ -424,7 +418,6 @@ void ConversationManager::updateSystemMessage(
     for (auto& msg : it->messages) {
         if (msg.role == "system") {
             msg.content = std::string(content);
-            if (m_store) saveActiveConversation();
             return;
         }
     }
@@ -436,6 +429,7 @@ void ConversationManager::setActiveSkillIds(
     std::string_view conv_id,
     std::vector<std::string> ids)
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it == m_conversations.end()) return;
@@ -445,6 +439,7 @@ void ConversationManager::setActiveSkillIds(
 std::vector<std::string> ConversationManager::activeSkillIds(
     std::string_view conv_id) const
 {
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
     auto it = std::ranges::find_if(m_conversations,
         [conv_id](auto& c) { return c.id == conv_id; });
     if (it != m_conversations.end()) return it->active_skill_ids;

@@ -9,7 +9,7 @@
 #include <string_view>
 #include "rook/domain/event_bus.hpp"
 #include "rook/domain/conversation.hpp"
-#include "rook/domain/agent.hpp"
+#include "rook/core/domain_actor.hpp"
 #include "rook/ports/llm_port.hpp"
 #include "rook/ports/store_port.hpp"
 #include "rook/adapters/secret_store.hpp"
@@ -19,6 +19,7 @@
 #include "rook/adapters/security/security_manager.hpp"
 #include "rook/adapters/extension/extension_manager.hpp"
 #include "rook/ports/extension_port.hpp"
+#include "rook/ports/tool_port.hpp"
 
 namespace rook::gui {
 
@@ -45,13 +46,13 @@ class RookApplication final : public peel::Adw::Application
     std::unique_ptr<rook::ports::StorePort> m_store;
     std::unique_ptr<rook::adapters::SecretStore> m_secrets;
     rook::core::SettingsLoader m_settings;
-    rook::domain::ConversationManager m_conversations;
-    std::unique_ptr<rook::domain::AgentEngine> m_engine;
+    std::unique_ptr<rook::core::DomainActor> m_actor;
     std::unique_ptr<rook::ports::ToolPort> m_tool_port;
     std::unique_ptr<rook::adapters::mcp::McpServerManager> m_mcp_manager;
     std::unique_ptr<rook::adapters::security::SecurityManager> m_security;
     std::unique_ptr<rook::adapters::extension::ExtensionManager> m_extensions;
     std::vector<rook::adapters::extension::CustomSkill> m_custom_skills;
+    std::unique_ptr<rook::ports::ToolPermissionPort> m_permission_port;
     bool m_first_run = true;
     bool m_css_loaded = false;
     std::unique_ptr<TrayIcon> m_tray_icon;

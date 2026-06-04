@@ -1,9 +1,12 @@
 #include "chat_view.hpp"
 #include "message_widget.hpp"
 #include "tool_call_row.hpp"
-#include "rook/adapters/model/model_cache.hpp"
-#include "rook/ports/model_discovery_port.hpp"
+#include "markdown_renderer.hpp"
+#include "permission_banner.hpp"
+#include "rook/core/domain_actor.hpp"
+#include "rook/core/actor_messages.hpp"
 #include "rook/ports/extension_port.hpp"
+#include "rook/adapters/model/model_cache.hpp"
 #include <spdlog/spdlog.h>
 #include <gtk/gtk.h>
 
@@ -40,24 +43,30 @@ inline void ChatView::vfunc_dispose()
         m_bus->unsubscribe(m_tool_requested_handler);
         m_bus->unsubscribe(m_tool_completed_handler);
         m_bus->unsubscribe(m_skill_handler);
+        m_bus->unsubscribe(m_perm_request_handler);
+        m_bus->unsubscribe(m_perm_timeout_handler);
         m_bus = nullptr;
     }
     parent_vfunc_dispose<ChatView>();
 }
 
-FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
-                                      rook::domain::ConversationManager &conv,
-                                      rook::ports::LlmPort &llm,
-                                      rook::ports::ExtensionPort *extensions,
-                                      std::vector<rook::adapters::extension::CustomSkill> *custom_skills)
+FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
+                                       rook::domain::EventBus &bus,
+                                       rook::domain::ConversationManager &conv,
+                                       rook::ports::LlmPort &llm,
+                                       rook::ports::ExtensionPort *extensions,
+                                       std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
+                                       rook::ports::ToolPermissionPort *permission_port)
 {
     auto view = Object::create<ChatView>();
     ChatView *v = view;
+    v->m_actor = actor;
     v->m_bus = &bus;
     v->m_conv = &conv;
     v->m_llm = &llm;
     v->m_extensions = extensions;
     v->m_custom_skills = custom_skills;
+    v->m_permission_port = permission_port;
 
     v->m_chunk_handler = bus.subscribe<rook::domain::LlmStreamChunk>(
         [v](const rook::domain::LlmStreamChunk &event) {
@@ -102,6 +111,16 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
             if (event.chat_id == v->m_chat_id) {
                 GLib::idle_add_once([v]() { v->buildSkillsPopover(); });
             }
+        });
+
+    v->m_perm_request_handler = bus.subscribe<rook::domain::ToolCallPermissionRequest>(
+        [v](const rook::domain::ToolCallPermissionRequest& event) {
+            GLib::idle_add_once([v, event]() { v->onPermissionRequest(event); });
+        });
+
+    v->m_perm_timeout_handler = bus.subscribe<rook::domain::ToolCallTimedOut>(
+        [v](const rook::domain::ToolCallTimedOut& event) {
+            GLib::idle_add_once([v, event]() { v->onPermissionTimeout(event); });
         });
 
     auto stack = Gtk::Stack::create();
@@ -207,6 +226,10 @@ FloatPtr<ChatView> ChatView::create(rook::domain::EventBus &bus,
     scrolled->set_vexpand(true);
     v->m_scrolled = scrolled;
     chat_page->append(std::move(scrolled));
+
+    auto banner_slot = Gtk::Box::create(Gtk::Orientation::VERTICAL, 0);
+    v->m_banner_slot = banner_slot;
+    chat_page->append(std::move(banner_slot));
 
     auto chat_bar = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 6);
     chat_bar->set_margin_start(12);
@@ -386,7 +409,8 @@ void ChatView::onSendClicked(Gtk::Button *)
         }
 
         setProcessing(true);
-        m_bus->publish(rook::domain::ChatCreated{.chat_id = ""});
+        if (m_actor)
+            m_actor->post(rook::domain::ActorCreateChat{.title = "New Chat", .model = "default"});
         return;
     }
 
@@ -410,12 +434,12 @@ void ChatView::doSend(std::string_view chat_id)
     auto idx = m_chat_model->get_selected();
     if (idx < m_chat_ids.size()) model_id = m_chat_ids[idx];
 
-    m_bus->publish(rook::domain::UserInputReceived{
-        .chat_id = std::string(chat_id),
-        .content = text,
-        .source = "text",
-        .model = model_id,
-    });
+    if (m_actor)
+        m_actor->post(rook::domain::ActorUserInput{
+            .chat_id = std::string(chat_id),
+            .content = text,
+            .model = model_id,
+        });
 }
 
 void ChatView::onMessageEntryActivated(Gtk::Entry *)
@@ -533,11 +557,12 @@ void ChatView::switchToChat(std::string_view chat_id)
     loadMessages(chat_id);
 
     for (auto& sid : m_welcome_pending_skills) {
-        m_bus->publish(rook::domain::SkillToggled{
-            .chat_id = m_chat_id,
-            .skill_id = sid,
-            .active = true,
-        });
+        if (m_actor)
+            m_actor->post(rook::domain::ActorToggleSkill{
+                .chat_id = m_chat_id,
+                .skill_id = sid,
+                .active = true,
+            });
     }
     m_welcome_pending_skills.clear();
 
@@ -558,12 +583,12 @@ void ChatView::switchToChat(std::string_view chat_id)
         auto idx = m_chat_model->get_selected();
         if (idx < m_chat_ids.size()) model_id = m_chat_ids[idx];
 
-        m_bus->publish(rook::domain::UserInputReceived{
-            .chat_id = m_chat_id,
-            .content = text,
-            .source = "text",
-            .model = model_id,
-        });
+        if (m_actor)
+            m_actor->post(rook::domain::ActorUserInput{
+                .chat_id = m_chat_id,
+                .content = text,
+                .model = model_id,
+            });
     }
 }
 
@@ -692,7 +717,7 @@ void ChatView::buildSkillsPopover(Gtk::MenuButton *target)
                         std::erase(raw_v->m_welcome_pending_skills, sid);
                     return;
                 }
-                raw_v->m_bus->publish(rook::domain::SkillToggled{
+                raw_v->m_actor->post(rook::domain::ActorToggleSkill{
                     .chat_id = raw_v->m_chat_id,
                     .skill_id = sid,
                     .active = cb->get_active(),
@@ -730,7 +755,7 @@ void ChatView::buildSkillsPopover(Gtk::MenuButton *target)
                             std::erase(raw_v->m_welcome_pending_skills, sid);
                         return;
                     }
-                    raw_v->m_bus->publish(rook::domain::SkillToggled{
+                    raw_v->m_actor->post(rook::domain::ActorToggleSkill{
                         .chat_id = raw_v->m_chat_id,
                         .skill_id = sid,
                         .active = cb->get_active(),
@@ -861,6 +886,82 @@ void ChatView::onChatEntryChanged()
 
     gtk_popover_popup(GTK_POPOVER(
         m_command_popover.operator Gtk::Popover*()));
+}
+
+void ChatView::onPermissionRequest(
+    const rook::domain::ToolCallPermissionRequest& event)
+{
+    if (m_active_banner) {
+        gtk_widget_unparent(
+            GTK_WIDGET(reinterpret_cast<::GObject*>(m_active_banner)));
+        m_active_banner = nullptr;
+    }
+    if (m_banner_timeout_id) {
+        g_source_remove(m_banner_timeout_id);
+        m_banner_timeout_id = 0;
+    }
+
+    auto banner = PermissionBanner::create(event);
+    auto *b = static_cast<PermissionBanner*>(banner);
+    m_active_banner = b;
+
+    b->on_decision =
+        [this](std::string_view uuid,
+               std::vector<rook::domain::ToolCallPermissionDecision::Result>
+                   results) {
+            if (m_actor) {
+                rook::domain::ActorPermissionDecision ad;
+                ad.request_uuid = std::string(uuid);
+                for (auto& r : results) {
+                    ad.results.push_back({r.call_id, r.decision});
+                }
+                m_actor->post(std::move(ad));
+            }
+
+            if (m_active_banner) {
+                gtk_widget_unparent(
+                    GTK_WIDGET(reinterpret_cast<::GObject*>(
+                        m_active_banner)));
+                m_active_banner = nullptr;
+            }
+            if (m_banner_timeout_id) {
+                g_source_remove(m_banner_timeout_id);
+                m_banner_timeout_id = 0;
+            }
+        };
+
+    m_banner_slot->append(std::move(banner).release_floating_ptr());
+
+    m_banner_timeout_id = g_timeout_add_seconds(30,
+        [](gpointer data) -> gboolean {
+            auto *self = static_cast<ChatView*>(data);
+            if (self->m_active_banner) {
+                auto uid = self->m_active_banner->requestUuid();
+                if (self->m_actor)
+                    self->m_actor->post(
+                        rook::domain::ActorPermissionTimeout{.request_uuid = uid});
+                gtk_widget_unparent(
+                    GTK_WIDGET(reinterpret_cast<::GObject*>(
+                        self->m_active_banner)));
+                self->m_active_banner = nullptr;
+            }
+            self->m_banner_timeout_id = 0;
+            return G_SOURCE_REMOVE;
+        }, this);
+}
+
+void ChatView::onPermissionTimeout(
+    const rook::domain::ToolCallTimedOut& /*event*/)
+{
+    if (m_active_banner) {
+        gtk_widget_unparent(
+            GTK_WIDGET(reinterpret_cast<::GObject*>(m_active_banner)));
+        m_active_banner = nullptr;
+    }
+    if (m_banner_timeout_id) {
+        g_source_remove(m_banner_timeout_id);
+        m_banner_timeout_id = 0;
+    }
 }
 
 } // namespace rook::gui

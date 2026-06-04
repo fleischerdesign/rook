@@ -53,8 +53,10 @@ public:
         AllowAlways,
     };
 
-    virtual bool isWhitelisted(std::string_view tool_name) const = 0;
-    virtual void addToWhitelist(std::string_view tool_name) = 0;
+    virtual bool isWhitelisted(std::string_view chat_id,
+                                std::string_view tool_name) const = 0;
+    virtual void addToWhitelist(std::string_view chat_id,
+                                 std::string_view tool_name) = 0;
 };
 
 } // namespace rook::ports

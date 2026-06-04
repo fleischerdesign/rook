@@ -11,7 +11,10 @@
 #include "rook/adapters/mcp/mcp_server_manager.hpp"
 #include "rook/adapters/security/security_manager.hpp"
 #include "rook/ports/extension_port.hpp"
+#include "rook/ports/tool_port.hpp"
 #include "rook/adapters/extension/extension_manifest.hpp"
+
+namespace rook::core { class DomainActor; }
 
 namespace rook::gui {
 
@@ -33,6 +36,7 @@ class RookWindow final : public peel::Adw::ApplicationWindow
     rook::adapters::security::SecurityManager *m_security = nullptr;
     rook::ports::ExtensionPort *m_extensions = nullptr;
     std::vector<rook::adapters::extension::CustomSkill> *m_custom_skills = nullptr;
+    rook::ports::ToolPermissionPort *m_permission_port = nullptr;
 
     inline void init(Class *);
 
@@ -41,14 +45,15 @@ public:
     void showAbout() { onAbout(); }
 
     static RookWindow *create(peel::Gtk::Application *app,
+                               rook::core::DomainActor *actor,
                                rook::domain::EventBus &bus,
                                rook::ports::LlmPort &llm,
-                               rook::domain::ConversationManager &conv,
                                rook::adapters::mcp::McpServerManager *mcp,
                                rook::adapters::security::SecurityManager *security,
                                rook::ports::ExtensionPort *extensions,
                                std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
-                               std::function<void()> save_fn);
+                               std::function<void()> save_fn,
+                               rook::ports::ToolPermissionPort *permission_port = nullptr);
 
     void refreshModels();
 

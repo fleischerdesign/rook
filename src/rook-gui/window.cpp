@@ -2,6 +2,7 @@
 #include "views/chat_view.hpp"
 #include "views/chat_sidebar.hpp"
 #include "views/preferences_window.hpp"
+#include "rook/core/domain_actor.hpp"
 
 #include <peel/Gio/Gio.h>
 
@@ -22,14 +23,15 @@ inline void RookWindow::init(Class *)
 }
 
 RookWindow *RookWindow::create(Gtk::Application *app,
+                                rook::core::DomainActor *actor,
                                 rook::domain::EventBus &bus,
                                 rook::ports::LlmPort &llm,
-                                rook::domain::ConversationManager &conv,
                                 rook::adapters::mcp::McpServerManager *mcp,
                                 rook::adapters::security::SecurityManager *security,
                                 rook::ports::ExtensionPort *extensions,
                                 std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
-                                std::function<void()> save_fn)
+                                std::function<void()> save_fn,
+                                rook::ports::ToolPermissionPort *permission_port)
 {
     auto *win = Object::create<RookWindow>(prop_application(), app);
     win->m_save_fn = std::move(save_fn);
@@ -38,12 +40,14 @@ RookWindow *RookWindow::create(Gtk::Application *app,
     win->m_security = security;
     win->m_extensions = extensions;
     win->m_custom_skills = custom_skills;
+    win->m_permission_port = permission_port;
 
-    auto sidebar = ChatSidebar::create(bus, conv);
-    sidebar->loadConversations(conv.list());
+    auto sidebar = ChatSidebar::create(bus, actor->conv(), actor);
+    sidebar->loadConversations(actor->conv().list());
     win->m_sidebar = std::move(sidebar).release_floating_ptr();
 
-    auto chat = ChatView::create(bus, conv, llm, extensions, custom_skills);
+    auto chat = ChatView::create(actor, bus, actor->conv(), llm, extensions, custom_skills,
+                                  permission_port);
     win->m_chat_view = std::move(chat).release_floating_ptr();
 
     win->m_header = Adw::HeaderBar::create();

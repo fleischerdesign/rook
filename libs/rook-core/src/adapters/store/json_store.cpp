@@ -26,6 +26,8 @@ public:
             j["active_skill_ids"] = nlohmann::json::parse(record.active_skill_ids_json);
         j["pinned"] = record.pinned;
         j["pinned_at"] = record.pinned_at;
+        if (!record.whitelisted_tools_json.empty())
+            j["whitelisted_tools"] = nlohmann::json::parse(record.whitelisted_tools_json);
 
         auto path = chatPath(record.id);
         std::ofstream out(path);
@@ -57,6 +59,8 @@ public:
             rec.active_skill_ids_json = j["active_skill_ids"].dump();
         rec.pinned = j.value("pinned", false);
         rec.pinned_at = j.value("pinned_at", uint64_t{0});
+        if (j.contains("whitelisted_tools"))
+            rec.whitelisted_tools_json = j["whitelisted_tools"].dump();
 
         return rec;
     }

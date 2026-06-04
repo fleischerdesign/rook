@@ -1,4 +1,6 @@
 #include "chat_sidebar.hpp"
+#include "rook/core/domain_actor.hpp"
+#include "rook/core/actor_messages.hpp"
 #include <spdlog/spdlog.h>
 #include <peel/Adw/Adw.h>
 
@@ -96,12 +98,14 @@ inline void ChatSidebar::vfunc_dispose()
 }
 
 FloatPtr<ChatSidebar> ChatSidebar::create(rook::domain::EventBus &bus,
-                                           rook::domain::ConversationManager &conv)
+                                           rook::domain::ConversationManager &conv,
+                                           rook::core::DomainActor *actor)
 {
     auto sidebar = Object::create<ChatSidebar>();
     auto *s = static_cast<ChatSidebar*>(sidebar);
     s->m_bus = &bus;
     s->m_conv = &conv;
+    s->m_actor = actor;
 
     s->m_created_handler = bus.subscribe<rook::domain::ChatCreated>(
         [s](const rook::domain::ChatCreated &event) { s->onChatCreated(event); });
@@ -117,9 +121,33 @@ FloatPtr<ChatSidebar> ChatSidebar::create(rook::domain::EventBus &bus,
     return sidebar;
 }
 
+// --- Helpers ---
+
+static Gtk::Stack* stackForRow(Gtk::ListBoxRow *row)
+{
+    auto *raw = g_object_get_data(
+        reinterpret_cast<::GObject*>(row), "chat-stack");
+    return raw ? static_cast<Gtk::Stack*>(
+        reinterpret_cast<peel::Gtk::Stack*>(raw)) : nullptr;
+}
+
+static std::string rowTitle(Gtk::ListBoxRow *row)
+{
+    auto *stack = stackForRow(row);
+    if (!stack) return {};
+    auto *label =
+        stack->get_child_by_name("label_")->template cast<Gtk::Label>();
+    if (!label) return {};
+    auto t = label->get_text();
+    return t ? std::string(t) : std::string{};
+}
+
+// --- Event handlers ---
+
 void ChatSidebar::onNewChat(Gtk::Button *)
 {
-    m_bus->publish(rook::domain::ChatSelected{.chat_id = ""});
+    if (m_actor)
+        m_actor->post(rook::domain::ActorSelectChat{.chat_id = ""});
 }
 
 void ChatSidebar::onRowActivated(Gtk::ListBox *, Gtk::ListBoxRow *row)
@@ -127,8 +155,8 @@ void ChatSidebar::onRowActivated(Gtk::ListBox *, Gtk::ListBoxRow *row)
     if (!row) return;
     auto chat_id = std::string(row->get_name());
     if (chat_id.empty()) return;
-    m_conv->setActive(chat_id);
-    m_bus->publish(rook::domain::ChatSelected{.chat_id = chat_id});
+    if (m_actor)
+        m_actor->post(rook::domain::ActorSelectChat{.chat_id = chat_id});
 }
 
 void ChatSidebar::onSearchChanged()
@@ -139,34 +167,21 @@ void ChatSidebar::onSearchChanged()
 
     bool any_visible = false;
     for (int i = 0; auto *row = m_list->get_row_at_index(i); ++i) {
-        auto *child = row->get_child();
-        if (!child) continue;
         auto name = std::string(row->get_name());
         if (name == "__sep__") continue;
 
         bool match = raw.empty();
         if (!match) {
-            auto *box = child->template cast<Gtk::Box>();
-            if (box) {
-                auto *first = box->get_first_child();
-                if (first) {
-                    auto *stack = first->template cast<Gtk::Stack>();
-                    if (stack) {
-                        auto *label =
-                            stack->get_child_by_name("label_")
-                                ->template cast<Gtk::Label>();
-                        if (label) {
-                            auto title = std::string(label->get_text());
-                            auto lower_title = title;
-                            auto lower_query = raw;
-                            for (auto &c : lower_title)
-                                c = std::tolower(c);
-                            for (auto &c : lower_query)
-                                c = std::tolower(c);
-                            match = lower_title.find(lower_query) !=
-                                    std::string::npos;
-                        }
-                    }
+            auto *stack = stackForRow(row);
+            if (stack) {
+                auto *label = stack->get_child_by_name("label_")
+                                  ->template cast<Gtk::Label>();
+                if (label) {
+                    auto title = std::string(label->get_text());
+                    auto lt = title, lq = raw;
+                    for (auto &c : lt) c = std::tolower(c);
+                    for (auto &c : lq) c = std::tolower(c);
+                    match = lt.find(lq) != std::string::npos;
                 }
             }
         }
@@ -181,30 +196,7 @@ void ChatSidebar::onSearchChanged()
     }
 }
 
-static std::string rowTitle(Gtk::Widget *row_child)
-{
-    auto *box = row_child->template cast<Gtk::Box>();
-    if (!box) return {};
-    auto *first = box->get_first_child();
-    if (!first) return {};
-    auto *stack = first->template cast<Gtk::Stack>();
-    if (!stack) return {};
-    auto *label =
-        stack->get_child_by_name("label_")->template cast<Gtk::Label>();
-    if (!label) return {};
-    auto t = label->get_text();
-    return t ? std::string(t) : std::string{};
-}
-
-void ChatSidebar::onContextGesture(GtkGestureClick *, int /*n_press*/,
-                                     double /*x*/, double /*y*/, gpointer data)
-{
-    auto *row = GTK_LIST_BOX_ROW(data);
-    auto *pair = static_cast<std::pair<ChatSidebar*, std::string>*>(
-        g_object_get_data(reinterpret_cast<::GObject*>(row), "sidebar-ctx"));
-    if (pair) pair->first->showContextMenu(
-        GTK_WIDGET(reinterpret_cast<::GObject*>(row)), pair->second);
-}
+// --- Build ---
 
 Gtk::ListBoxRow* ChatSidebar::buildChatRow(std::string_view id,
                                             std::string title, bool pinned)
@@ -229,31 +221,29 @@ Gtk::ListBoxRow* ChatSidebar::buildChatRow(std::string_view id,
     auto *s_raw = GTK_STACK(reinterpret_cast<::GObject*>(
         static_cast<Gtk::Stack*>(stack)));
 
-    auto label = Gtk::Label::create(display.c_str());
-    label->set_xalign(0.0f);
-    label->set_margin_start(2);
-    label->set_margin_end(6);
-    label->set_margin_top(6);
-    label->set_margin_bottom(6);
-    label->set_max_width_chars(20);
-    label->set_ellipsize(
+    auto *lbl_ptr = std::move(Gtk::Label::create(display.c_str())).release_floating_ptr();
+    lbl_ptr->set_xalign(0.0f);
+    lbl_ptr->set_margin_start(2);
+    lbl_ptr->set_margin_end(6);
+    lbl_ptr->set_margin_top(6);
+    lbl_ptr->set_margin_bottom(6);
+    lbl_ptr->set_max_width_chars(20);
+    lbl_ptr->set_ellipsize(
         static_cast<Pango::EllipsizeMode>(PANGO_ELLIPSIZE_END));
-    auto *lbl_ptr = std::move(label).release_floating_ptr();
     gtk_stack_add_named(s_raw,
         GTK_WIDGET(reinterpret_cast<::GObject*>(lbl_ptr)), "label_");
 
-    auto entry = Gtk::Entry::create();
-    entry->set_text(display.c_str());
-    entry->set_margin_start(2);
-    entry->set_margin_end(6);
-    entry->set_margin_top(4);
-    entry->set_margin_bottom(4);
-    entry->set_hexpand(true);
-    entry->connect_activate([this, cid](Gtk::Entry *e) {
+    auto *ent_ptr = std::move(Gtk::Entry::create()).release_floating_ptr();
+    ent_ptr->set_text(display.c_str());
+    ent_ptr->set_margin_start(2);
+    ent_ptr->set_margin_end(6);
+    ent_ptr->set_margin_top(4);
+    ent_ptr->set_margin_bottom(4);
+    ent_ptr->set_hexpand(true);
+    ent_ptr->connect_activate([this, cid](Gtk::Entry *e) {
         auto t = e->get_text();
         confirmRename(cid, t ? std::string(t) : std::string{});
     });
-    auto *ent_ptr = std::move(entry).release_floating_ptr();
     gtk_stack_add_named(s_raw,
         GTK_WIDGET(reinterpret_cast<::GObject*>(ent_ptr)), "edit");
 
@@ -262,8 +252,12 @@ Gtk::ListBoxRow* ChatSidebar::buildChatRow(std::string_view id,
     row->set_child(std::move(outer).release_floating_ptr());
 
     auto *row_ptr = static_cast<Gtk::ListBoxRow*>(row);
+    g_object_set_data(reinterpret_cast<::GObject*>(row_ptr),
+                      "chat-stack", s_raw);
+
     auto *ctx = new std::pair<ChatSidebar*, std::string>(this, cid);
-    g_object_set_data_full(reinterpret_cast<::GObject*>(row_ptr), "sidebar-ctx", ctx,
+    g_object_set_data_full(reinterpret_cast<::GObject*>(row_ptr),
+        "sidebar-ctx", ctx,
         [](void *p) {
             delete static_cast<std::pair<ChatSidebar*, std::string>*>(p);
         });
@@ -277,6 +271,18 @@ Gtk::ListBoxRow* ChatSidebar::buildChatRow(std::string_view id,
                                GTK_EVENT_CONTROLLER(ctrl));
 
     return std::move(row).release_floating_ptr();
+}
+
+// --- Context menu ---
+
+void ChatSidebar::onContextGesture(GtkGestureClick *, int /*n_press*/,
+                                     double /*x*/, double /*y*/, gpointer data)
+{
+    auto *row = GTK_LIST_BOX_ROW(data);
+    auto *pair = static_cast<std::pair<ChatSidebar*, std::string>*>(
+        g_object_get_data(reinterpret_cast<::GObject*>(row), "sidebar-ctx"));
+    if (pair) pair->first->showContextMenu(
+        GTK_WIDGET(reinterpret_cast<::GObject*>(row)), pair->second);
 }
 
 void ChatSidebar::showContextMenu(::GtkWidget *parent,
@@ -323,7 +329,8 @@ void ChatSidebar::showContextMenu(::GtkWidget *parent,
 
     add_btn(is_pinned ? "Unpin" : "Pin", "view-pin-symbolic",
             [this, cid, pop_ptr]() {
-                m_conv->togglePin(cid);
+                if (m_actor)
+                    m_actor->post(rook::domain::ActorTogglePin{.chat_id = cid});
                 pop_ptr->popdown();
             });
 
@@ -354,23 +361,19 @@ void ChatSidebar::showContextMenu(::GtkWidget *parent,
     popover->popup();
 }
 
+// --- Rename ---
+
 void ChatSidebar::startRename(std::string_view chat_id)
 {
     for (int i = 0; auto *row = m_list->get_row_at_index(i); ++i) {
         if (std::string(row->get_name()) != chat_id) continue;
         m_rename_row = row;
-        auto *child = row->get_child();
-        if (!child) return;
-        auto *outer = child->template cast<Gtk::Box>();
-        if (!outer) return;
-        auto *first = outer->get_first_child();
-        if (!first) return;
-        auto *stack = first->template cast<Gtk::Stack>();
+        auto *stack = stackForRow(row);
         if (!stack) return;
         auto *entry_w =
             stack->get_child_by_name("edit")->template cast<Gtk::Entry>();
         if (!entry_w) return;
-        auto current = rowTitle(child);
+        auto current = rowTitle(row);
         entry_w->set_text(current.c_str());
         entry_w->set_position(-1);
         stack->set_visible_child_name("edit");
@@ -396,24 +399,22 @@ void ChatSidebar::confirmRename(std::string_view chat_id,
         cancelRename();
         return;
     }
-    m_conv->setTitle(chat_id, trimmed);
+    if (m_actor)
+        m_actor->post(rook::domain::ActorRenameChat{
+            .chat_id = std::string(chat_id),
+            .title = std::string(trimmed)});
     cancelRename();
 }
 
 void ChatSidebar::cancelRename()
 {
     if (!m_rename_row) return;
-    auto *child = m_rename_row->get_child();
-    if (!child) { m_rename_row = nullptr; return; }
-    auto *outer = child->template cast<Gtk::Box>();
-    if (!outer) { m_rename_row = nullptr; return; }
-    auto *first = outer->get_first_child();
-    if (!first) { m_rename_row = nullptr; return; }
-    auto *stack = first->template cast<Gtk::Stack>();
-    if (!stack) { m_rename_row = nullptr; return; }
-    stack->set_visible_child_name("label_");
+    auto *stack = stackForRow(m_rename_row);
+    if (stack) stack->set_visible_child_name("label_");
     m_rename_row = nullptr;
 }
+
+// --- Delete ---
 
 void ChatSidebar::confirmDelete(std::string_view chat_id)
 {
@@ -431,12 +432,15 @@ void ChatSidebar::confirmDelete(std::string_view chat_id)
     dialog->connect_response(
         [sidebar, cid2](Adw::MessageDialog *, const char *response) {
             if (std::string(response) == "delete") {
-                sidebar->m_bus->publish(
-                    rook::domain::ChatDeleted{.chat_id = cid2});
+                if (sidebar->m_actor)
+                    sidebar->m_actor->post(
+                        rook::domain::ActorDeleteChat{.chat_id = cid2});
             }
         });
     dialog->present();
 }
+
+// --- Event subscriptions ---
 
 void ChatSidebar::onChatCreated(const rook::domain::ChatCreated &event)
 {
@@ -463,13 +467,7 @@ void ChatSidebar::onChatUpdated(const rook::domain::ChatUpdated &event)
         [this, id = event.chat_id, title = event.title]() {
             for (int i = 0; auto *row = m_list->get_row_at_index(i); ++i) {
                 if (std::string(row->get_name()) != id) continue;
-                auto *child = row->get_child();
-                if (!child) return;
-                auto *outer = child->template cast<Gtk::Box>();
-                if (!outer) return;
-                auto *first = outer->get_first_child();
-                if (!first) return;
-                auto *stack = first->template cast<Gtk::Stack>();
+                auto *stack = stackForRow(row);
                 if (!stack) return;
                 auto display = title;
                 if (display.size() > 30)
@@ -510,6 +508,8 @@ void ChatSidebar::onChatPinned(const rook::domain::ChatPinned &event)
         if (m_search) { m_search->set_text(""); onSearchChanged(); }
     });
 }
+
+// --- Rebuild ---
 
 void ChatSidebar::rebuildList()
 {

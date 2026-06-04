@@ -2,6 +2,7 @@ librook_core_sources = files(
   'src/domain/event_bus.cpp',
   'src/domain/conversation.cpp',
   'src/domain/agent.cpp',
+  'src/core/domain_actor.cpp',
   'src/core/settings.cpp',
   'src/ports/provider_registry.cpp',
   'src/adapters/llm/llm_http_client.cpp',
