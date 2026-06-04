@@ -1,6 +1,7 @@
 #include "application.hpp"
 #include "window.hpp"
 #include "views/first_run_wizard.hpp"
+#include "views/tray_icon.hpp"
 #include "rook/adapters/llm/multi_provider_adapter.hpp"
 #include "rook/adapters/llm/llm_factory.hpp"
 #include "rook/adapters/store/json_store.hpp"
@@ -180,7 +181,11 @@ RefPtr<RookApplication> RookApplication::create()
 inline void RookApplication::vfunc_activate()
 {
     parent_vfunc_activate<RookApplication>();
-    if (get_active_window() != nullptr) return;
+
+    if (m_window) {
+        gtk_window_present(GTK_WINDOW(reinterpret_cast<::GObject*>(m_window)));
+        return;
+    }
 
     if (!m_css_loaded) {
         auto* provider = gtk_css_provider_new();
@@ -212,7 +217,29 @@ inline void RookApplication::vfunc_activate()
         m_mcp_manager.get(), m_security.get(), m_extensions.get(),
         &m_custom_skills,
         [this]() { saveConfig(); });
+    m_window = window;
     window->present();
+
+    if (!m_tray_icon) {
+        auto tray_name = "org.kde.StatusNotifierItem-"
+            + std::to_string(getpid()) + "-rook";
+        m_tray_icon = std::make_unique<TrayIcon>(
+            tray_name, "Rook", "io.github.fleischerdesign.Rook");
+
+        m_tray_icon->onActivate([this]() {
+            if (m_window)
+                gtk_window_present(GTK_WINDOW(
+                    reinterpret_cast<::GObject*>(m_window)));
+        });
+
+        m_tray_icon->show();
+
+        g_signal_connect(reinterpret_cast<::GObject*>(window), "close-request",
+            G_CALLBACK(+[](GtkWindow*, gpointer data) -> gboolean {
+                gtk_widget_set_visible(GTK_WIDGET(data), FALSE);
+                return TRUE;
+            }), window);
+    }
 
     if (m_first_run) {
         auto wizard = FirstRunWizard::create();
@@ -246,6 +273,7 @@ inline void RookApplication::vfunc_activate()
 
 inline void RookApplication::vfunc_dispose()
 {
+    m_tray_icon.reset();
     if (m_mcp_manager) m_mcp_manager->stopAll();
     m_llm.reset();
     m_store.reset();

@@ -23,6 +23,7 @@
 namespace rook::gui {
 
 class RookWindow;
+class TrayIcon;
 
 class RookApplication final : public peel::Adw::Application
 {
@@ -53,6 +54,8 @@ class RookApplication final : public peel::Adw::Application
     std::vector<rook::adapters::extension::CustomSkill> m_custom_skills;
     bool m_first_run = true;
     bool m_css_loaded = false;
+    std::unique_ptr<TrayIcon> m_tray_icon;
+    RookWindow *m_window = nullptr;
 
 public:
     static peel::RefPtr<RookApplication> create();
