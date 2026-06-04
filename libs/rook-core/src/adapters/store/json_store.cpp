@@ -24,6 +24,8 @@ public:
         j["messages"] = nlohmann::json::parse(record.messages_json.empty() ? "[]" : record.messages_json);
         if (!record.active_skill_ids_json.empty())
             j["active_skill_ids"] = nlohmann::json::parse(record.active_skill_ids_json);
+        j["pinned"] = record.pinned;
+        j["pinned_at"] = record.pinned_at;
 
         auto path = chatPath(record.id);
         std::ofstream out(path);
@@ -53,6 +55,8 @@ public:
         rec.messages_json = j["messages"].dump();
         if (j.contains("active_skill_ids"))
             rec.active_skill_ids_json = j["active_skill_ids"].dump();
+        rec.pinned = j.value("pinned", false);
+        rec.pinned_at = j.value("pinned_at", uint64_t{0});
 
         return rec;
     }

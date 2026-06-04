@@ -1,6 +1,6 @@
 #include "chat_sidebar.hpp"
 #include <spdlog/spdlog.h>
-#include <gtk/gtk.h> // gtk_orientable_set_orientation
+#include <peel/Adw/Adw.h>
 
 using namespace peel;
 
@@ -20,43 +20,15 @@ inline void ChatSidebar::init(Class *)
         GTK_ORIENTATION_VERTICAL);
     set_size_request(220, -1);
 
-    auto grid = Gtk::Grid::create();
-    grid->set_row_homogeneous(true);
-    grid->set_column_homogeneous(true);
-    grid->set_row_spacing(6);
-    grid->set_column_spacing(6);
-    grid->set_margin_start(6);
-    grid->set_margin_end(6);
-    grid->set_margin_top(6);
-    grid->set_margin_bottom(6);
-
-    auto search_btn = Gtk::Button::create_from_icon_name("system-search-symbolic");
-    search_btn->set_hexpand(true);
-    search_btn->set_halign(Gtk::Align::FILL);
-    search_btn->set_valign(Gtk::Align::FILL);
-    grid->attach(std::move(search_btn), 0, 0, 1, 1);
-
-    auto library_btn = Gtk::Button::create_from_icon_name("folder-documents-symbolic");
-    library_btn->set_hexpand(true);
-    library_btn->set_halign(Gtk::Align::FILL);
-    library_btn->set_valign(Gtk::Align::FILL);
-    grid->attach(std::move(library_btn), 1, 0, 1, 1);
-
-    auto presets_btn = Gtk::Button::create_from_icon_name("document-edit-symbolic");
-    presets_btn->set_hexpand(true);
-    presets_btn->set_halign(Gtk::Align::FILL);
-    presets_btn->set_valign(Gtk::Align::FILL);
-    grid->attach(std::move(presets_btn), 0, 1, 1, 1);
-
-    auto new_btn = Gtk::Button::create_from_icon_name("tab-new-symbolic");
-    new_btn->set_hexpand(true);
-    new_btn->set_halign(Gtk::Align::FILL);
-    new_btn->set_valign(Gtk::Align::FILL);
-    new_btn->add_css_class("suggested-action");
-    new_btn->connect_clicked([this](Gtk::Button *) { onNewChat(nullptr); });
-    grid->attach(std::move(new_btn), 1, 1, 1, 1);
-
-    append(std::move(grid));
+    auto search = Gtk::SearchEntry::create();
+    search->set_placeholder_text("Search chats...");
+    search->set_margin_start(6);
+    search->set_margin_end(6);
+    search->set_margin_top(6);
+    search->set_margin_bottom(3);
+    search->connect_search_changed([this](Gtk::SearchEntry *) { onSearchChanged(); });
+    m_search = search;
+    append(std::move(search));
 
     auto scrolled = Gtk::ScrolledWindow::create();
     auto list = Gtk::ListBox::create();
@@ -67,7 +39,47 @@ inline void ChatSidebar::init(Class *)
         [this](Gtk::ListBox *, Gtk::ListBoxRow *r) { onRowActivated(nullptr, r); });
     m_list = list;
     scrolled->set_child(std::move(list));
-    append(std::move(scrolled));
+
+    auto empty_box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 6);
+    empty_box->set_valign(Gtk::Align::CENTER);
+    empty_box->set_halign(Gtk::Align::CENTER);
+    empty_box->set_vexpand(true);
+    empty_box->set_hexpand(true);
+    auto empty_label = Gtk::Label::create("No conversations yet");
+    empty_label->add_css_class("dim-label");
+    empty_box->append(std::move(empty_label));
+    m_empty_placeholder = empty_box;
+    m_empty_placeholder->set_visible(false);
+
+    auto nores_box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 6);
+    nores_box->set_valign(Gtk::Align::CENTER);
+    nores_box->set_halign(Gtk::Align::CENTER);
+    nores_box->set_vexpand(true);
+    nores_box->set_hexpand(true);
+    auto nores_label = Gtk::Label::create("No matching chats");
+    nores_label->add_css_class("dim-label");
+    nores_box->append(std::move(nores_label));
+    m_no_results_placeholder = nores_box;
+    m_no_results_placeholder->set_visible(false);
+
+    auto overlay = Gtk::Overlay::create();
+    overlay->set_vexpand(true);
+    auto eb = static_cast<Gtk::Widget*>(static_cast<Gtk::Box*>(empty_box));
+    auto nb = static_cast<Gtk::Widget*>(static_cast<Gtk::Box*>(nores_box));
+    auto sw = static_cast<Gtk::Widget*>(static_cast<Gtk::ScrolledWindow*>(scrolled));
+    overlay->add_overlay(eb);
+    overlay->add_overlay(nb);
+    overlay->set_child(sw);
+    append(std::move(overlay));
+
+    auto new_btn = Gtk::Button::create_with_label("New Chat");
+    new_btn->add_css_class("suggested-action");
+    new_btn->set_margin_start(6);
+    new_btn->set_margin_end(6);
+    new_btn->set_margin_top(3);
+    new_btn->set_margin_bottom(6);
+    new_btn->connect_clicked([this](Gtk::Button *) { onNewChat(nullptr); });
+    append(std::move(new_btn));
 }
 
 inline void ChatSidebar::vfunc_dispose()
@@ -77,6 +89,7 @@ inline void ChatSidebar::vfunc_dispose()
         m_bus->unsubscribe(m_deleted_handler);
         m_bus->unsubscribe(m_updated_handler);
         m_bus->unsubscribe(m_selected_handler);
+        m_bus->unsubscribe(m_pinned_handler);
         m_bus = nullptr;
     }
     parent_vfunc_dispose<ChatSidebar>();
@@ -98,6 +111,8 @@ FloatPtr<ChatSidebar> ChatSidebar::create(rook::domain::EventBus &bus,
         [s](const rook::domain::ChatUpdated &event) { s->onChatUpdated(event); });
     s->m_selected_handler = bus.subscribe<rook::domain::ChatSelected>(
         [s](const rook::domain::ChatSelected &event) { s->onChatSelected(event); });
+    s->m_pinned_handler = bus.subscribe<rook::domain::ChatPinned>(
+        [s](const rook::domain::ChatPinned &event) { s->onChatPinned(event); });
 
     return sidebar;
 }
@@ -110,54 +125,366 @@ void ChatSidebar::onNewChat(Gtk::Button *)
 void ChatSidebar::onRowActivated(Gtk::ListBox *, Gtk::ListBoxRow *row)
 {
     if (!row) return;
-    std::string chat_id(row->get_name());
+    auto chat_id = std::string(row->get_name());
     if (chat_id.empty()) return;
     m_conv->setActive(chat_id);
     m_bus->publish(rook::domain::ChatSelected{.chat_id = chat_id});
 }
 
+void ChatSidebar::onSearchChanged()
+{
+    auto query = m_search->get_text();
+    auto raw = std::string(query ? query : "");
+    m_no_results_placeholder->set_visible(false);
+
+    bool any_visible = false;
+    for (int i = 0; auto *row = m_list->get_row_at_index(i); ++i) {
+        auto *child = row->get_child();
+        if (!child) continue;
+        auto name = std::string(row->get_name());
+        if (name == "__sep__") continue;
+
+        bool match = raw.empty();
+        if (!match) {
+            auto *box = child->template cast<Gtk::Box>();
+            if (box) {
+                auto *first = box->get_first_child();
+                if (first) {
+                    auto *stack = first->template cast<Gtk::Stack>();
+                    if (stack) {
+                        auto *label =
+                            stack->get_child_by_name("label_")
+                                ->template cast<Gtk::Label>();
+                        if (label) {
+                            auto title = std::string(label->get_text());
+                            auto lower_title = title;
+                            auto lower_query = raw;
+                            for (auto &c : lower_title)
+                                c = std::tolower(c);
+                            for (auto &c : lower_query)
+                                c = std::tolower(c);
+                            match = lower_title.find(lower_query) !=
+                                    std::string::npos;
+                        }
+                    }
+                }
+            }
+        }
+
+        gtk_widget_set_visible(
+            GTK_WIDGET(reinterpret_cast<::GObject*>(row)), match);
+        if (match) any_visible = true;
+    }
+
+    if (!raw.empty() && !any_visible) {
+        m_no_results_placeholder->set_visible(true);
+    }
+}
+
+static std::string rowTitle(Gtk::Widget *row_child)
+{
+    auto *box = row_child->template cast<Gtk::Box>();
+    if (!box) return {};
+    auto *first = box->get_first_child();
+    if (!first) return {};
+    auto *stack = first->template cast<Gtk::Stack>();
+    if (!stack) return {};
+    auto *label =
+        stack->get_child_by_name("label_")->template cast<Gtk::Label>();
+    if (!label) return {};
+    auto t = label->get_text();
+    return t ? std::string(t) : std::string{};
+}
+
+void ChatSidebar::onContextGesture(GtkGestureClick *, int /*n_press*/,
+                                     double /*x*/, double /*y*/, gpointer data)
+{
+    auto *row = GTK_LIST_BOX_ROW(data);
+    auto *pair = static_cast<std::pair<ChatSidebar*, std::string>*>(
+        g_object_get_data(reinterpret_cast<::GObject*>(row), "sidebar-ctx"));
+    if (pair) pair->first->showContextMenu(
+        GTK_WIDGET(reinterpret_cast<::GObject*>(row)), pair->second);
+}
+
+Gtk::ListBoxRow* ChatSidebar::buildChatRow(std::string_view id,
+                                            std::string title, bool pinned)
+{
+    auto display = title;
+    if (display.size() > 30) display = display.substr(0, 30) + "...";
+
+    std::string cid(id);
+
+    auto row = Gtk::ListBoxRow::create();
+    row->set_name(cid.c_str());
+
+    auto outer = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 0);
+
+    auto pin_icon = Gtk::Image::create_from_icon_name("view-pin-symbolic");
+    pin_icon->set_visible(pinned);
+    pin_icon->set_margin_start(6);
+    pin_icon->set_margin_end(2);
+    outer->append(std::move(pin_icon));
+
+    auto stack = Gtk::Stack::create();
+    auto *s_raw = GTK_STACK(reinterpret_cast<::GObject*>(
+        static_cast<Gtk::Stack*>(stack)));
+
+    auto label = Gtk::Label::create(display.c_str());
+    label->set_xalign(0.0f);
+    label->set_margin_start(2);
+    label->set_margin_end(6);
+    label->set_margin_top(6);
+    label->set_margin_bottom(6);
+    label->set_max_width_chars(20);
+    label->set_ellipsize(
+        static_cast<Pango::EllipsizeMode>(PANGO_ELLIPSIZE_END));
+    auto *lbl_ptr = std::move(label).release_floating_ptr();
+    gtk_stack_add_named(s_raw,
+        GTK_WIDGET(reinterpret_cast<::GObject*>(lbl_ptr)), "label_");
+
+    auto entry = Gtk::Entry::create();
+    entry->set_text(display.c_str());
+    entry->set_margin_start(2);
+    entry->set_margin_end(6);
+    entry->set_margin_top(4);
+    entry->set_margin_bottom(4);
+    entry->set_hexpand(true);
+    entry->connect_activate([this, cid](Gtk::Entry *e) {
+        auto t = e->get_text();
+        confirmRename(cid, t ? std::string(t) : std::string{});
+    });
+    auto *ent_ptr = std::move(entry).release_floating_ptr();
+    gtk_stack_add_named(s_raw,
+        GTK_WIDGET(reinterpret_cast<::GObject*>(ent_ptr)), "edit");
+
+    stack->set_visible_child_name("label_");
+    outer->append(std::move(stack));
+    row->set_child(std::move(outer).release_floating_ptr());
+
+    auto *row_ptr = static_cast<Gtk::ListBoxRow*>(row);
+    auto *ctx = new std::pair<ChatSidebar*, std::string>(this, cid);
+    g_object_set_data_full(reinterpret_cast<::GObject*>(row_ptr), "sidebar-ctx", ctx,
+        [](void *p) {
+            delete static_cast<std::pair<ChatSidebar*, std::string>*>(p);
+        });
+
+    auto ctrl = gtk_gesture_click_new();
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(ctrl),
+                                   GDK_BUTTON_SECONDARY);
+    g_signal_connect(ctrl, "pressed",
+                     G_CALLBACK(onContextGesture), row_ptr);
+    gtk_widget_add_controller(GTK_WIDGET(row_ptr),
+                               GTK_EVENT_CONTROLLER(ctrl));
+
+    return std::move(row).release_floating_ptr();
+}
+
+void ChatSidebar::showContextMenu(::GtkWidget *parent,
+                                   std::string_view chat_id)
+{
+    bool is_pinned = m_conv->isPinned(chat_id);
+    std::string cid(chat_id);
+
+    auto popover = Gtk::Popover::create();
+    popover->set_has_arrow(false);
+    auto *popover_raw = GTK_WIDGET(reinterpret_cast<::GObject*>(
+        static_cast<Gtk::Popover*>(popover)));
+
+    gtk_widget_set_parent(popover_raw,
+        GTK_WIDGET(reinterpret_cast<::GObject*>(m_list)));
+
+    graphene_rect_t bounds;
+    graphene_rect_init(&bounds, 0.f, 0.f, 0.f, 0.f);
+    bool ok = gtk_widget_compute_bounds(parent,
+        GTK_WIDGET(reinterpret_cast<::GObject*>(m_list)), &bounds);
+    GdkRectangle rect = {
+        ok ? static_cast<int>(bounds.origin.x) : 0,
+        ok ? static_cast<int>(bounds.origin.y) : 0,
+        ok ? static_cast<int>(bounds.size.width) : 1,
+        ok ? static_cast<int>(bounds.size.height) : 1,
+    };
+    gtk_popover_set_pointing_to(GTK_POPOVER(popover_raw), &rect);
+    auto *pop_ptr = static_cast<Gtk::Popover*>(popover);
+
+    auto box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 0);
+
+    auto add_btn = [&](const char *label, const char *icon,
+                        std::function<void()> cb) {
+        auto btn = Gtk::Button::create();
+        btn->set_has_frame(false);
+        auto inner = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 6);
+        inner->append(Gtk::Image::create_from_icon_name(icon));
+        inner->append(Gtk::Label::create(label));
+        btn->set_child(std::move(inner).release_floating_ptr());
+        btn->connect_clicked(
+            [cb = std::move(cb)](Gtk::Button *) { cb(); });
+        box->append(std::move(btn));
+    };
+
+    add_btn(is_pinned ? "Unpin" : "Pin", "view-pin-symbolic",
+            [this, cid, pop_ptr]() {
+                m_conv->togglePin(cid);
+                pop_ptr->popdown();
+            });
+
+    add_btn("Rename", "document-edit-symbolic",
+            [this, cid, pop_ptr]() {
+                startRename(cid);
+                pop_ptr->popdown();
+            });
+
+    auto del_btn = Gtk::Button::create();
+    del_btn->set_has_frame(false);
+    {
+        auto inner = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 6);
+        inner->append(
+            Gtk::Image::create_from_icon_name("user-trash-symbolic"));
+        auto del_label = Gtk::Label::create("Delete");
+        del_label->add_css_class("error");
+        inner->append(std::move(del_label));
+        del_btn->set_child(std::move(inner).release_floating_ptr());
+    }
+    del_btn->connect_clicked([this, cid, pop_ptr](Gtk::Button *) {
+        confirmDelete(cid);
+        pop_ptr->popdown();
+    });
+    box->append(std::move(del_btn));
+
+    popover->set_child(std::move(box).release_floating_ptr());
+    popover->popup();
+}
+
+void ChatSidebar::startRename(std::string_view chat_id)
+{
+    for (int i = 0; auto *row = m_list->get_row_at_index(i); ++i) {
+        if (std::string(row->get_name()) != chat_id) continue;
+        m_rename_row = row;
+        auto *child = row->get_child();
+        if (!child) return;
+        auto *outer = child->template cast<Gtk::Box>();
+        if (!outer) return;
+        auto *first = outer->get_first_child();
+        if (!first) return;
+        auto *stack = first->template cast<Gtk::Stack>();
+        if (!stack) return;
+        auto *entry_w =
+            stack->get_child_by_name("edit")->template cast<Gtk::Entry>();
+        if (!entry_w) return;
+        auto current = rowTitle(child);
+        entry_w->set_text(current.c_str());
+        entry_w->set_position(-1);
+        stack->set_visible_child_name("edit");
+        gtk_widget_grab_focus(
+            GTK_WIDGET(reinterpret_cast<::GObject*>(entry_w)));
+        return;
+    }
+    m_rename_row = nullptr;
+}
+
+void ChatSidebar::confirmRename(std::string_view chat_id,
+                                 std::string_view new_title)
+{
+    auto trimmed = std::string(new_title);
+    auto start = trimmed.find_first_not_of(" \t\n\r");
+    auto end = trimmed.find_last_not_of(" \t\n\r");
+    if (start == std::string::npos || trimmed.empty()) {
+        cancelRename();
+        return;
+    }
+    trimmed = trimmed.substr(start, end - start + 1);
+    if (trimmed.empty()) {
+        cancelRename();
+        return;
+    }
+    m_conv->setTitle(chat_id, trimmed);
+    cancelRename();
+}
+
+void ChatSidebar::cancelRename()
+{
+    if (!m_rename_row) return;
+    auto *child = m_rename_row->get_child();
+    if (!child) { m_rename_row = nullptr; return; }
+    auto *outer = child->template cast<Gtk::Box>();
+    if (!outer) { m_rename_row = nullptr; return; }
+    auto *first = outer->get_first_child();
+    if (!first) { m_rename_row = nullptr; return; }
+    auto *stack = first->template cast<Gtk::Stack>();
+    if (!stack) { m_rename_row = nullptr; return; }
+    stack->set_visible_child_name("label_");
+    m_rename_row = nullptr;
+}
+
+void ChatSidebar::confirmDelete(std::string_view chat_id)
+{
+    auto dialog = Adw::MessageDialog::create(
+        nullptr, "Delete Conversation",
+        "This action cannot be undone.");
+    dialog->add_response("cancel", "Cancel");
+    dialog->add_response("delete", "Delete");
+    dialog->set_response_appearance("delete",
+        Adw::ResponseAppearance::DESTRUCTIVE);
+    dialog->set_close_response("cancel");
+
+    ChatSidebar *sidebar = this;
+    std::string cid2(chat_id);
+    dialog->connect_response(
+        [sidebar, cid2](Adw::MessageDialog *, const char *response) {
+            if (std::string(response) == "delete") {
+                sidebar->m_bus->publish(
+                    rook::domain::ChatDeleted{.chat_id = cid2});
+            }
+        });
+    dialog->present();
+}
+
 void ChatSidebar::onChatCreated(const rook::domain::ChatCreated &event)
 {
     if (event.chat_id.empty()) return;
-    auto conv = m_conv->open(event.chat_id);
-    std::string title = event.chat_id;
-    if (!conv.title.empty()) title = conv.title;
-    std::string cid = event.chat_id;
-    GLib::idle_add_once([this, id = std::move(cid), title = std::move(title)]() {
-        addChatRow(id, title);
+    GLib::idle_add_once([this, id = event.chat_id]() {
+        rebuildList();
+        if (m_search) m_search->set_text("");
+        onSearchChanged();
     });
 }
 
 void ChatSidebar::onChatDeleted(const rook::domain::ChatDeleted &event)
 {
     GLib::idle_add_once([this, id = std::string(event.chat_id)]() {
-        for (int i = 0; auto *row = m_list->get_row_at_index(i); ++i) {
-            if (std::string(row->get_name()) == id) {
-                m_list->remove(row);
-                return;
-            }
-        }
+        rebuildList();
+        if (m_search) m_search->set_text("");
+        onSearchChanged();
     });
 }
 
 void ChatSidebar::onChatUpdated(const rook::domain::ChatUpdated &event)
 {
-    GLib::idle_add_once([this, id = event.chat_id, title = event.title]() {
-        for (int i = 0; auto *row = m_list->get_row_at_index(i); ++i) {
-            if (std::string(row->get_name()) == id) {
+    GLib::idle_add_once(
+        [this, id = event.chat_id, title = event.title]() {
+            for (int i = 0; auto *row = m_list->get_row_at_index(i); ++i) {
+                if (std::string(row->get_name()) != id) continue;
                 auto *child = row->get_child();
-                if (child) {
-                    auto *label = child->template cast<Gtk::Label>();
-                    if (label) {
-                        auto display = title;
-                        if (display.size() > 25) display = display.substr(0, 25) + "...";
-                        label->set_text(display.c_str());
-                    }
-                }
+                if (!child) return;
+                auto *outer = child->template cast<Gtk::Box>();
+                if (!outer) return;
+                auto *first = outer->get_first_child();
+                if (!first) return;
+                auto *stack = first->template cast<Gtk::Stack>();
+                if (!stack) return;
+                auto display = title;
+                if (display.size() > 30)
+                    display = display.substr(0, 30) + "...";
+
+                auto *label = stack->get_child_by_name("label_")
+                                  ->template cast<Gtk::Label>();
+                if (label) label->set_text(display.c_str());
+
+                auto *entry = stack->get_child_by_name("edit")
+                                  ->template cast<Gtk::Entry>();
+                if (entry) entry->set_text(display.c_str());
                 return;
             }
-        }
-    });
+        });
 }
 
 void ChatSidebar::onChatSelected(const rook::domain::ChatSelected &event)
@@ -176,39 +503,81 @@ void ChatSidebar::onChatSelected(const rook::domain::ChatSelected &event)
     });
 }
 
-void ChatSidebar::addChatRow(std::string_view id, std::string_view title)
+void ChatSidebar::onChatPinned(const rook::domain::ChatPinned &event)
 {
-    for (int i = 0; auto *existing = m_list->get_row_at_index(i); ++i) {
-        if (std::string(existing->get_name()) == id) return;
+    GLib::idle_add_once([this, id = event.chat_id]() {
+        rebuildList();
+        if (m_search) { m_search->set_text(""); onSearchChanged(); }
+    });
+}
+
+void ChatSidebar::rebuildList()
+{
+    while (auto *row = m_list->get_row_at_index(0))
+        m_list->remove(row);
+
+    m_rename_row = nullptr;
+
+    auto chats = m_conv->list();
+
+    std::sort(chats.begin(), chats.end(),
+        [](const rook::domain::Conversation &a,
+           const rook::domain::Conversation &b) {
+            if (a.pinned != b.pinned) return a.pinned > b.pinned;
+            if (a.pinned && b.pinned)
+                return a.pinned_at > b.pinned_at;
+            return a.updated_at > b.updated_at;
+        });
+
+    bool seen_unpinned = false;
+    bool has_pinned = false;
+    bool has_unpinned = false;
+
+    for (auto it = chats.begin(); it != chats.end(); ++it) {
+        if (it->pinned) has_pinned = true;
+        else has_unpinned = true;
+
+        if (!it->pinned && !seen_unpinned && has_pinned) {
+            auto sep_row = Gtk::ListBoxRow::create();
+            sep_row->set_name("__sep__");
+            sep_row->set_sensitive(false);
+            sep_row->set_activatable(false);
+            sep_row->set_selectable(false);
+            sep_row->add_css_class("separator-row");
+            auto sep_widget = Gtk::Separator::create(
+                Gtk::Orientation::HORIZONTAL);
+            sep_widget->set_margin_top(2);
+            sep_widget->set_margin_bottom(2);
+            sep_row->set_child(
+                std::move(sep_widget).release_floating_ptr());
+            sep_row->set_visible(false);
+            m_list->append(
+                std::move(sep_row).release_floating_ptr());
+            seen_unpinned = true;
+        }
+
+        auto display = it->title.empty() ? it->id : it->title;
+        auto *row = buildChatRow(it->id, display, it->pinned);
+        m_list->append(row);
     }
 
-    auto display = std::string(title);
-    if (display.size() > 25) display = display.substr(0, 25) + "...";
+    m_empty_placeholder->set_visible(chats.empty());
 
-    auto row = Gtk::ListBoxRow::create();
-    auto label = Gtk::Label::create(display.c_str());
-    label->set_xalign(0.0f);
-    label->set_margin_start(6);
-    label->set_margin_end(6);
-    label->set_margin_top(6);
-    label->set_margin_bottom(6);
-    label->set_max_width_chars(20);
-    label->set_ellipsize(static_cast<Pango::EllipsizeMode>(PANGO_ELLIPSIZE_END));
-    row->set_child(std::move(label).release_floating_ptr());
-    row->set_name(std::string(id).c_str());
-    m_list->append(std::move(row).release_floating_ptr());
+    if (has_pinned && has_unpinned) {
+        for (int i = 0; auto *r = m_list->get_row_at_index(i); ++i) {
+            if (std::string(r->get_name()) == "__sep__") {
+                r->set_visible(true);
+                break;
+            }
+        }
+    }
 }
 
 void ChatSidebar::loadConversations(
-    const std::vector<rook::domain::Conversation> &chats)
+    const std::vector<rook::domain::Conversation> & /*chats*/)
 {
-    while (auto *row = m_list->get_row_at_index(0)) {
-        m_list->remove(row);
-    }
-    for (const auto &conv : chats) {
-        auto display = conv.title.empty() ? conv.id : conv.title;
-        addChatRow(conv.id, display);
-    }
+    rebuildList();
+    if (m_search) m_search->set_text("");
 }
 
 } // namespace rook::gui

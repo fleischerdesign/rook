@@ -204,6 +204,12 @@ inline void RookApplication::vfunc_activate()
             "  border-left: 3px solid alpha(currentColor, 0.2);"
             "  padding-left: 8px;"
             "  opacity: 0.85;"
+            "}"
+            ".separator-row {"
+            "  padding: 0;"
+            "  min-height: 0;"
+            "  background: transparent;"
+            "  box-shadow: none;"
             "}");
         gtk_style_context_add_provider_for_display(
             gdk_display_get_default(),

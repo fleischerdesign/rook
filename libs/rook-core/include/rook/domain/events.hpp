@@ -114,6 +114,35 @@ struct SkillToggled {
     bool active;
 };
 
+struct ChatPinned {
+    std::string chat_id;
+    bool pinned;
+};
+
+struct ToolCallPermissionRequest {
+    std::string request_uuid;
+    std::string chat_id;
+    struct CallInfo {
+        std::string call_id;
+        std::string tool_name;
+        std::string arguments;
+    };
+    std::vector<CallInfo> calls;
+};
+
+struct ToolCallPermissionDecision {
+    std::string request_uuid;
+    struct Result {
+        std::string call_id;
+        int decision = 2; // 0=Allow, 1=Deny, 2=AllowAlways
+    };
+    std::vector<Result> results;
+};
+
+struct ToolCallTimedOut {
+    std::string request_uuid;
+};
+
 using DomainEvent = std::variant<
     UserInputReceived,
     LlmStreamChunk,
@@ -135,7 +164,11 @@ using DomainEvent = std::variant<
     SyncStateReceived,
     TaskDelegated,
     TaskCompleted,
-    SkillToggled
+    SkillToggled,
+    ChatPinned,
+    ToolCallPermissionRequest,
+    ToolCallPermissionDecision,
+    ToolCallTimedOut
 >;
 
 } // namespace rook::domain

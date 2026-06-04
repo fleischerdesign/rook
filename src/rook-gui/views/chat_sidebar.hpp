@@ -17,25 +17,43 @@ class ChatSidebar final : public peel::Gtk::Box
     rook::domain::EventBus *m_bus = nullptr;
     rook::domain::ConversationManager *m_conv = nullptr;
 
+    peel::Gtk::SearchEntry *m_search = nullptr;
     peel::Gtk::ListBox *m_list = nullptr;
+    peel::Gtk::Box *m_empty_placeholder = nullptr;
+    peel::Gtk::Box *m_no_results_placeholder = nullptr;
+    peel::Gtk::ListBoxRow *m_rename_row = nullptr;
 
     rook::domain::EventBus::HandlerId m_created_handler;
     rook::domain::EventBus::HandlerId m_deleted_handler;
     rook::domain::EventBus::HandlerId m_updated_handler;
     rook::domain::EventBus::HandlerId m_selected_handler;
+    rook::domain::EventBus::HandlerId m_pinned_handler;
 
     inline void init(Class *);
     inline void vfunc_dispose ();
 
     void onNewChat(peel::Gtk::Button *);
     void onRowActivated(peel::Gtk::ListBox *, peel::Gtk::ListBoxRow *row);
+    void onSearchChanged();
 
     void onChatCreated(const rook::domain::ChatCreated &event);
     void onChatDeleted(const rook::domain::ChatDeleted &event);
     void onChatUpdated(const rook::domain::ChatUpdated &event);
     void onChatSelected(const rook::domain::ChatSelected &event);
+    void onChatPinned(const rook::domain::ChatPinned &event);
 
-    void addChatRow(std::string_view id, std::string_view title);
+    void rebuildList();
+    peel::Gtk::ListBoxRow* buildChatRow(std::string_view id, std::string title,
+                                         bool pinned);
+    void showContextMenu(::GtkWidget *parent, std::string_view chat_id);
+
+    void startRename(std::string_view chat_id);
+    void confirmRename(std::string_view chat_id, std::string_view new_title);
+    void cancelRename();
+    void confirmDelete(std::string_view chat_id);
+
+    static void onContextGesture(GtkGestureClick *, int n_press,
+                                  double x, double y, gpointer data);
 
 public:
     static peel::FloatPtr<ChatSidebar> create(rook::domain::EventBus &bus,

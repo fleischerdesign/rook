@@ -277,6 +277,33 @@ void ConversationManager::setModel(std::string_view conv_id, std::string_view mo
     it->model = model;
 }
 
+void ConversationManager::togglePin(std::string_view conv_id) {
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](auto& c) { return c.id == conv_id; });
+    if (it == m_conversations.end()) return;
+
+    it->pinned = !it->pinned;
+    it->pinned_at = it->pinned
+        ? std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::system_clock::now().time_since_epoch()).count()
+        : 0;
+
+    if (m_bus) {
+        m_bus->publish(ChatPinned{
+            .chat_id = std::string(conv_id),
+            .pinned = it->pinned,
+        });
+    }
+
+    if (m_store) saveActiveConversation();
+}
+
+bool ConversationManager::isPinned(std::string_view conv_id) const {
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](const auto& c) { return c.id == conv_id; });
+    return it != m_conversations.end() && it->pinned;
+}
+
 void ConversationManager::loadFromStore(ports::StorePort& store) {
     auto chat_ids = store.listChats();
     for (const auto& record : chat_ids) {
@@ -289,6 +316,8 @@ void ConversationManager::loadFromStore(ports::StorePort& store) {
         conv.model = opt->model;
         conv.created_at = opt->created_at;
         conv.updated_at = opt->updated_at;
+        conv.pinned = opt->pinned;
+        conv.pinned_at = opt->pinned_at;
 
         if (!opt->messages_json.empty()) {
             try {
@@ -356,6 +385,8 @@ void ConversationManager::saveActiveConversation() {
     }
 
     record.messages_json = messages.dump();
+    record.pinned = conv->pinned;
+    record.pinned_at = conv->pinned_at;
 
     nlohmann::json active_skills = nlohmann::json::array();
     for (auto& sid : conv->active_skill_ids) active_skills.push_back(sid);

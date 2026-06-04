@@ -5,6 +5,7 @@
 #include <vector>
 #include <optional>
 #include <chrono>
+#include <cstdint>
 
 namespace rook::ports {
 
@@ -16,6 +17,8 @@ struct ChatRecord {
     std::chrono::system_clock::time_point updated_at;
     std::string messages_json;
     std::string active_skill_ids_json;
+    bool pinned = false;
+    uint64_t pinned_at = 0;
 };
 
 class StorePort {

@@ -5,6 +5,7 @@
 #include <vector>
 #include <optional>
 #include <chrono>
+#include <cstdint>
 #include "rook/ports/llm_port.hpp"
 #include "rook/ports/store_port.hpp"
 #include "rook/domain/event_bus.hpp"
@@ -32,6 +33,8 @@ struct Conversation {
     std::chrono::system_clock::time_point created_at;
     std::chrono::system_clock::time_point updated_at;
     int32_t context_window = 8192;
+    bool pinned = false;
+    uint64_t pinned_at = 0;
 };
 
 class ConversationManager {
@@ -48,6 +51,8 @@ public:
     void setAssistantToolCalls(std::string_view conv_id, std::string json);
     void setTitle(std::string_view conv_id, std::string_view title);
     void setModel(std::string_view conv_id, std::string_view model);
+    void togglePin(std::string_view conv_id);
+    bool isPinned(std::string_view conv_id) const;
     std::vector<ports::LlmMessage> buildLlmMessages(std::string_view conv_id) const;
     int32_t estimateTokens(std::string_view conv_id) const;
     void setSystemMessage(std::string_view conv_id, std::string_view content);

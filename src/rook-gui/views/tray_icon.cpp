@@ -117,20 +117,22 @@ void TrayIcon::Impl::onNameAcquired(GDBusConnection *conn)
         nullptr, nullptr);
 
     if (watcher) {
+        g_object_ref(watcher);
         g_dbus_proxy_call(
             watcher, "RegisterStatusNotifierItem",
             g_variant_new("(s)", service_name.c_str()),
             G_DBUS_CALL_FLAGS_NONE, -1, nullptr,
-            [](GObject*, GAsyncResult *res, gpointer) {
+            [](GObject *src, GAsyncResult *res, gpointer) {
                 GError *err = nullptr;
                 auto *reply =
-                    g_dbus_proxy_call_finish(G_DBUS_PROXY(res), res, &err);
+                    g_dbus_proxy_call_finish(G_DBUS_PROXY(src), res, &err);
                 if (err) {
                     spdlog::warn("TrayIcon: failed to register with watcher: {}",
                                  err->message);
                     g_error_free(err);
                 }
                 if (reply) g_variant_unref(reply);
+                g_object_unref(src);
             }, nullptr);
         g_object_unref(watcher);
     }
