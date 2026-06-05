@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "chat_sidebar.hpp"
 #include "rook/core/domain_actor.hpp"
 #include "rook/core/actor_messages.hpp"
@@ -24,7 +25,7 @@ inline void ChatSidebar::init(Class *)
     set_size_request(220, -1);
 
     auto search = Gtk::SearchEntry::create();
-    search->set_placeholder_text("Search chats...");
+    search->set_placeholder_text(_("Search chats..."));
     search->set_margin_start(6);
     search->set_margin_end(6);
     search->set_margin_top(6);
@@ -48,7 +49,7 @@ inline void ChatSidebar::init(Class *)
     empty_box->set_halign(Gtk::Align::CENTER);
     empty_box->set_vexpand(true);
     empty_box->set_hexpand(true);
-    auto empty_label = Gtk::Label::create("No conversations yet");
+    auto empty_label = Gtk::Label::create(_("No conversations yet"));
     empty_label->add_css_class("dim-label");
     empty_box->append(std::move(empty_label));
     m_empty_placeholder = empty_box;
@@ -59,7 +60,7 @@ inline void ChatSidebar::init(Class *)
     nores_box->set_halign(Gtk::Align::CENTER);
     nores_box->set_vexpand(true);
     nores_box->set_hexpand(true);
-    auto nores_label = Gtk::Label::create("No matching chats");
+    auto nores_label = Gtk::Label::create(_("No matching chats"));
     nores_label->add_css_class("dim-label");
     nores_box->append(std::move(nores_label));
     m_no_results_placeholder = nores_box;
@@ -75,7 +76,7 @@ inline void ChatSidebar::init(Class *)
     overlay->set_child(sw);
     append(std::move(overlay));
 
-    auto new_btn = Gtk::Button::create_with_label("New Chat");
+    auto new_btn = Gtk::Button::create_with_label(_("New Chat"));
     new_btn->add_css_class("suggested-action");
     new_btn->set_margin_start(6);
     new_btn->set_margin_end(6);

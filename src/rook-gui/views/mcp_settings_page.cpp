@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "mcp_settings_page.hpp"
 #include "mcp_server_dialog.hpp"
 #include <peel/Adw/Adw.h>
@@ -37,7 +38,7 @@ FloatPtr<McpSettingsPage> McpSettingsPage::create(
     page->m_mcp = mcp;
     page->m_security = security;
 
-    auto heading = Gtk::Label::create("Tools");
+    auto heading = Gtk::Label::create(_("Tools"));
     heading->set_xalign(0.0f);
     heading->add_css_class("title-2");
     page->append(std::move(heading));
@@ -50,7 +51,7 @@ FloatPtr<McpSettingsPage> McpSettingsPage::create(
     desc->set_margin_bottom(4);
     page->append(std::move(desc));
 
-    auto builtin_expander = Gtk::Expander::create("Built-in");
+    auto builtin_expander = Gtk::Expander::create(_("Built-in"));
     builtin_expander->set_expanded(false);
 
     auto builtin_box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 4);
@@ -102,8 +103,8 @@ FloatPtr<McpSettingsPage> McpSettingsPage::create(
     stack->set_vexpand(true);
 
     auto empty = Adw::StatusPage::create();
-    empty->set_title("No MCP Servers");
-    empty->set_description("Add servers to give the assistant access to external tools.");
+    empty->set_title(_("No MCP Servers"));
+    empty->set_description(_("Add servers to give the assistant access to external tools."));
     empty->add_css_class("compact");
     stack->add_named(std::move(empty).release_floating_ptr(), "empty");
 
@@ -124,7 +125,7 @@ FloatPtr<McpSettingsPage> McpSettingsPage::create(
 
     McpSettingsPage *raw_page = page;
 
-    auto add = Gtk::Button::create_with_label("Add Server");
+    auto add = Gtk::Button::create_with_label(_("Add Server"));
     add->add_css_class("suggested-action");
     add->connect_clicked([raw_page](Gtk::Button *) {
         raw_page->onAddServer();
@@ -236,13 +237,13 @@ void McpSettingsPage::refreshList()
             std::string sid_ovr = srv.id;
             McpSettingsPage *raw_page_ovr = this;
 
-            auto caps_btn = Gtk::Button::create_with_label("Capabilities");
+            auto caps_btn = Gtk::Button::create_with_label(_("Capabilities"));
             caps_btn->connect_clicked([raw_page_ovr, sid_ovr](Gtk::Button *) {
                 raw_page_ovr->onOverrideCapabilities(sid_ovr);
             });
             expander->add_suffix(std::move(caps_btn).release_floating_ptr());
 
-            auto managed_label = Gtk::Label::create("via extension");
+            auto managed_label = Gtk::Label::create(_("via extension"));
             managed_label->add_css_class("dim-label");
             managed_label->set_margin_end(8);
             expander->add_suffix(std::move(managed_label).release_floating_ptr());
@@ -250,7 +251,7 @@ void McpSettingsPage::refreshList()
             std::string sid = srv.id;
             McpSettingsPage *raw_page = this;
 
-            auto edit_btn = Gtk::Button::create_with_label("Edit");
+            auto edit_btn = Gtk::Button::create_with_label(_("Edit"));
             edit_btn->connect_clicked([raw_page, sid](Gtk::Button *) {
                 raw_page->onEditServer(sid);
             });
@@ -375,7 +376,7 @@ void McpSettingsPage::onDeleteServer(std::string_view id)
 void McpSettingsPage::onOverrideCapabilities(std::string_view id)
 {
     auto dlg = Gtk::Window::create();
-    dlg->set_title("Capability Override");
+    dlg->set_title(_("Capability Override"));
     dlg->set_modal(true);
     dlg->set_default_size(400, 420);
 
@@ -415,7 +416,7 @@ void McpSettingsPage::onOverrideCapabilities(std::string_view id)
     Gtk::Box* rl = read_list;
     content->append(std::move(read_list));
 
-    auto add_read = Gtk::Button::create_with_label("+ Add Read Path");
+    auto add_read = Gtk::Button::create_with_label(_("+ Add Read Path"));
     add_read->connect_clicked([rl, &read_paths](Gtk::Button *) {
         auto row = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 4);
         auto entry = Gtk::Entry::create();
@@ -447,7 +448,7 @@ void McpSettingsPage::onOverrideCapabilities(std::string_view id)
     Gtk::Box* wl = write_list;
     content->append(std::move(write_list));
 
-    auto add_write = Gtk::Button::create_with_label("+ Add Write Path");
+    auto add_write = Gtk::Button::create_with_label(_("+ Add Write Path"));
     add_write->connect_clicked([wl, &write_paths](Gtk::Button *) {
         auto row = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 4);
         auto entry = Gtk::Entry::create();
@@ -470,7 +471,7 @@ void McpSettingsPage::onOverrideCapabilities(std::string_view id)
     content->append(std::move(add_write));
 
     auto net_row = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 12);
-    auto net_label = Gtk::Label::create("Allow Network Access:");
+    auto net_label = Gtk::Label::create(_("Allow Network Access:"));
     net_label->set_xalign(0.0f);
     net_label->set_hexpand(true);
     auto net_switch = Gtk::Switch::create();
@@ -480,7 +481,7 @@ void McpSettingsPage::onOverrideCapabilities(std::string_view id)
     content->append(std::move(net_row));
 
     auto mem_row = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 12);
-    auto mem_label = Gtk::Label::create("Memory Limit (MB):");
+    auto mem_label = Gtk::Label::create(_("Memory Limit (MB):"));
     mem_label->set_xalign(0.0f);
     mem_label->set_hexpand(true);
     auto mem_spin = Gtk::SpinButton::create_with_range(0, 65536, 1);
@@ -491,7 +492,7 @@ void McpSettingsPage::onOverrideCapabilities(std::string_view id)
     content->append(std::move(mem_row));
 
     auto cpu_row = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 12);
-    auto cpu_label = Gtk::Label::create("CPU Time Limit (sec):");
+    auto cpu_label = Gtk::Label::create(_("CPU Time Limit (sec):"));
     cpu_label->set_xalign(0.0f);
     cpu_label->set_hexpand(true);
     auto cpu_spin = Gtk::SpinButton::create_with_range(0, 86400, 1);
@@ -505,12 +506,12 @@ void McpSettingsPage::onOverrideCapabilities(std::string_view id)
     button_bar->set_halign(Gtk::Align::END);
     button_bar->set_margin_top(8);
 
-    auto cancel_btn = Gtk::Button::create_with_label("Cancel");
+    auto cancel_btn = Gtk::Button::create_with_label(_("Cancel"));
     Gtk::Window* raw_dlg = dlg;
     cancel_btn->connect_clicked([raw_dlg](Gtk::Button *) { raw_dlg->close(); });
     button_bar->append(std::move(cancel_btn));
 
-    auto save_btn = Gtk::Button::create_with_label("Save");
+    auto save_btn = Gtk::Button::create_with_label(_("Save"));
     save_btn->add_css_class("suggested-action");
 
     McpSettingsPage* raw_page = this;

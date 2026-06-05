@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "voice_settings_page.hpp"
 #include <gtk/gtk.h>
 using namespace peel;
@@ -7,7 +8,7 @@ inline void VoiceSettingsPage::Class::init() {}
 inline void VoiceSettingsPage::init(Class*) {
     gtk_orientable_set_orientation(GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)), GTK_ORIENTATION_VERTICAL);
     set_vexpand(true);
-    append(Gtk::Label::create("Voice Settings (TODO)"));
+    append(Gtk::Label::create(_("Voice Settings")));
 }
 FloatPtr<VoiceSettingsPage> VoiceSettingsPage::create() { return Object::create<VoiceSettingsPage>(); }
 }

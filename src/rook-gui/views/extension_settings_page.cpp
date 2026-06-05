@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "extension_settings_page.hpp"
 #include "extension_install_dialog.hpp"
 #include "rook/adapters/extension/extension_manager.hpp"
@@ -38,7 +39,7 @@ FloatPtr<ExtensionSettingsPage> ExtensionSettingsPage::create(
     page->m_extensions = extensions;
     page->m_mcp = mcp;
 
-    auto heading = Gtk::Label::create("Extensions");
+    auto heading = Gtk::Label::create(_("Extensions"));
     heading->set_xalign(0.0f);
     heading->add_css_class("title-2");
     page->append(std::move(heading));
@@ -55,7 +56,7 @@ FloatPtr<ExtensionSettingsPage> ExtensionSettingsPage::create(
     stack->set_vexpand(true);
 
     auto empty = Adw::StatusPage::create();
-    empty->set_title("No Extensions Installed");
+    empty->set_title(_("No Extensions Installed"));
     empty->set_description(
         "Install extensions from GitHub to give the assistant new capabilities.");
     empty->add_css_class("compact");
@@ -77,7 +78,7 @@ FloatPtr<ExtensionSettingsPage> ExtensionSettingsPage::create(
 
     ExtensionSettingsPage *raw_page = page;
 
-    auto install_btn = Gtk::Button::create_with_label("Install from GitHub");
+    auto install_btn = Gtk::Button::create_with_label(_("Install from GitHub"));
     install_btn->add_css_class("suggested-action");
     install_btn->connect_clicked([raw_page](Gtk::Button *) {
         raw_page->onInstallFromUrl();
@@ -118,7 +119,7 @@ void ExtensionSettingsPage::refreshList()
 
         if (!ext.mcp_servers.empty()) {
             auto mcp_label = Adw::ActionRow::create();
-            mcp_label->set_title("MCP Servers");
+            mcp_label->set_title(_("MCP Servers"));
             mcp_label->set_subtitle(
                 (std::to_string(ext.mcp_servers.size()) + " server"
                  + (ext.mcp_servers.size() > 1 ? "s" : "") + " provided").c_str());
@@ -160,7 +161,7 @@ void ExtensionSettingsPage::refreshList()
 
         if (!ext.commands.empty()) {
             auto cmd_label = Adw::ActionRow::create();
-            cmd_label->set_title("Commands");
+            cmd_label->set_title(_("Commands"));
             cmd_label->set_subtitle(
                 (std::to_string(ext.commands.size()) + " command"
                  + (ext.commands.size() > 1 ? "s" : "")).c_str());
@@ -169,7 +170,7 @@ void ExtensionSettingsPage::refreshList()
 
         if (!ext.context_files.empty()) {
             auto cf_label = Adw::ActionRow::create();
-            cf_label->set_title("Context Files");
+            cf_label->set_title(_("Context Files"));
             std::string names;
             for (auto& cf : ext.context_files) {
                 if (!names.empty()) names += ", ";
@@ -182,7 +183,7 @@ void ExtensionSettingsPage::refreshList()
         std::string name = ext.name;
         std::string url = ext.url;
 
-        auto uninstall_btn = Gtk::Button::create_with_label("Uninstall");
+        auto uninstall_btn = Gtk::Button::create_with_label(_("Uninstall"));
         uninstall_btn->add_css_class("destructive-action");
         uninstall_btn->connect_clicked([this, name](Gtk::Button *) {
             if (m_extensions->uninstall(name)) {
@@ -194,7 +195,7 @@ void ExtensionSettingsPage::refreshList()
         });
         row->add_suffix(std::move(uninstall_btn).release_floating_ptr());
 
-        auto update_btn = Gtk::Button::create_with_label("Update");
+        auto update_btn = Gtk::Button::create_with_label(_("Update"));
         update_btn->connect_clicked([this, name](Gtk::Button *) {
             if (m_extensions->update(name)) {
                 m_mcp->stopAll();

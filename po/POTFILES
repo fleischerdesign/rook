@@ -1,1 +1,19 @@
-# Empty for now (Phase 1 skeleton)
+src/rook-gui/main.cpp
+src/rook-gui/window.cpp
+src/rook-gui/views/chat_view.cpp
+src/rook-gui/views/chat_sidebar.cpp
+src/rook-gui/views/message_widget.cpp
+src/rook-gui/views/tool_call_row.cpp
+src/rook-gui/views/permission_banner.cpp
+src/rook-gui/views/preferences_window.cpp
+src/rook-gui/views/llm_settings_page.cpp
+src/rook-gui/views/provider_dialog.cpp
+src/rook-gui/views/mcp_settings_page.cpp
+src/rook-gui/views/mcp_server_dialog.cpp
+src/rook-gui/views/skills_page.cpp
+src/rook-gui/views/skill_dialog.cpp
+src/rook-gui/views/extension_settings_page.cpp
+src/rook-gui/views/extension_install_dialog.cpp
+src/rook-gui/views/voice_settings_page.cpp
+src/rook-gui/views/appearance_page.cpp
+src/rook-gui/views/first_run_wizard.cpp

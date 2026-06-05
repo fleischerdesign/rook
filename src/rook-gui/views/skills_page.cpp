@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "skills_page.hpp"
 #include "skill_dialog.hpp"
 #include "rook/ports/extension_port.hpp"
@@ -38,7 +39,7 @@ FloatPtr<SkillsPage> SkillsPage::create(
     page->m_custom_skills = custom_skills;
     page->m_extensions = extensions;
 
-    auto heading = Gtk::Label::create("Skills");
+    auto heading = Gtk::Label::create(_("Skills"));
     heading->set_xalign(0.0f);
     heading->add_css_class("title-2");
     page->append(std::move(heading));
@@ -68,7 +69,7 @@ FloatPtr<SkillsPage> SkillsPage::create(
 
     SkillsPage *raw_page = page;
 
-    auto create_btn = Gtk::Button::create_with_label("+ Create Skill");
+    auto create_btn = Gtk::Button::create_with_label(_("+ Create Skill"));
     create_btn->connect_clicked([raw_page](Gtk::Button *) {
         raw_page->onCreateSkill();
     });
@@ -120,7 +121,7 @@ void SkillsPage::refreshList()
         });
         expander->add_suffix(std::move(toggle).release_floating_ptr());
 
-        auto al_label = Gtk::Label::create("Always ON");
+        auto al_label = Gtk::Label::create(_("Always ON"));
         al_label->add_css_class("dim-label");
         al_label->set_margin_end(4);
         expander->add_suffix(std::move(al_label).release_floating_ptr());
@@ -176,7 +177,7 @@ void SkillsPage::refreshList()
             });
             expander->add_suffix(std::move(toggle).release_floating_ptr());
 
-            auto al_label = Gtk::Label::create("Always ON");
+            auto al_label = Gtk::Label::create(_("Always ON"));
             al_label->add_css_class("dim-label");
             al_label->set_margin_end(4);
             expander->add_suffix(std::move(al_label).release_floating_ptr());

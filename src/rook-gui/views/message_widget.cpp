@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "message_widget.hpp"
 #include "markdown_renderer.hpp"
 #include <gtk/gtk.h>
@@ -55,7 +56,7 @@ FloatPtr<MessageWidget> MessageWidget::create(const std::string &role,
     widget->m_raw_content = content;
 
     if (!reasoning_content.empty()) {
-        auto expander = Gtk::Expander::create("Thinking...");
+        auto expander = Gtk::Expander::create(_("Thinking..."));
         expander->set_expanded(false);
 
         auto rlabel = Gtk::Label::create(escapeText(reasoning_content).c_str());
@@ -116,7 +117,7 @@ void MessageWidget::appendChunk(std::string_view chunk)
 void MessageWidget::appendReasoningChunk(std::string_view chunk)
 {
     if (!m_reasoning_expander) {
-        auto expander = Gtk::Expander::create("Thinking...");
+        auto expander = Gtk::Expander::create(_("Thinking..."));
         expander->set_expanded(false);
 
         auto rlabel = Gtk::Label::create("");

@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "extension_install_dialog.hpp"
 #include <gtk/gtk.h>
 
@@ -16,7 +17,7 @@ inline void ExtensionInstallDialog::Class::init()
 
 inline void ExtensionInstallDialog::init(Class *)
 {
-    set_title("Install Extension");
+    set_title(_("Install Extension"));
     set_modal(true);
     set_default_size(420, 200);
 
@@ -47,14 +48,14 @@ inline void ExtensionInstallDialog::init(Class *)
     auto buttons = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 8);
     buttons->set_halign(Gtk::Align::END);
 
-    auto cancel = Gtk::Button::create_with_label("Cancel");
+    auto cancel = Gtk::Button::create_with_label(_("Cancel"));
     cancel->connect_clicked([this](Gtk::Button *) {
         m_accepted = false;
         close();
     });
     buttons->append(std::move(cancel));
 
-    auto install = Gtk::Button::create_with_label("Install");
+    auto install = Gtk::Button::create_with_label(_("Install"));
     install->add_css_class("suggested-action");
     m_install_button = install;
     install->connect_clicked([this](Gtk::Button *) { onInstall(); });

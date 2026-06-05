@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "chat_view.hpp"
 #include "message_widget.hpp"
 #include "tool_call_row.hpp"
@@ -133,7 +134,7 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
     stack->set_vexpand(true);
 
     auto welcome_page = Adw::StatusPage::create();
-    welcome_page->set_title("Welcome to Rook");
+    welcome_page->set_title(_("Welcome to Rook"));
     welcome_page->set_description(
         "Your multi-modal AI assistant. Ask anything, explore ideas.");
     welcome_page->add_css_class("compact");
@@ -145,7 +146,7 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
 
     {
         auto skills_btn = Gtk::MenuButton::create();
-        skills_btn->set_tooltip_text("Skills");
+        skills_btn->set_tooltip_text(_("Skills"));
         skills_btn->set_icon_name("applications-engineering-symbolic");
         skills_btn->set_margin_end(4);
         v->m_welcome_skills_btn = skills_btn;
@@ -161,7 +162,7 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
     {
         auto entry = Gtk::Entry::create();
         entry->set_hexpand(true);
-        entry->set_placeholder_text("Type a message...");
+        entry->set_placeholder_text(_("Type a message..."));
         entry->connect_activate([v](Gtk::Entry *) { v->onMessageEntryActivated(nullptr); });
         entry->connect_changed([v](Gtk::Editable *) { v->onChatEntryChanged(); });
 
@@ -244,7 +245,7 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
 
     {
         auto skills_btn = Gtk::MenuButton::create();
-        skills_btn->set_tooltip_text("Skills");
+        skills_btn->set_tooltip_text(_("Skills"));
         skills_btn->set_icon_name("applications-engineering-symbolic");
         skills_btn->set_margin_end(4);
         v->m_skills_btn = skills_btn;
@@ -260,7 +261,7 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
     {
         auto entry = Gtk::Entry::create();
         entry->set_hexpand(true);
-        entry->set_placeholder_text("Type a message...");
+        entry->set_placeholder_text(_("Type a message..."));
         entry->connect_activate([v](Gtk::Entry *) { v->onMessageEntryActivated(nullptr); });
         entry->connect_changed([v](Gtk::Editable *) { v->onChatEntryChanged(); });
 
@@ -675,7 +676,7 @@ void ChatView::buildSkillsPopover(Gtk::MenuButton *target)
     content->set_margin_top(8);
     content->set_margin_bottom(8);
 
-    auto heading = Gtk::Label::create("Skills for this chat");
+    auto heading = Gtk::Label::create(_("Skills for this chat"));
     heading->set_xalign(0.0f);
     heading->set_use_markup(true);
     heading->set_markup("<span weight=\"bold\">Skills for this chat</span>");

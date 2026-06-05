@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "tool_call_row.hpp"
 #include <gtk/gtk.h>
 
@@ -58,7 +59,7 @@ FloatPtr<ToolCallRow> ToolCallRow::createPending(
 
     row->append(std::move(header));
 
-    auto expander = Gtk::Expander::create("Show details");
+    auto expander = Gtk::Expander::create(_("Show details"));
     expander->set_expanded(false);
 
     auto box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 4);
@@ -94,7 +95,7 @@ void ToolCallRow::buildArgsBox(std::string_view arguments)
     auto args_header = Gtk::Label::create("");
     args_header->set_xalign(0.0f);
     args_header->set_use_markup(true);
-    args_header->set_markup("<span weight=\"bold\">Arguments:</span>");
+    args_header->set_markup(_("<span weight=\"bold\">Arguments:</span>"));
 
     auto args_label = Gtk::Label::create(std::string(arguments).c_str());
     args_label->set_wrap(true);
@@ -126,9 +127,9 @@ void ToolCallRow::setResult(std::string_view result, bool is_error)
     result_header->set_xalign(0.0f);
     result_header->set_use_markup(true);
     if (is_error) {
-        result_header->set_markup("<span weight=\"bold\" foreground=\"#e01b24\">Error:</span>");
+        result_header->set_markup(_("<span weight=\"bold\" foreground=\"#e01b24\">Error:</span>"));
     } else {
-        result_header->set_markup("<span weight=\"bold\">Result:</span>");
+        result_header->set_markup(_("<span weight=\"bold\">Result:</span>"));
     }
 
     auto result_label = Gtk::Label::create(std::string(result).c_str());

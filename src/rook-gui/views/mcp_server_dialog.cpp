@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "mcp_server_dialog.hpp"
 #include "rook/adapters/mcp/stdio_transport.hpp"
 #include "rook/adapters/mcp/http_sse_transport.hpp"
@@ -53,7 +54,7 @@ static void connectTransportToggles(
 
 inline void McpServerDialog::init(Class *)
 {
-    set_title("Add MCP Server");
+    set_title(_("Add MCP Server"));
     set_modal(true);
     set_default_size(480, 640);
 
@@ -63,7 +64,7 @@ inline void McpServerDialog::init(Class *)
     content->set_margin_top(16);
     content->set_margin_bottom(16);
 
-    auto transport_label = Gtk::Label::create("Transport:");
+    auto transport_label = Gtk::Label::create(_("Transport:"));
     transport_label->set_xalign(0.0f);
     content->append(std::move(transport_label));
 
@@ -81,7 +82,7 @@ inline void McpServerDialog::init(Class *)
 
     content->append(std::move(toggle_box));
 
-    auto name_label = Gtk::Label::create("Name:");
+    auto name_label = Gtk::Label::create(_("Name:"));
     name_label->set_xalign(0.0f);
     content->append(std::move(name_label));
 
@@ -94,7 +95,7 @@ inline void McpServerDialog::init(Class *)
 
     auto stdio_page = Gtk::Box::create(Gtk::Orientation::VERTICAL, 6);
 
-    auto cmd_label = Gtk::Label::create("Command:");
+    auto cmd_label = Gtk::Label::create(_("Command:"));
     cmd_label->set_xalign(0.0f);
     stdio_page->append(std::move(cmd_label));
 
@@ -103,7 +104,7 @@ inline void McpServerDialog::init(Class *)
     m_command_entry = cmd_entry;
     stdio_page->append(std::move(cmd_entry));
 
-    auto args_label = Gtk::Label::create("Arguments:");
+    auto args_label = Gtk::Label::create(_("Arguments:"));
     args_label->set_xalign(0.0f);
     stdio_page->append(std::move(args_label));
 
@@ -111,7 +112,7 @@ inline void McpServerDialog::init(Class *)
     m_args_list = args_list;
     stdio_page->append(std::move(args_list));
 
-    auto add_arg = Gtk::Button::create_with_label("+ Add Argument");
+    auto add_arg = Gtk::Button::create_with_label(_("+ Add Argument"));
     add_arg->connect_clicked([this](Gtk::Button *) { addArgEntry(); });
     stdio_page->append(std::move(add_arg));
 
@@ -120,7 +121,7 @@ inline void McpServerDialog::init(Class *)
 
     auto url_page = Gtk::Box::create(Gtk::Orientation::VERTICAL, 6);
 
-    auto url_label = Gtk::Label::create("URL:");
+    auto url_label = Gtk::Label::create(_("URL:"));
     url_label->set_xalign(0.0f);
     url_page->append(std::move(url_label));
 
@@ -129,7 +130,7 @@ inline void McpServerDialog::init(Class *)
     m_url_entry = url_entry;
     url_page->append(std::move(url_entry));
 
-    auto hdrs_label = Gtk::Label::create("Headers:");
+    auto hdrs_label = Gtk::Label::create(_("Headers:"));
     hdrs_label->set_xalign(0.0f);
     url_page->append(std::move(hdrs_label));
 
@@ -137,7 +138,7 @@ inline void McpServerDialog::init(Class *)
     m_headers_list = headers_list;
     url_page->append(std::move(headers_list));
 
-    auto add_hdr = Gtk::Button::create_with_label("+ Add Header");
+    auto add_hdr = Gtk::Button::create_with_label(_("+ Add Header"));
     add_hdr->connect_clicked([this](Gtk::Button *) { addHeaderRow(); });
     url_page->append(std::move(add_hdr));
 
@@ -156,7 +157,7 @@ inline void McpServerDialog::init(Class *)
             if (m_cpu_row) m_cpu_row->set_visible(is_stdio);
         });
 
-    auto cap_expander = Gtk::Expander::create("Capabilities");
+    auto cap_expander = Gtk::Expander::create(_("Capabilities"));
     cap_expander->set_expanded(false);
 
     auto cap_box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 6);
@@ -173,7 +174,7 @@ inline void McpServerDialog::init(Class *)
     m_read_paths_list = read_list;
     cap_box->append(std::move(read_list));
 
-    auto add_read = Gtk::Button::create_with_label("+ Add Read Path");
+    auto add_read = Gtk::Button::create_with_label(_("+ Add Read Path"));
     add_read->connect_clicked([this](Gtk::Button *) { addReadPathEntry(); });
     cap_box->append(std::move(add_read));
 
@@ -187,12 +188,12 @@ inline void McpServerDialog::init(Class *)
     m_write_paths_list = write_list;
     cap_box->append(std::move(write_list));
 
-    auto add_write = Gtk::Button::create_with_label("+ Add Write Path");
+    auto add_write = Gtk::Button::create_with_label(_("+ Add Write Path"));
     add_write->connect_clicked([this](Gtk::Button *) { addWritePathEntry(); });
     cap_box->append(std::move(add_write));
 
     auto net_row = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 12);
-    auto net_label = Gtk::Label::create("Allow Network Access:");
+    auto net_label = Gtk::Label::create(_("Allow Network Access:"));
     net_label->set_xalign(0.0f);
     net_label->set_hexpand(true);
     auto net_switch = Gtk::Switch::create();
@@ -203,7 +204,7 @@ inline void McpServerDialog::init(Class *)
     cap_box->append(std::move(net_row));
 
     auto mem_row = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 12);
-    auto mem_label = Gtk::Label::create("Memory Limit (MB):");
+    auto mem_label = Gtk::Label::create(_("Memory Limit (MB):"));
     mem_label->set_xalign(0.0f);
     mem_label->set_hexpand(true);
     auto mem_spin = Gtk::SpinButton::create_with_range(0, 65536, 1);
@@ -215,7 +216,7 @@ inline void McpServerDialog::init(Class *)
     cap_box->append(std::move(mem_row));
 
     auto cpu_row = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 12);
-    auto cpu_label = Gtk::Label::create("CPU Time Limit (sec):");
+    auto cpu_label = Gtk::Label::create(_("CPU Time Limit (sec):"));
     cpu_label->set_xalign(0.0f);
     cpu_label->set_hexpand(true);
     auto cpu_spin = Gtk::SpinButton::create_with_range(0, 86400, 1);
@@ -231,7 +232,7 @@ inline void McpServerDialog::init(Class *)
     content->append(std::move(cap_expander));
 
     auto enabled_row = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 12);
-    auto enabled_label = Gtk::Label::create("Enabled:");
+    auto enabled_label = Gtk::Label::create(_("Enabled:"));
     enabled_label->set_xalign(0.0f);
     enabled_label->set_hexpand(true);
     auto enabled_switch = Gtk::Switch::create();
@@ -251,16 +252,16 @@ inline void McpServerDialog::init(Class *)
     button_bar->set_halign(Gtk::Align::END);
     button_bar->set_margin_top(8);
 
-    auto test_btn = Gtk::Button::create_with_label("Test Connection");
+    auto test_btn = Gtk::Button::create_with_label(_("Test Connection"));
     m_test_button = test_btn;
     test_btn->connect_clicked([this](Gtk::Button *) { onTestConnection(); });
     button_bar->append(std::move(test_btn));
 
-    auto cancel = Gtk::Button::create_with_label("Cancel");
+    auto cancel = Gtk::Button::create_with_label(_("Cancel"));
     cancel->connect_clicked([this](Gtk::Button *) { onCancel(); });
     button_bar->append(std::move(cancel));
 
-    auto save = Gtk::Button::create_with_label("Save Server");
+    auto save = Gtk::Button::create_with_label(_("Save Server"));
     save->add_css_class("suggested-action");
     save->connect_clicked([this](Gtk::Button *) { onSave(); });
     button_bar->append(std::move(save));
@@ -280,7 +281,7 @@ FloatPtr<McpServerDialog> McpServerDialog::create(
     if (existing) {
         dlg->m_edit_mode = true;
         dlg->m_edit_id = existing->id;
-        dlg->set_title("Edit MCP Server");
+        dlg->set_title(_("Edit MCP Server"));
 
         dlg->m_id_entry->set_text(existing->id.c_str());
         dlg->m_id_entry->set_sensitive(false);
@@ -367,7 +368,7 @@ void McpServerDialog::onTestConnection()
     auto cfg = getConfig();
 
     m_test_button->set_sensitive(false);
-    m_test_button->set_label("Testing...");
+    m_test_button->set_label(_("Testing..."));
     setTestResult(false, "");
 
     (void)std::async(std::launch::async, [this, cfg = std::move(cfg)]() {

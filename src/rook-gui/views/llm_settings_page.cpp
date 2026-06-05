@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "llm_settings_page.hpp"
 #include "provider_dialog.hpp"
 #include <gtk/gtk.h>
@@ -32,7 +33,7 @@ FloatPtr<LlmSettingsPage> LlmSettingsPage::create(rook::ports::LlmPort &llm)
     auto *raw = static_cast<LlmSettingsPage*>(page);
     raw->m_llm = &llm;
 
-    auto heading = Gtk::Label::create("LLM Providers");
+    auto heading = Gtk::Label::create(_("LLM Providers"));
     heading->set_xalign(0.0f);
     heading->add_css_class("title-2");
     raw->append(std::move(heading));
@@ -53,7 +54,7 @@ FloatPtr<LlmSettingsPage> LlmSettingsPage::create(rook::ports::LlmPort &llm)
     raw->m_list = list;
     raw->append(std::move(list));
 
-    auto add_btn = Gtk::Button::create_with_label("Add Provider");
+    auto add_btn = Gtk::Button::create_with_label(_("Add Provider"));
     add_btn->add_css_class("suggested-action");
     add_btn->set_halign(Gtk::Align::START);
     add_btn->set_margin_top(12);
@@ -89,7 +90,7 @@ void LlmSettingsPage::refreshList()
         });
         row->add_suffix(std::move(sw).release_floating_ptr());
 
-        auto edit_btn = Gtk::Button::create_with_label("Edit");
+        auto edit_btn = Gtk::Button::create_with_label(_("Edit"));
         edit_btn->set_valign(Gtk::Align::CENTER);
         edit_btn->connect_clicked([this, pid](Gtk::Button *) { onEditClicked(pid); });
         row->add_suffix(std::move(edit_btn).release_floating_ptr());

@@ -1,4 +1,5 @@
 #include "window.hpp"
+#include <glib/gi18n.h>
 #include "views/chat_view.hpp"
 #include "views/chat_sidebar.hpp"
 #include "views/preferences_window.hpp"
@@ -18,7 +19,7 @@ inline void RookWindow::Class::init()
 
 inline void RookWindow::init(Class *)
 {
-    set_title("Rook");
+    set_title(_("Rook"));
     set_default_size(900, 650);
 }
 
@@ -52,7 +53,7 @@ RookWindow *RookWindow::create(Gtk::Application *app,
     win->m_header = Adw::HeaderBar::create();
 
     auto sidebar_toggle = Gtk::Button::create_from_icon_name("sidebar-show-symbolic");
-    sidebar_toggle->set_tooltip_text("Toggle Sidebar");
+    sidebar_toggle->set_tooltip_text(_("Toggle Sidebar"));
     sidebar_toggle->connect_clicked([win](Gtk::Button *) {
         win->m_split->set_show_sidebar(!win->m_split->get_show_sidebar());
     });
@@ -67,7 +68,7 @@ RookWindow *RookWindow::create(Gtk::Application *app,
     auto menu_button = Gtk::MenuButton::create();
     menu_button->set_icon_name("open-menu-symbolic");
     menu_button->set_popover(std::move(popover));
-    menu_button->set_tooltip_text("Menu");
+    menu_button->set_tooltip_text(_("Menu"));
     win->m_header->pack_end(std::move(menu_button));
 
     auto split = Adw::OverlaySplitView::create();

@@ -23,6 +23,8 @@ rook_gui_sources = files(
   'views/permission_banner.cpp',
 )
 
+localedir = get_option('prefix') / get_option('localedir')
+
 rook_gui_deps = [
   dependency('gtk4'),
   dependency('libadwaita-1'),
@@ -36,5 +38,9 @@ rook_gui = executable(
   rook_gui_sources,
   peel_bindings,
   dependencies: rook_gui_deps,
+  cpp_args: [
+    '-DGETTEXT_PACKAGE="rook"',
+    '-DLOCALEDIR="@0@"'.format(localedir),
+  ],
   install: true,
 )

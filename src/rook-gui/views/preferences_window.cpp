@@ -5,6 +5,7 @@
 #include "mcp_settings_page.hpp"
 #include "skills_page.hpp"
 #include "extension_settings_page.hpp"
+#include <glib/gi18n.h>
 
 using namespace peel;
 
@@ -24,10 +25,10 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
                                                         std::function<void()> on_changed)
 {
     auto dialog = Object::create<PreferencesWindow>();
-    dialog->set_title("Preferences");
+    dialog->set_title(_("Preferences"));
 
     auto llm_page = Adw::PreferencesPage::create();
-    llm_page->set_title("Providers");
+    llm_page->set_title(_("Providers"));
     llm_page->set_icon_name("applications-system-symbolic");
 
     auto llm_group = Adw::PreferencesGroup::create();
@@ -39,7 +40,7 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
 
     if (mcp && security) {
         auto mcp_page = Adw::PreferencesPage::create();
-        mcp_page->set_title("Tools");
+        mcp_page->set_title(_("Tools"));
         mcp_page->set_icon_name("applications-engineering-symbolic");
 
         auto mcp_group = Adw::PreferencesGroup::create();
@@ -53,7 +54,7 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
 
     if (custom_skills) {
         auto skills_page = Adw::PreferencesPage::create();
-        skills_page->set_title("Skills");
+        skills_page->set_title(_("Skills"));
         skills_page->set_icon_name("applications-graphics-symbolic");
 
         auto skills_group = Adw::PreferencesGroup::create();
@@ -67,7 +68,7 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
 
     if (extensions) {
         auto ext_page = Adw::PreferencesPage::create();
-        ext_page->set_title("Extensions");
+        ext_page->set_title(_("Extensions"));
         ext_page->set_icon_name("system-software-install-symbolic");
 
         auto ext_group = Adw::PreferencesGroup::create();
@@ -80,7 +81,7 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
     }
 
     auto voice_page = Adw::PreferencesPage::create();
-    voice_page->set_title("Voice");
+    voice_page->set_title(_("Voice"));
     voice_page->set_icon_name("audio-input-microphone-symbolic");
     auto voice_group = Adw::PreferencesGroup::create();
     voice_group->add(VoiceSettingsPage::create().release_floating_ptr());
@@ -88,7 +89,7 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
     dialog->add(std::move(voice_page).release_floating_ptr());
 
     auto appearance_page = Adw::PreferencesPage::create();
-    appearance_page->set_title("Appearance");
+    appearance_page->set_title(_("Appearance"));
     auto appearance_group = Adw::PreferencesGroup::create();
     appearance_group->add(AppearancePage::create().release_floating_ptr());
     appearance_page->add(std::move(appearance_group).release_floating_ptr());

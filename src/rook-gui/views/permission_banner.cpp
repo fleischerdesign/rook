@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "permission_banner.hpp"
 #include <sstream>
 
@@ -80,7 +81,7 @@ FloatPtr<PermissionBanner> PermissionBanner::create(
     btn_box->set_margin_top(4);
     btn_box->set_halign(Gtk::Align::END);
 
-    auto deny_btn = Gtk::Button::create_with_label("Deny All");
+    auto deny_btn = Gtk::Button::create_with_label(_("Deny All"));
     deny_btn->add_css_class("flat");
     deny_btn->connect_clicked([b](Gtk::Button *) {
         std::vector<rook::domain::ToolCallPermissionDecision::Result> results;
@@ -95,7 +96,7 @@ FloatPtr<PermissionBanner> PermissionBanner::create(
     });
     btn_box->append(std::move(deny_btn));
 
-    auto allow_btn = Gtk::Button::create_with_label("Allow Selected");
+    auto allow_btn = Gtk::Button::create_with_label(_("Allow Selected"));
     allow_btn->add_css_class("suggested-action");
     allow_btn->connect_clicked([b](Gtk::Button *) {
         std::vector<rook::domain::ToolCallPermissionDecision::Result> results;
@@ -109,7 +110,7 @@ FloatPtr<PermissionBanner> PermissionBanner::create(
     });
     btn_box->append(std::move(allow_btn));
 
-    auto always_btn = Gtk::Button::create_with_label("Always Allow");
+    auto always_btn = Gtk::Button::create_with_label(_("Always Allow"));
     always_btn->add_css_class("flat");
     always_btn->connect_clicked([b](Gtk::Button *) {
         std::vector<rook::domain::ToolCallPermissionDecision::Result> results;

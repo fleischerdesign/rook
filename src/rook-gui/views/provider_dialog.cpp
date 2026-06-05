@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "provider_dialog.hpp"
 #include "rook/ports/llm_port.hpp"
 
@@ -16,7 +17,7 @@ inline void ProviderDialog::Class::init()
 
 inline void ProviderDialog::init(Class *)
 {
-    set_title("Add Provider");
+    set_title(_("Add Provider"));
     set_default_size(380, 220);
     set_modal(true);
 
@@ -26,7 +27,7 @@ inline void ProviderDialog::init(Class *)
     box->set_margin_top(16);
     box->set_margin_bottom(16);
 
-    auto type_label = Gtk::Label::create("Provider:");
+    auto type_label = Gtk::Label::create(_("Provider:"));
     type_label->set_xalign(0.0f);
     box->append(std::move(type_label));
 
@@ -44,12 +45,12 @@ inline void ProviderDialog::init(Class *)
         box->append(std::move(dd));
     }
 
-    auto key_label = Gtk::Label::create("API Key:");
+    auto key_label = Gtk::Label::create(_("API Key:"));
     key_label->set_xalign(0.0f);
     box->append(std::move(key_label));
     {
         auto entry = Gtk::Entry::create();
-        entry->set_placeholder_text("Enter your API key");
+        entry->set_placeholder_text(_("Enter your API key"));
         entry->set_visibility(false);
         m_api_key = entry;
         box->append(std::move(entry));
@@ -60,11 +61,11 @@ inline void ProviderDialog::init(Class *)
     btn_box->set_margin_top(8);
     btn_box->set_hexpand(true);
 
-    auto cancel = Gtk::Button::create_with_label("Cancel");
+    auto cancel = Gtk::Button::create_with_label(_("Cancel"));
     cancel->connect_clicked([this](Gtk::Button *) { onCancel(nullptr); });
     btn_box->append(std::move(cancel));
 
-    auto save = Gtk::Button::create_with_label("Save");
+    auto save = Gtk::Button::create_with_label(_("Save"));
     save->add_css_class("suggested-action");
     save->connect_clicked([this](Gtk::Button *) { onSave(nullptr); });
     btn_box->append(std::move(save));
@@ -93,7 +94,7 @@ FloatPtr<ProviderDialog> ProviderDialog::create(const ProviderConfig &existing)
 {
     auto dlg = Object::create<ProviderDialog>();
     if (!existing.type.empty()) {
-        dlg->set_title("Edit Provider");
+        dlg->set_title(_("Edit Provider"));
         dlg->m_config = existing;
         if (!existing.api_key.empty())
             dlg->m_api_key->set_text(existing.api_key.c_str());

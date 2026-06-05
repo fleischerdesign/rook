@@ -1,3 +1,4 @@
+#include <glib/gi18n.h>
 #include "first_run_wizard.hpp"
 #include "rook/ports/llm_port.hpp"
 
@@ -16,7 +17,7 @@ inline void FirstRunWizard::Class::init()
 
 inline void FirstRunWizard::init(Class *)
 {
-    set_title("Welcome to Rook");
+    set_title(_("Welcome to Rook"));
     set_default_size(450, 350);
     set_modal(true);
 
@@ -26,7 +27,7 @@ inline void FirstRunWizard::init(Class *)
     box->set_margin_top(24);
     box->set_margin_bottom(24);
 
-    auto title = Gtk::Label::create("Set Up Your AI Assistant");
+    auto title = Gtk::Label::create(_("Set Up Your AI Assistant"));
     title->add_css_class("title-1");
     box->append(std::move(title));
 
@@ -78,7 +79,7 @@ inline void FirstRunWizard::init(Class *)
         box->append(std::move(entry));
     }
 
-    auto finish = Gtk::Button::create_with_label("Get Started");
+    auto finish = Gtk::Button::create_with_label(_("Get Started"));
     finish->add_css_class("suggested-action");
     finish->add_css_class("pill");
     finish->set_halign(Gtk::Align::CENTER);
