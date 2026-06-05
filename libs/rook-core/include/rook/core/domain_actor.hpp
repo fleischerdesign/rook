@@ -89,6 +89,7 @@ private:
     void runLlm(std::string chat_id, std::string model);
     void processTools(std::string chat_id, std::string model);
     void executeTool(const std::string& chat_id, const ports::ToolCall& call);
+    void resumeAfterBatch(std::string chat_id);
     std::string buildToolsJson();
     std::string buildSystemPrompt(std::string_view chat_id);
     void injectSkillsOnFirstMessage(std::string_view chat_id);
@@ -124,6 +125,13 @@ private:
         std::vector<ports::ToolCall> calls;
     };
     std::unordered_map<std::string, PendingPerm> m_pending_perms;
+
+    struct ActiveBatch {
+        std::string model;
+        int remaining = 0;
+        bool finalized = false;
+    };
+    std::optional<ActiveBatch> m_active_batch;
 };
 
 } // namespace rook::core

@@ -45,6 +45,10 @@ inline void RookApplication::init(Class *)
 
     m_llm = rook::adapters::llm::makeMultiProviderAdapter();
 
+    m_security = std::make_unique<rook::adapters::security::SecurityManager>();
+
+    m_mcp_manager = std::make_unique<rook::adapters::mcp::McpServerManager>();
+
     auto composite = std::make_unique<rook::adapters::composite::CompositeToolPort>();
     auto guarded_builtin =
         std::make_unique<rook::adapters::security::SecurityGuardedToolPort>(
@@ -52,10 +56,6 @@ inline void RookApplication::init(Class *)
             rook::adapters::builtin::makeBuiltinToolPort(),
             "builtin");
     composite->addPort(std::move(guarded_builtin));
-
-    m_mcp_manager = std::make_unique<rook::adapters::mcp::McpServerManager>();
-
-    m_security = std::make_unique<rook::adapters::security::SecurityManager>();
 
     m_extensions = std::make_unique<rook::adapters::extension::ExtensionManager>(
         m_data_dir, m_mcp_manager.get());

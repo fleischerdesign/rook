@@ -368,10 +368,12 @@ void DomainActor::processTools(std::string chat_id, std::string model) {
     m_conv->setAssistantToolCalls(chat_id, tc_json.dump());
 
     std::vector<ports::ToolCall> needs_permission;
+    int whitelisted_count = 0;
     for (auto& call : calls) {
         if (m_perm_port && m_perm_port->isWhitelisted(chat_id, call.name)) {
             spdlog::info("Actor: tool {} whitelisted, executing", call.name);
             executeTool(chat_id, call);
+            whitelisted_count++;
         } else {
             needs_permission.push_back(std::move(call));
         }
@@ -387,6 +389,9 @@ void DomainActor::processTools(std::string chat_id, std::string model) {
 
         m_pending_perms[uuid] = {chat_id, model, std::move(needs_permission)};
 
+        if (whitelisted_count > 0)
+            m_active_batch = ActiveBatch{"", whitelisted_count, false};
+
         domain::ToolCallPermissionRequest req;
         req.request_uuid = uuid;
         req.chat_id = chat_id;
@@ -401,7 +406,8 @@ void DomainActor::processTools(std::string chat_id, std::string model) {
         return;
     }
 
-    runLlm(chat_id, std::move(model));
+    if (whitelisted_count > 0)
+        m_active_batch = ActiveBatch{std::move(model), whitelisted_count, true};
 }
 
 void DomainActor::handleToolResult(const domain::ActorToolResult& msg) {
@@ -420,6 +426,20 @@ void DomainActor::handleToolResult(const domain::ActorToolResult& msg) {
         .result = msg.result,
         .is_error = msg.is_error,
     });
+
+    if (m_active_batch) {
+        m_active_batch->remaining--;
+        if (m_active_batch->finalized && m_active_batch->remaining <= 0)
+            resumeAfterBatch(msg.chat_id);
+    }
+}
+
+void DomainActor::resumeAfterBatch(std::string chat_id) {
+    if (!m_active_batch) return;
+
+    auto model = std::move(m_active_batch->model);
+    m_active_batch.reset();
+    runLlm(std::move(chat_id), std::move(model));
 }
 
 void DomainActor::executeTool(const std::string& chat_id, const ports::ToolCall& call) {
@@ -454,12 +474,14 @@ void DomainActor::handlePermissionDecision(const domain::ActorPermissionDecision
     for (auto& r : msg.results)
         decisions[r.call_id] = r.decision;
 
+    int newly_executed = 0;
     for (auto& call : pending.calls) {
         auto d = decisions.find(call.id);
         if (d != decisions.end() && d->second != 1) {
             if (d->second == 2 && m_perm_port)
                 m_perm_port->addToWhitelist(pending.chat_id, call.name);
             executeTool(pending.chat_id, call);
+            newly_executed++;
         } else {
             emitUiEvent(domain::ToolCallCompleted{
                 .chat_id = pending.chat_id,
@@ -477,7 +499,18 @@ void DomainActor::handlePermissionDecision(const domain::ActorPermissionDecision
         }
     }
 
-    runLlm(pending.chat_id, std::move(pending.model));
+    if (m_active_batch && !m_active_batch->finalized) {
+        m_active_batch->model = std::move(pending.model);
+        m_active_batch->remaining += newly_executed;
+        m_active_batch->finalized = true;
+
+        if (m_active_batch->remaining <= 0)
+            resumeAfterBatch(pending.chat_id);
+    } else if (newly_executed > 0) {
+        m_active_batch = ActiveBatch{std::move(pending.model), newly_executed, true};
+    } else {
+        runLlm(pending.chat_id, std::move(pending.model));
+    }
 }
 
 void DomainActor::handlePermissionTimeout(const domain::ActorPermissionTimeout& msg) {
@@ -505,6 +538,7 @@ void DomainActor::handlePermissionTimeout(const domain::ActorPermissionTimeout& 
         m_conv->addMessage(pending.chat_id, std::move(tool_msg));
     }
 
+    m_active_batch.reset();
     runLlm(pending.chat_id, std::move(pending.model));
 }
 
