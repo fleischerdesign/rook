@@ -1,9 +1,11 @@
 #pragma once
 
 #include "rook/adapters/mcp/mcp_transport.hpp"
+#include "rook/adapters/security/capability.hpp"
 
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -21,6 +23,8 @@ public:
     void start() override;
     void stop() override;
 
+    void setSandbox(std::optional<security::Capability> cap);
+
 private:
     void readerLoop();
     void cleanupChild();
@@ -28,6 +32,8 @@ private:
     std::string m_command;
     std::vector<std::string> m_args;
     MessageHandler m_handler;
+
+    std::optional<security::Capability> m_sandbox;
 
     int m_stdin_fd = -1;
     int m_stdout_fd = -1;

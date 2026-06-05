@@ -1,4 +1,5 @@
 #include "rook/adapters/mcp/stdio_transport.hpp"
+#include "rook/adapters/security/bwrap_executor.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -27,6 +28,11 @@ StdioTransport::~StdioTransport()
 void StdioTransport::setMessageHandler(MessageHandler handler)
 {
     m_handler = std::move(handler);
+}
+
+void StdioTransport::setSandbox(std::optional<security::Capability> cap)
+{
+    m_sandbox = std::move(cap);
 }
 
 void StdioTransport::start()
@@ -63,6 +69,23 @@ void StdioTransport::start()
         close(pipe_to_child[1]);
         close(pipe_from_child[0]);
         close(pipe_from_child[1]);
+
+        if (m_sandbox.has_value()) {
+            auto bwrap_argv = security::buildBwrapArgs(*m_sandbox, m_command, m_args);
+            std::vector<char*> argv;
+            for (auto& arg : bwrap_argv) {
+                argv.push_back(const_cast<char*>(arg.c_str()));
+            }
+            argv.push_back(nullptr);
+            execvp("bwrap", argv.data());
+
+            if (errno == ENOENT) {
+                spdlog::warn("StdioTransport: bwrap not found, falling back to direct exec");
+            } else {
+                spdlog::error("StdioTransport: execvp(bwrap) failed: {}", strerror(errno));
+                _exit(1);
+            }
+        }
 
         std::vector<char*> argv;
         argv.push_back(const_cast<char*>(m_command.c_str()));

@@ -4,6 +4,10 @@
 #include <string>
 #include <string_view>
 
+namespace rook::adapters::security {
+class Capability;
+}
+
 namespace rook::ports {
 
 class SecurityPort {
@@ -14,6 +18,9 @@ public:
                            const ToolCall& call) const = 0;
 
     virtual void loadFromConfig(std::string_view config_json) = 0;
+
+    virtual const rook::adapters::security::Capability*
+    findCapability(std::string_view /*server_id*/) const { return nullptr; }
 };
 
 } // namespace rook::ports

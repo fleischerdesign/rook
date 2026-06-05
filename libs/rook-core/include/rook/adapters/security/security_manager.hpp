@@ -17,7 +17,7 @@ public:
 
     void loadFromConfig(std::string_view config_json) override;
 
-    const Capability* findCapability(std::string_view server_id) const;
+    const Capability* findCapability(std::string_view server_id) const override;
 
     void setCapability(std::string server_id, Capability cap);
 

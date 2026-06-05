@@ -27,6 +27,7 @@ librook_core_sources = files(
   'src/adapters/security/capability.cpp',
   'src/adapters/security/security_manager.cpp',
   'src/adapters/security/security_guarded_tool_port.cpp',
+  'src/adapters/security/bwrap_executor.cpp',
   'src/adapters/extension/extension_manifest.cpp',
   'src/adapters/extension/extension_manager.cpp',
 )

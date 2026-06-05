@@ -1,6 +1,7 @@
 #include "rook/adapters/mcp/mcp_server_manager.hpp"
 #include "rook/adapters/mcp/stdio_transport.hpp"
 #include "rook/adapters/mcp/http_sse_transport.hpp"
+#include "rook/adapters/security/capability.hpp"
 #include "rook/ports/security_port.hpp"
 
 #include <nlohmann/json.hpp>
@@ -83,6 +84,14 @@ void McpServerManager::startAll(
             default:
                 transport = makeStdioTransport(
                     entry.config.command, entry.config.args);
+
+                if (m_security) {
+                    const auto* cap = m_security->findCapability(entry.config.id);
+                    if (cap) {
+                        static_cast<StdioTransport*>(transport.get())
+                            ->setSandbox(std::make_optional(*cap));
+                    }
+                }
                 break;
             }
 
