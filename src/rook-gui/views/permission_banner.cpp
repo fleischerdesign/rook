@@ -30,10 +30,14 @@ FloatPtr<PermissionBanner> PermissionBanner::create(
     auto *b = static_cast<PermissionBanner*>(banner);
     b->m_request_uuid = req.request_uuid;
 
-    auto header = Gtk::Label::create(
-        ("Rook requests " + std::to_string(req.calls.size())
-         + " tool call" + (req.calls.size() > 1 ? "s" : ""))
-        .c_str());
+    auto count = static_cast<unsigned long>(req.calls.size());
+    g_autofree gchar *msg = g_strdup_printf(
+        dngettext(GETTEXT_PACKAGE,
+            "Rook requests %lu tool call",
+            "Rook requests %lu tool calls",
+            count),
+        count);
+    auto header = Gtk::Label::create(msg);
     header->set_xalign(0.0f);
     header->set_margin_bottom(4);
     b->append(std::move(header));

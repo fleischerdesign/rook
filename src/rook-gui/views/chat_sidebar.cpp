@@ -334,14 +334,14 @@ void ChatSidebar::showContextMenu(::GtkWidget *parent,
         box->append(std::move(btn));
     };
 
-    add_btn(is_pinned ? "Unpin" : "Pin", "view-pin-symbolic",
+    add_btn(is_pinned ? _("Unpin") : _("Pin"), "view-pin-symbolic",
             [this, cid, pop_ptr]() {
                 if (m_actor)
                     m_actor->post(rook::domain::ActorTogglePin{.chat_id = cid});
                 pop_ptr->popdown();
             });
 
-    add_btn("Rename", "document-edit-symbolic",
+    add_btn(_("Rename"), "document-edit-symbolic",
             [this, cid, pop_ptr]() {
                 startRename(cid);
                 pop_ptr->popdown();
@@ -353,7 +353,7 @@ void ChatSidebar::showContextMenu(::GtkWidget *parent,
         auto inner = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 6);
         inner->append(
             Gtk::Image::create_from_icon_name("user-trash-symbolic"));
-        auto del_label = Gtk::Label::create("Delete");
+        auto del_label = Gtk::Label::create(_("Delete"));
         del_label->add_css_class("error");
         inner->append(std::move(del_label));
         del_btn->set_child(std::move(inner).release_floating_ptr());
@@ -426,10 +426,10 @@ void ChatSidebar::cancelRename()
 void ChatSidebar::confirmDelete(std::string_view chat_id)
 {
     auto dialog = Adw::MessageDialog::create(
-        nullptr, "Delete Conversation",
-        "This action cannot be undone.");
-    dialog->add_response("cancel", "Cancel");
-    dialog->add_response("delete", "Delete");
+        nullptr, _("Delete Conversation"),
+        _("This action cannot be undone."));
+    dialog->add_response("cancel", _("Cancel"));
+    dialog->add_response("delete", _("Delete"));
     dialog->set_response_appearance("delete",
         Adw::ResponseAppearance::DESTRUCTIVE);
     dialog->set_close_response("cancel");

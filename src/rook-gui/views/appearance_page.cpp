@@ -2,35 +2,59 @@
 #include <glib/gi18n.h>
 #include <gtk/gtk.h>
 #include <gio/gio.h>
+#include <unistd.h>
 using namespace peel;
 namespace rook::gui {
-PEEL_CLASS_IMPL(AppearancePage, "RookAppearancePage", Gtk::Box)
 
 struct AppearancePage::Impl {
     GSettings *settings = nullptr;
 };
 
-inline void AppearancePage::Class::init() {}
+struct LangCtx {
+    GSettings *settings;
+};
 
 static void on_language_changed(GtkDropDown *dd, GParamSpec *, gpointer user_data) {
-    auto *settings = static_cast<GSettings *>(user_data);
+    auto *ctx = static_cast<LangCtx *>(user_data);
     guint sel = gtk_drop_down_get_selected(dd);
-    g_settings_set_string(settings, "language", sel == 1 ? "en" : "de");
+    g_settings_set_string(ctx->settings, "language", sel == 1 ? "en" : "de");
     g_settings_sync();
+
+    auto dlg = Adw::AlertDialog::create(
+        _("Restart Required"),
+        _("Rook must restart to apply the new language. Restart now?"));
+    dlg->add_response("later", _("Later"));
+    dlg->add_response("restart", _("Restart Now"));
+    dlg->set_response_appearance("restart", Adw::ResponseAppearance::SUGGESTED);
+    dlg->set_default_response("restart");
+    dlg->set_close_response("later");
+
+    dlg->connect_response([](Adw::AlertDialog *, const char *resp) {
+        if (g_strcmp0(resp, "restart") == 0) {
+            execl("/proc/self/exe", "/proc/self/exe", nullptr);
+            _exit(1);
+        }
+    });
+
+    dlg->present(nullptr);
 }
 
-inline void AppearancePage::init(Class*) {
-    gtk_orientable_set_orientation(GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)), GTK_ORIENTATION_VERTICAL);
-    set_vexpand(true);
-    set_spacing(12);
+AppearancePage::~AppearancePage() = default;
 
-    m_impl = std::make_unique<Impl>();
-    m_impl->settings = g_settings_new("io.github.fleischerdesign.Rook");
+std::unique_ptr<AppearancePage> AppearancePage::create()
+{
+    auto page = std::unique_ptr<AppearancePage>(new AppearancePage());
+    page->m_impl = std::make_unique<Impl>();
+    page->m_impl->settings = g_settings_new("io.github.fleischerdesign.Rook");
+    return page;
+}
 
+void AppearancePage::populate(peel::Adw::PreferencesGroup &group)
+{
     auto heading = Gtk::Label::create(_("Appearance"));
     heading->add_css_class("title-1");
     heading->set_xalign(0.0f);
-    append(std::move(heading));
+    group.add(std::move(heading).release_floating_ptr());
 
     auto lang_box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 4);
     auto lang_label = Gtk::Label::create(_("Language"));
@@ -48,19 +72,14 @@ inline void AppearancePage::init(Class*) {
     gtk_drop_down_set_selected(raw_dd, g_strcmp0(current_lang, "en") == 0 ? 1 : 0);
     g_free(current_lang);
 
-    g_signal_connect(raw_dd, "notify::selected",
-                     G_CALLBACK(on_language_changed), m_impl->settings);
+    auto *ctx = new LangCtx{m_impl->settings};
+    g_signal_connect_data(raw_dd, "notify::selected",
+        G_CALLBACK(on_language_changed), ctx,
+        [](gpointer data, GClosure *) { delete static_cast<LangCtx *>(data); },
+        G_CONNECT_DEFAULT);
 
     lang_box->append(std::move(dd));
-
-    auto hint = Gtk::Label::create(_("Requires restart to take effect."));
-    hint->add_css_class("dim-label");
-    hint->set_xalign(0.0f);
-    hint->set_wrap(true);
-    lang_box->append(std::move(hint));
-
-    append(std::move(lang_box));
+    group.add(std::move(lang_box).release_floating_ptr());
 }
 
-FloatPtr<AppearancePage> AppearancePage::create() { return Object::create<AppearancePage>(); }
-}
+} // namespace rook::gui

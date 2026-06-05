@@ -1,14 +1,14 @@
 #pragma once
 #include <peel/Gtk/Gtk.h>
-#include <peel/class.h>
+#include <peel/Adw/Adw.h>
+#include <memory>
 
 namespace rook::gui {
 
-class VoiceSettingsPage final : public peel::Gtk::Box {
-    PEEL_SIMPLE_CLASS(VoiceSettingsPage, peel::Gtk::Box)
-    inline void init(Class*);
+class VoiceSettingsPage {
 public:
-    static peel::FloatPtr<VoiceSettingsPage> create();
+    static std::unique_ptr<VoiceSettingsPage> create();
+    void populate(peel::Adw::PreferencesGroup &group);
 };
 
 } // namespace rook::gui

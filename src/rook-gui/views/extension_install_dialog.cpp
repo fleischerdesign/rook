@@ -28,7 +28,7 @@ inline void ExtensionInstallDialog::init(Class *)
     content->set_margin_bottom(16);
 
     auto label = Gtk::Label::create(
-        "Enter the GitHub URL of the extension to install:");
+        _("Enter the GitHub URL of the extension to install:"));
     label->set_xalign(0.0f);
     label->set_wrap(true);
     content->append(std::move(label));

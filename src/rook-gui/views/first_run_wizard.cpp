@@ -49,7 +49,7 @@ inline void FirstRunWizard::init(Class *)
         m_provider_ids.push_back(t.id);
     }
 
-    auto provider_label = Gtk::Label::create("Provider:");
+    auto provider_label = Gtk::Label::create(_("Provider:"));
     provider_label->set_xalign(0.0f);
     box->append(std::move(provider_label));
 
@@ -67,13 +67,13 @@ inline void FirstRunWizard::init(Class *)
         box->append(std::move(dd));
     }
 
-    auto key_label = Gtk::Label::create("API Key:");
+    auto key_label = Gtk::Label::create(_("API Key:"));
     key_label->set_xalign(0.0f);
     box->append(std::move(key_label));
 
     {
         auto entry = Gtk::Entry::create();
-        entry->set_placeholder_text("Enter your API key");
+        entry->set_placeholder_text(_("Enter your API key"));
         entry->set_visibility(false);
         m_api_key = entry;
         box->append(std::move(entry));

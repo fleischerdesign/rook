@@ -53,7 +53,7 @@ FloatPtr<ToolCallRow> ToolCallRow::createPending(
     label->set_xalign(0.0f);
     label->set_use_markup(true);
     label->set_markup(
-        (std::string("<span weight=\"bold\">Tool:</span> ") + row->m_tool_name).c_str());
+        (std::string(_("<span weight=\"bold\">Tool:</span> ")) + row->m_tool_name).c_str());
     row->m_status_label = label;
     header->append(std::move(label));
 
@@ -118,7 +118,7 @@ void ToolCallRow::setResult(std::string_view result, bool is_error)
 
     if (m_status_label) {
         m_status_label->set_markup(
-            (std::string("<span weight=\"bold\">Tool used:</span> ") + m_tool_name).c_str());
+            (std::string(_("<span weight=\"bold\">Tool used:</span> ")) + m_tool_name).c_str());
     }
 
     if (!m_details_box) return;

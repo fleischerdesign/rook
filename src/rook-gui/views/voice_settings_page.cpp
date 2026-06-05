@@ -1,14 +1,19 @@
 #include <glib/gi18n.h>
 #include "voice_settings_page.hpp"
+#include <peel/Adw/Adw.h>
 #include <gtk/gtk.h>
 using namespace peel;
+
 namespace rook::gui {
-PEEL_CLASS_IMPL(VoiceSettingsPage, "RookVoiceSettingsPage", Gtk::Box)
-inline void VoiceSettingsPage::Class::init() {}
-inline void VoiceSettingsPage::init(Class*) {
-    gtk_orientable_set_orientation(GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)), GTK_ORIENTATION_VERTICAL);
-    set_vexpand(true);
-    append(Gtk::Label::create(_("Voice Settings")));
+
+std::unique_ptr<VoiceSettingsPage> VoiceSettingsPage::create()
+{
+    return std::unique_ptr<VoiceSettingsPage>(new VoiceSettingsPage());
 }
-FloatPtr<VoiceSettingsPage> VoiceSettingsPage::create() { return Object::create<VoiceSettingsPage>(); }
+
+void VoiceSettingsPage::populate(peel::Adw::PreferencesGroup &group)
+{
+    group.add(std::move(Gtk::Label::create(_("Voice Settings"))).release_floating_ptr());
 }
+
+} // namespace rook::gui

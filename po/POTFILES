@@ -1,4 +1,5 @@
 src/rook-gui/main.cpp
+src/rook-gui/application.cpp
 src/rook-gui/window.cpp
 src/rook-gui/views/chat_view.cpp
 src/rook-gui/views/chat_sidebar.cpp

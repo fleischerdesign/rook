@@ -61,8 +61,8 @@ RookWindow *RookWindow::create(Gtk::Application *app,
     win->m_header->pack_start(std::move(sidebar_toggle));
 
     RefPtr<Gio::Menu> menu = Gio::Menu::create();
-    menu->append("_Preferences", "app.preferences");
-    menu->append("_About", "app.about");
+    menu->append(_("_Preferences"), "app.preferences");
+    menu->append(_("_About"), "app.about");
     auto popover = Gtk::PopoverMenu::create_from_model(menu);
 
     auto menu_button = Gtk::MenuButton::create();
@@ -106,12 +106,12 @@ void RookWindow::onAbout()
         nullptr
     };
     Adw::show_about_dialog(this,
-        Adw::AboutDialog::prop_application_name(), "Rook",
+        Adw::AboutDialog::prop_application_name(), _("Rook"),
         Adw::AboutDialog::prop_application_icon(), "application-x-executable",
         Adw::AboutDialog::prop_version(), "0.1.0",
         Adw::AboutDialog::prop_license_type(), Gtk::License::MIT_X11,
         Adw::AboutDialog::prop_comments(),
-            "Multi-modal AI assistant with wake-word voice control.",
+            _("Multi-modal AI assistant with wake-word voice control."),
         Adw::AboutDialog::prop_developers(), developers);
 }
 

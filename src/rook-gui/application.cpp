@@ -1,4 +1,5 @@
 #include "application.hpp"
+#include <glib/gi18n.h>
 #include "window.hpp"
 #include "views/first_run_wizard.hpp"
 #include "views/tray_icon.hpp"
@@ -244,7 +245,7 @@ inline void RookApplication::vfunc_activate()
         auto tray_name = "org.kde.StatusNotifierItem-"
             + std::to_string(getpid()) + "-rook";
         m_tray_icon = std::make_unique<TrayIcon>(
-            tray_name, "Rook", "io.github.fleischerdesign.Rook");
+            tray_name, _("Rook"), "io.github.fleischerdesign.Rook");
 
         m_tray_icon->onActivate([this]() {
             if (m_window)

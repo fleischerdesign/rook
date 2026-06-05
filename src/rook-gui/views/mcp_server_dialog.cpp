@@ -71,12 +71,12 @@ inline void McpServerDialog::init(Class *)
     auto toggle_box = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 4);
     toggle_box->add_css_class("linked");
 
-    auto stdio_btn = Gtk::ToggleButton::create_with_label("Command");
+    auto stdio_btn = Gtk::ToggleButton::create_with_label(_("Command"));
     stdio_btn->set_active(true);
     m_stdio_toggle = stdio_btn;
     toggle_box->append(std::move(stdio_btn));
 
-    auto url_btn = Gtk::ToggleButton::create_with_label("URL");
+    auto url_btn = Gtk::ToggleButton::create_with_label(_("URL"));
     m_url_toggle = url_btn;
     toggle_box->append(std::move(url_btn));
 
@@ -455,12 +455,12 @@ void McpServerDialog::addArgEntryTo(
 void McpServerDialog::addHeaderRow(std::string_view key, std::string_view value)
 {
     auto key_entry = Gtk::Entry::create();
-    key_entry->set_placeholder_text("Key");
+    key_entry->set_placeholder_text(_("Key"));
     key_entry->set_text(std::string(key).c_str());
     key_entry->set_hexpand(true);
 
     auto value_entry = Gtk::Entry::create();
-    value_entry->set_placeholder_text("Value");
+    value_entry->set_placeholder_text(_("Value"));
     value_entry->set_text(std::string(value).c_str());
     value_entry->set_hexpand(true);
 

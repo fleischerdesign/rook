@@ -9,47 +9,32 @@ using namespace peel;
 
 namespace rook::gui {
 
-Signal<McpSettingsPage, void(void)> McpSettingsPage::sig_changed;
-
-PEEL_CLASS_IMPL(McpSettingsPage, "RookMcpSettingsPage", Gtk::Box)
-
-inline void McpSettingsPage::Class::init()
-{
-    sig_changed = Signal<McpSettingsPage, void(void)>::create("changed");
-}
-
-inline void McpSettingsPage::init(Class *)
-{
-    gtk_orientable_set_orientation(
-        GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
-        GTK_ORIENTATION_VERTICAL);
-    set_spacing(12);
-    set_margin_start(12);
-    set_margin_end(12);
-    set_margin_top(12);
-    set_margin_bottom(12);
-}
-
-FloatPtr<McpSettingsPage> McpSettingsPage::create(
+std::unique_ptr<McpSettingsPage> McpSettingsPage::create(
     rook::adapters::mcp::McpServerManager *mcp,
-    rook::adapters::security::SecurityManager *security)
+    rook::adapters::security::SecurityManager *security,
+    ChangeFn on_changed)
 {
-    auto page = Object::create<McpSettingsPage>();
+    auto page = std::unique_ptr<McpSettingsPage>(new McpSettingsPage());
     page->m_mcp = mcp;
     page->m_security = security;
+    page->m_on_changed = std::move(on_changed);
+    return page;
+}
 
+void McpSettingsPage::populate(peel::Adw::PreferencesGroup &group)
+{
     auto heading = Gtk::Label::create(_("Tools"));
     heading->set_xalign(0.0f);
     heading->add_css_class("title-2");
-    page->append(std::move(heading));
+    group.add(std::move(heading).release_floating_ptr());
 
     auto desc = Gtk::Label::create(
-        "Tools the AI assistant can use to read files, search the web, and more.");
+        _("Tools the AI assistant can use to read files, search the web, and more."));
     desc->set_xalign(0.0f);
     desc->add_css_class("dim-label");
     desc->set_wrap(true);
     desc->set_margin_bottom(4);
-    page->append(std::move(desc));
+    group.add(std::move(desc).release_floating_ptr());
 
     auto builtin_expander = Gtk::Expander::create(_("Built-in"));
     builtin_expander->set_expanded(false);
@@ -59,7 +44,7 @@ FloatPtr<McpSettingsPage> McpSettingsPage::create(
     builtin_box->set_margin_start(12);
 
     auto builtin_hint = Gtk::Label::create(
-        "Always available, run locally on your computer.");
+        _("Always available, run locally on your computer."));
     builtin_hint->set_xalign(0.0f);
     builtin_hint->add_css_class("dim-label");
     builtin_hint->set_margin_bottom(6);
@@ -70,9 +55,9 @@ FloatPtr<McpSettingsPage> McpSettingsPage::create(
     builtin_list->set_selection_mode(Gtk::SelectionMode::NONE);
 
     struct { const char* name; const char* desc; } builtins[] = {
-        {"read_file", "Read the contents of a file at the given path"},
-        {"write_file", "Create or overwrite a file at the given path"},
-        {"list_directory", "List files and directories at the given path"},
+        {"read_file", _("Read the contents of a file at the given path")},
+        {"write_file", _("Create or overwrite a file at the given path")},
+        {"list_directory", _("List files and directories at the given path")},
     };
     for (auto& bt : builtins) {
         auto row = Adw::ActionRow::create();
@@ -82,22 +67,22 @@ FloatPtr<McpSettingsPage> McpSettingsPage::create(
     }
     builtin_box->append(std::move(builtin_list));
     builtin_expander->set_child(std::move(builtin_box).release_floating_ptr());
-    page->append(std::move(builtin_expander));
+    group.add(std::move(builtin_expander).release_floating_ptr());
 
     auto mcp_header = Gtk::Label::create("");
     mcp_header->set_xalign(0.0f);
     mcp_header->set_use_markup(true);
-    mcp_header->set_markup("<span weight=\"bold\" size=\"small\">MCP Servers</span>");
+    mcp_header->set_markup(("<span weight=\"bold\" size=\"small\">" + std::string(_("MCP Servers")) + "</span>").c_str());
     mcp_header->set_margin_top(16);
-    page->m_mcp_header = mcp_header;
-    page->append(std::move(mcp_header));
+    m_mcp_header = mcp_header;
+    group.add(std::move(mcp_header).release_floating_ptr());
 
     auto mcp_hint = Gtk::Label::create(
-        "External tools from MCP servers. Each server can provide multiple tools.");
+        _("External tools from MCP servers. Each server can provide multiple tools."));
     mcp_hint->set_xalign(0.0f);
     mcp_hint->add_css_class("dim-label");
     mcp_hint->set_margin_bottom(4);
-    page->append(std::move(mcp_hint));
+    group.add(std::move(mcp_hint).release_floating_ptr());
 
     auto stack = Gtk::Stack::create();
     stack->set_vexpand(true);
@@ -109,33 +94,28 @@ FloatPtr<McpSettingsPage> McpSettingsPage::create(
     stack->add_named(std::move(empty).release_floating_ptr(), "empty");
 
     auto list = Gtk::ListBox::create();
-    list->add_css_class("boxed-list");
+        list->add_css_class("boxed-list");
     list->set_selection_mode(Gtk::SelectionMode::NONE);
-    Gtk::ListBox *lptr = list;
-    page->m_list = lptr;
+    m_list = list;
     stack->add_named(std::move(list).release_floating_ptr(), "list");
 
-    Gtk::Stack *sptr = stack;
-    page->m_stack = sptr;
-    page->append(std::move(stack));
+    m_stack = static_cast<Gtk::Stack *>(stack);
+    group.add(std::move(stack).release_floating_ptr());
 
     auto button_bar = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 8);
     button_bar->set_halign(Gtk::Align::START);
     button_bar->set_margin_top(4);
 
-    McpSettingsPage *raw_page = page;
+    auto *self = this;
 
     auto add = Gtk::Button::create_with_label(_("Add Server"));
     add->add_css_class("suggested-action");
-    add->connect_clicked([raw_page](Gtk::Button *) {
-        raw_page->onAddServer();
-    });
+    add->connect_clicked([self](Gtk::Button *) { self->onAddServer(); });
     button_bar->append(std::move(add));
 
-    page->append(std::move(button_bar));
+    group.add(std::move(button_bar).release_floating_ptr());
 
-    page->refreshList();
-    return page;
+    refreshList();
 }
 
 bool McpSettingsPage::isExtensionServer(std::string_view id) const
@@ -159,7 +139,7 @@ void McpSettingsPage::refreshList()
         m_stack->set_visible_child_name("empty");
         if (m_mcp_header)
             m_mcp_header->set_markup(
-                "<span weight=\"bold\" size=\"small\">MCP Servers</span>");
+                ("<span weight=\"bold\" size=\"small\">" + std::string(_("MCP Servers")) + "</span>").c_str());
         return;
     }
 
@@ -171,12 +151,13 @@ void McpSettingsPage::refreshList()
     }
 
     if (m_mcp_header) {
-        auto header_text = std::string("<span weight=\"bold\" size=\"small\">MCP Servers</span>"
-            " <span alpha=\"55%\" size=\"small\">· ") +
-            std::to_string(servers.size()) + " server" +
-            (servers.size() > 1 ? "s" : "") +
-            ", " + std::to_string(total_tools) + " tool" +
-            (total_tools > 1 ? "s" : "") + "</span>";
+        auto header_text = std::string("<span weight=\"bold\" size=\"small\">")
+            + _("MCP Servers") + "</span>"
+            " <span alpha=\"55%\" size=\"small\">" "\302\267 "
+            + std::to_string(servers.size()) + " server"
+            + (servers.size() > 1 ? "s" : "")
+            + ", " + std::to_string(total_tools) + " tool"
+            + (total_tools > 1 ? "s" : "") + "</span>";
         m_mcp_header->set_markup(header_text.c_str());
     }
 
@@ -188,22 +169,22 @@ void McpSettingsPage::refreshList()
 
         auto title = srv.id;
         if (tool_count > 0) {
-            title += " · " + std::to_string(tool_count) + " tool"
+            title += " " "\302\267" " " + std::to_string(tool_count) + " tool"
                    + (tool_count > 1 ? "s" : "");
         }
         expander->set_title(title.c_str());
 
         std::string subtitle;
         if (srv.transport_type == rook::adapters::mcp::McpTransportType::HttpSse) {
-            subtitle = "http · " + srv.url;
+            subtitle = "http " "\302\267" " " + srv.url;
         } else {
-            subtitle = "stdio · " + srv.command;
+            subtitle = "stdio " "\302\267" " " + srv.command;
             for (auto& a : srv.args) subtitle += " " + a;
         }
 
         if (!srv.source.empty() && srv.source.starts_with("extension:")) {
             auto ext_name = srv.source.substr(10);
-            subtitle += " · via " + ext_name;
+            subtitle += " " "\302\267" " via " + ext_name;
         }
 
         expander->set_subtitle(subtitle.c_str());
@@ -223,10 +204,10 @@ void McpSettingsPage::refreshList()
         auto enabled_switch = Gtk::Switch::create();
         enabled_switch->set_active(srv.enabled);
         std::string sid_enable = srv.id;
-        McpSettingsPage *raw_page_enable = this;
-        enabled_switch->connect_state_set([raw_page_enable, sid_enable](Gtk::Switch *, bool state) {
-            raw_page_enable->m_mcp->setEnabled(sid_enable, state);
-            raw_page_enable->sig_changed.emit(raw_page_enable);
+        auto *self = this;
+        enabled_switch->connect_state_set([self, sid_enable](Gtk::Switch *, bool state) {
+            self->m_mcp->setEnabled(sid_enable, state);
+            self->m_on_changed();
             return false;
         });
         expander->add_suffix(std::move(enabled_switch).release_floating_ptr());
@@ -235,11 +216,10 @@ void McpSettingsPage::refreshList()
 
         if (is_ext) {
             std::string sid_ovr = srv.id;
-            McpSettingsPage *raw_page_ovr = this;
 
             auto caps_btn = Gtk::Button::create_with_label(_("Capabilities"));
-            caps_btn->connect_clicked([raw_page_ovr, sid_ovr](Gtk::Button *) {
-                raw_page_ovr->onOverrideCapabilities(sid_ovr);
+            caps_btn->connect_clicked([self, sid_ovr](Gtk::Button *) {
+                self->onOverrideCapabilities(sid_ovr);
             });
             expander->add_suffix(std::move(caps_btn).release_floating_ptr());
 
@@ -249,18 +229,17 @@ void McpSettingsPage::refreshList()
             expander->add_suffix(std::move(managed_label).release_floating_ptr());
         } else {
             std::string sid = srv.id;
-            McpSettingsPage *raw_page = this;
 
             auto edit_btn = Gtk::Button::create_with_label(_("Edit"));
-            edit_btn->connect_clicked([raw_page, sid](Gtk::Button *) {
-                raw_page->onEditServer(sid);
+            edit_btn->connect_clicked([self, sid](Gtk::Button *) {
+                self->onEditServer(sid);
             });
             expander->add_suffix(std::move(edit_btn).release_floating_ptr());
 
-            auto del_btn = Gtk::Button::create_with_label("Delete");
+            auto del_btn = Gtk::Button::create_with_label(_("Delete"));
             del_btn->add_css_class("destructive-action");
-            del_btn->connect_clicked([raw_page, sid](Gtk::Button *) {
-                raw_page->onDeleteServer(sid);
+            del_btn->connect_clicked([self, sid](Gtk::Button *) {
+                self->onDeleteServer(sid);
             });
             expander->add_suffix(std::move(del_btn).release_floating_ptr());
         }
@@ -273,9 +252,9 @@ void McpSettingsPage::onAddServer()
 {
     auto dialog = McpServerDialog::create();
     McpServerDialog *raw_dlg = dialog;
-    McpSettingsPage *raw_page = this;
+    auto *self = this;
 
-    raw_dlg->connect_done([raw_dlg, raw_page](McpServerDialog *) {
+    raw_dlg->connect_done([raw_dlg, self](McpServerDialog *) {
         if (!raw_dlg->wasAccepted()) return;
         auto cfg = raw_dlg->getConfig();
         cfg.source = "manual";
@@ -286,13 +265,13 @@ void McpSettingsPage::onAddServer()
                      || cap.allowsNetwork()
                      || cap.maxMemoryMb() != 256
                      || cap.maxCpuTimeSecs() != 60;
-        raw_page->m_mcp->addServer(std::move(cfg));
-        raw_page->m_mcp->stopAll();
-        raw_page->m_mcp->startAll();
+        self->m_mcp->addServer(std::move(cfg));
+        self->m_mcp->stopAll();
+        self->m_mcp->startAll();
         if (has_caps)
-            raw_page->m_security->setCapability(server_id, std::move(cap));
-        raw_page->refreshList();
-        raw_page->sig_changed.emit(raw_page);
+            self->m_security->setCapability(server_id, std::move(cap));
+        self->refreshList();
+        self->m_on_changed();
         raw_dlg->close();
     });
     raw_dlg->present();
@@ -312,7 +291,7 @@ void McpSettingsPage::onEditServer(std::string_view id)
 
     auto dialog = McpServerDialog::create(&existing);
     McpServerDialog *raw_dlg = dialog;
-    McpSettingsPage *raw_page = this;
+    auto *self = this;
 
     if (auto* cap = m_security->findCapability(id)) {
         for (auto& p : cap->readPaths()) raw_dlg->addReadPath(p);
@@ -322,7 +301,7 @@ void McpSettingsPage::onEditServer(std::string_view id)
         raw_dlg->setCpuSecs(cap->maxCpuTimeSecs());
     }
 
-    raw_dlg->connect_done([raw_dlg, raw_page, existing_source = existing.source](McpServerDialog *) {
+    raw_dlg->connect_done([raw_dlg, self, existing_source = existing.source](McpServerDialog *) {
         if (!raw_dlg->wasAccepted()) return;
         auto cfg = raw_dlg->getConfig();
         cfg.source = existing_source.empty() ? "manual" : existing_source;
@@ -333,14 +312,14 @@ void McpSettingsPage::onEditServer(std::string_view id)
                      || cap.allowsNetwork()
                      || cap.maxMemoryMb() != 256
                      || cap.maxCpuTimeSecs() != 60;
-        raw_page->m_mcp->removeServer(server_id);
-        raw_page->m_mcp->addServer(std::move(cfg));
-        raw_page->m_mcp->stopAll();
-        raw_page->m_mcp->startAll();
+        self->m_mcp->removeServer(server_id);
+        self->m_mcp->addServer(std::move(cfg));
+        self->m_mcp->stopAll();
+        self->m_mcp->startAll();
         if (has_caps)
-            raw_page->m_security->setCapability(server_id, std::move(cap));
-        raw_page->refreshList();
-        raw_page->sig_changed.emit(raw_page);
+            self->m_security->setCapability(server_id, std::move(cap));
+        self->refreshList();
+        self->m_on_changed();
         raw_dlg->close();
     });
     raw_dlg->present();
@@ -350,27 +329,26 @@ void McpSettingsPage::onDeleteServer(std::string_view id)
 {
     if (isExtensionServer(id)) return;
 
-    auto msg = std::string("Delete '") + std::string(id) + "'?\n"
-             + "This server and all its tools will be removed. This cannot be undone.";
+    auto msg = std::string(_("Delete '")) + std::string(id) + std::string(_("'?\nThis server and all its tools will be removed. This cannot be undone."));
 
-    auto dlg = Adw::AlertDialog::create("Delete MCP Server", msg.c_str());
-    dlg->add_response("cancel", "Cancel");
-    dlg->add_response("delete", "Delete");
+    auto dlg = Adw::AlertDialog::create(_("Delete MCP Server"), msg.c_str());
+    dlg->add_response("cancel", _("Cancel"));
+    dlg->add_response("delete", _("Delete"));
     dlg->set_response_appearance("delete", Adw::ResponseAppearance::DESTRUCTIVE);
     dlg->set_default_response("cancel");
     dlg->set_close_response("cancel");
 
-    McpSettingsPage *raw_page = this;
+    auto *self = this;
     std::string sid {id};
-    dlg->connect_response([raw_page, sid](Adw::AlertDialog *, const char *response) {
+    dlg->connect_response([self, sid](Adw::AlertDialog *, const char *response) {
         if (!g_strcmp0(response, "delete")) {
-            raw_page->m_mcp->removeServer(sid);
-            raw_page->refreshList();
-            raw_page->sig_changed.emit(raw_page);
+            self->m_mcp->removeServer(sid);
+            self->refreshList();
+            self->m_on_changed();
         }
     });
 
-    dlg->present(this);
+    dlg->present(nullptr);
 }
 
 void McpSettingsPage::onOverrideCapabilities(std::string_view id)
@@ -392,8 +370,7 @@ void McpSettingsPage::onOverrideCapabilities(std::string_view id)
     heading->set_markup(("<span weight=\"bold\">" + std::string(id) + "</span>").c_str());
     content->append(std::move(heading));
 
-    auto hint = Gtk::Label::create("Override the security bounds for this server. "
-        "Empty paths and disabled network mean unrestricted access.");
+    auto hint = Gtk::Label::create(_("Override the security bounds for this server. Empty paths and disabled network mean unrestricted access."));
     hint->set_xalign(0.0f);
     hint->add_css_class("dim-label");
     hint->set_wrap(true);
@@ -409,7 +386,7 @@ void McpSettingsPage::onOverrideCapabilities(std::string_view id)
     auto read_label = Gtk::Label::create("");
     read_label->set_xalign(0.0f);
     read_label->set_use_markup(true);
-    read_label->set_markup("<span weight=\"bold\">Read Paths</span>");
+    read_label->set_markup(("<span weight=\"bold\">" + std::string(_("Read Paths")) + "</span>").c_str());
     content->append(std::move(read_label));
 
     auto read_list = Gtk::Box::create(Gtk::Orientation::VERTICAL, 2);
@@ -441,7 +418,7 @@ void McpSettingsPage::onOverrideCapabilities(std::string_view id)
     auto write_label = Gtk::Label::create("");
     write_label->set_xalign(0.0f);
     write_label->set_use_markup(true);
-    write_label->set_markup("<span weight=\"bold\">Write Paths</span>");
+    write_label->set_markup(("<span weight=\"bold\">" + std::string(_("Write Paths")) + "</span>").c_str());
     content->append(std::move(write_label));
 
     auto write_list = Gtk::Box::create(Gtk::Orientation::VERTICAL, 2);
@@ -462,7 +439,7 @@ void McpSettingsPage::onOverrideCapabilities(std::string_view id)
         del->connect_clicked([wl, pe, &write_paths](Gtk::Button *) {
             wl->remove(pe->row);
             auto it = std::find_if(write_paths.begin(), write_paths.end(),
-                [pe](auto& p) { return &p == pe; });
+                [pe](auto& x) { return &x == pe; });
             if (it != write_paths.end()) write_paths.erase(it);
         });
         row->append(std::move(del));
@@ -514,9 +491,9 @@ void McpSettingsPage::onOverrideCapabilities(std::string_view id)
     auto save_btn = Gtk::Button::create_with_label(_("Save"));
     save_btn->add_css_class("suggested-action");
 
-    McpSettingsPage* raw_page = this;
+    auto *self = this;
     std::string sid {id};
-    save_btn->connect_clicked([raw_page, sid, raw_dlg,
+    save_btn->connect_clicked([self, sid, raw_dlg,
         &read_paths, &write_paths, ns_ptr, ms_ptr, cs_ptr](Gtk::Button *) {
         auto builder = rook::adapters::security::Capability::grant();
         for (auto& p : read_paths) {
@@ -533,9 +510,9 @@ void McpSettingsPage::onOverrideCapabilities(std::string_view id)
         builder.maxCpuTime(std::chrono::seconds(
             static_cast<int64_t>(cs_ptr->get_value())));
 
-        raw_page->m_security->setCapability(sid, builder.build());
-        raw_page->refreshList();
-        raw_page->sig_changed.emit(raw_page);
+        self->m_security->setCapability(sid, builder.build());
+        self->refreshList();
+        self->m_on_changed();
         raw_dlg->close();
     });
     button_bar->append(std::move(save_btn));

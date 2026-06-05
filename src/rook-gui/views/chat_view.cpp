@@ -136,7 +136,7 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
     auto welcome_page = Adw::StatusPage::create();
     welcome_page->set_title(_("Welcome to Rook"));
     welcome_page->set_description(
-        "Your multi-modal AI assistant. Ask anything, explore ideas.");
+        _("Your multi-modal AI assistant. Ask anything, explore ideas."));
     welcome_page->add_css_class("compact");
 
     auto welcome_bar = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 6);
@@ -153,7 +153,7 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
         welcome_bar->append(std::move(skills_btn));
     }
     {
-        const char *loading[] = {"Loading...", nullptr};
+        const char *loading[] = {_("Loading..."), nullptr};
         auto model = Gtk::DropDown::create_from_strings(loading);
         model->set_margin_end(6);
         v->m_welcome_model = model;
@@ -206,7 +206,7 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
         welcome_bar->append(std::move(entry));
     }
     {
-        auto send = Gtk::Button::create_with_label("Send");
+        auto send = Gtk::Button::create_with_label(_("Send"));
         send->add_css_class("suggested-action");
         send->connect_clicked([v](Gtk::Button *) { v->onSendClicked(nullptr); });
         v->m_welcome_send = send;
@@ -252,7 +252,7 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
         chat_bar->append(std::move(skills_btn));
     }
     {
-        const char *loading[] = {"Loading...", nullptr};
+        const char *loading[] = {_("Loading..."), nullptr};
         auto model = Gtk::DropDown::create_from_strings(loading);
         model->set_margin_end(6);
         v->m_chat_model = model;
@@ -305,7 +305,7 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
         chat_bar->append(std::move(entry));
     }
     {
-        auto send = Gtk::Button::create_with_label("Send");
+        auto send = Gtk::Button::create_with_label(_("Send"));
         send->add_css_class("suggested-action");
         send->connect_clicked([v](Gtk::Button *) { v->onSendClicked(nullptr); });
         v->m_chat_send = send;
@@ -679,7 +679,7 @@ void ChatView::buildSkillsPopover(Gtk::MenuButton *target)
     auto heading = Gtk::Label::create(_("Skills for this chat"));
     heading->set_xalign(0.0f);
     heading->set_use_markup(true);
-    heading->set_markup("<span weight=\"bold\">Skills for this chat</span>");
+    heading->set_markup(("<span weight=\"bold\">" + std::string(_("Skills for this chat")) + "</span>").c_str());
     content->append(std::move(heading));
 
     auto sep = Gtk::Separator::create(Gtk::Orientation::HORIZONTAL);
@@ -758,7 +758,7 @@ void ChatView::buildSkillsPopover(Gtk::MenuButton *target)
 
                 auto row = Adw::ActionRow::create();
                 row->set_title(skill.name.c_str());
-                std::string subtitle = "via " + ext.display_name;
+                std::string subtitle = std::string(_("via ")) + ext.display_name;
                 row->set_subtitle(subtitle.c_str());
 
                 std::string sid = "ext:" + ext.name + ":" + skill.name;

@@ -10,88 +10,69 @@ using namespace peel;
 
 namespace rook::gui {
 
-Signal<SkillsPage, void(void)> SkillsPage::sig_changed;
-
-PEEL_CLASS_IMPL(SkillsPage, "RookSkillsPage", Gtk::Box)
-
-inline void SkillsPage::Class::init()
-{
-    sig_changed = Signal<SkillsPage, void(void)>::create("changed");
-}
-
-inline void SkillsPage::init(Class *)
-{
-    gtk_orientable_set_orientation(
-        GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
-        GTK_ORIENTATION_VERTICAL);
-    set_spacing(12);
-    set_margin_start(12);
-    set_margin_end(12);
-    set_margin_top(12);
-    set_margin_bottom(12);
-}
-
-FloatPtr<SkillsPage> SkillsPage::create(
+std::unique_ptr<SkillsPage> SkillsPage::create(
     std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
-    rook::ports::ExtensionPort *extensions)
+    rook::ports::ExtensionPort *extensions,
+    ChangeFn on_changed)
 {
-    auto page = Object::create<SkillsPage>();
+    auto page = std::unique_ptr<SkillsPage>(new SkillsPage());
     page->m_custom_skills = custom_skills;
     page->m_extensions = extensions;
+    page->m_on_changed = std::move(on_changed);
+    return page;
+}
 
+void SkillsPage::populate(peel::Adw::PreferencesGroup &group)
+{
     auto heading = Gtk::Label::create(_("Skills"));
     heading->set_xalign(0.0f);
     heading->add_css_class("title-2");
-    page->append(std::move(heading));
+    group.add(std::move(heading).release_floating_ptr());
 
     auto desc = Gtk::Label::create(
-        "Skills are system prompts that influence how the AI responds. "
-        "They can be created manually or come from installed extensions.");
+        _("Skills are system prompts that influence how the AI responds. They can be created manually or come from installed extensions."));
     desc->set_xalign(0.0f);
     desc->add_css_class("dim-label");
     desc->set_wrap(true);
     desc->set_margin_bottom(4);
-    page->append(std::move(desc));
+    group.add(std::move(desc).release_floating_ptr());
 
     auto custom_header = Gtk::Label::create("");
     custom_header->set_xalign(0.0f);
     custom_header->set_use_markup(true);
     custom_header->set_markup(
-        "<span weight=\"bold\" size=\"small\">Custom Skills</span>");
+        ("<span weight=\"bold\" size=\"small\">" + std::string(_("Custom Skills")) + "</span>").c_str());
     custom_header->set_margin_top(8);
-    page->append(std::move(custom_header));
+    group.add(std::move(custom_header).release_floating_ptr());
 
     auto custom_list = Gtk::ListBox::create();
     custom_list->add_css_class("boxed-list");
     custom_list->set_selection_mode(Gtk::SelectionMode::NONE);
-    page->m_custom_list = custom_list;
-    page->append(std::move(custom_list));
+    m_custom_list = custom_list;
+    group.add(std::move(custom_list).release_floating_ptr());
 
-    SkillsPage *raw_page = page;
+    auto *self = this;
 
     auto create_btn = Gtk::Button::create_with_label(_("+ Create Skill"));
-    create_btn->connect_clicked([raw_page](Gtk::Button *) {
-        raw_page->onCreateSkill();
-    });
+    create_btn->connect_clicked([self](Gtk::Button *) { self->onCreateSkill(); });
     create_btn->set_halign(Gtk::Align::START);
-    page->append(std::move(create_btn));
+    group.add(std::move(create_btn).release_floating_ptr());
 
     auto ext_header = Gtk::Label::create("");
     ext_header->set_xalign(0.0f);
     ext_header->set_use_markup(true);
     ext_header->set_markup(
-        "<span weight=\"bold\" size=\"small\">Extension Skills</span>");
+        ("<span weight=\"bold\" size=\"small\">" + std::string(_("Extension Skills")) + "</span>").c_str());
     ext_header->set_margin_top(16);
-    page->append(std::move(ext_header));
+    group.add(std::move(ext_header).release_floating_ptr());
 
     auto ext_list = Gtk::ListBox::create();
     ext_list->add_css_class("boxed-list");
     ext_list->set_selection_mode(Gtk::SelectionMode::NONE);
-    page->m_ext_list = ext_list;
-    page->append(std::move(ext_list));
+    m_ext_list = ext_list;
+    group.add(std::move(ext_list).release_floating_ptr());
 
-    page->refreshList();
-    return page;
+    refreshList();
 }
 
 void SkillsPage::refreshList()
@@ -101,22 +82,23 @@ void SkillsPage::refreshList()
     while (auto *row = m_ext_list->get_row_at_index(0))
         m_ext_list->remove(row);
 
+    auto *self = this;
+
     for (auto& skill : *m_custom_skills) {
         auto expander = Adw::ExpanderRow::create();
 
         auto title = skill.name;
         if (!skill.description.empty())
-            title += " · " + skill.description;
+            title += " " "\302\267" " " + skill.description;
         expander->set_title(title.c_str());
 
-        expander->set_subtitle(("Prompt: " + skill.prompt).c_str());
+        expander->set_subtitle((std::string(_("Prompt: ")) + skill.prompt).c_str());
 
         auto toggle = Gtk::Switch::create();
         toggle->set_active(skill.enabled);
         std::string sname = skill.name;
-        SkillsPage *raw = this;
-        toggle->connect_state_set([raw, sname](Gtk::Switch *, bool state) {
-            raw->onToggleAlwaysOn(sname, state);
+        toggle->connect_state_set([self, sname](Gtk::Switch *, bool state) {
+            self->onToggleAlwaysOn(sname, state);
             return false;
         });
         expander->add_suffix(std::move(toggle).release_floating_ptr());
@@ -126,18 +108,12 @@ void SkillsPage::refreshList()
         al_label->set_margin_end(4);
         expander->add_suffix(std::move(al_label).release_floating_ptr());
 
-        auto del_btn = Gtk::Button::create_from_icon_name(
-            "edit-delete-symbolic");
-        del_btn->connect_clicked([raw, sname](Gtk::Button *) {
-            raw->onDeleteSkill(sname);
-        });
+        auto del_btn = Gtk::Button::create_from_icon_name("edit-delete-symbolic");
+        del_btn->connect_clicked([self, sname](Gtk::Button *) { self->onDeleteSkill(sname); });
         expander->add_suffix(std::move(del_btn).release_floating_ptr());
 
-        auto edit_btn = Gtk::Button::create_from_icon_name(
-            "document-edit-symbolic");
-        edit_btn->connect_clicked([raw, sname](Gtk::Button *) {
-            raw->onEditSkill(sname);
-        });
+        auto edit_btn = Gtk::Button::create_from_icon_name("document-edit-symbolic");
+        edit_btn->connect_clicked([self, sname](Gtk::Button *) { self->onEditSkill(sname); });
         expander->add_suffix(std::move(edit_btn).release_floating_ptr());
 
         m_custom_list->append(std::move(expander).release_floating_ptr());
@@ -155,24 +131,20 @@ void SkillsPage::refreshList()
             auto title = skill.name;
             expander->set_title(title.c_str());
 
-            std::string subtitle = "via " + ext.display_name
+            std::string subtitle = _("via ") + ext.display_name
                 + " v" + ext.version;
             if (!skill.description.empty())
-                subtitle += " · " + skill.description;
+                subtitle += " " "\302\267" " " + skill.description;
             expander->set_subtitle(subtitle.c_str());
 
             auto toggle = Gtk::Switch::create();
             toggle->set_active(skill.enabled);
             std::string ext_name = ext.name;
             std::string skill_name = skill.name;
-            SkillsPage *raw = this;
-            toggle->connect_state_set([raw, ext_name, skill_name](
-                Gtk::Switch *, bool state) {
-                auto* em = dynamic_cast<
-                    rook::adapters::extension::ExtensionManager*>(
-                    raw->m_extensions);
+            toggle->connect_state_set([self, ext_name, skill_name](Gtk::Switch *, bool state) {
+                auto* em = dynamic_cast<rook::adapters::extension::ExtensionManager*>(self->m_extensions);
                 if (em) em->setSkillEnabled(ext_name, skill_name, state);
-                raw->sig_changed.emit(raw);
+                self->m_on_changed();
                 return false;
             });
             expander->add_suffix(std::move(toggle).release_floating_ptr());
@@ -182,8 +154,7 @@ void SkillsPage::refreshList()
             al_label->set_margin_end(4);
             expander->add_suffix(std::move(al_label).release_floating_ptr());
 
-            m_ext_list->append(
-                std::move(expander).release_floating_ptr());
+            m_ext_list->append(std::move(expander).release_floating_ptr());
         }
     }
 }
@@ -192,14 +163,14 @@ void SkillsPage::onCreateSkill()
 {
     auto dlg = SkillDialog::create();
     SkillDialog *raw_dlg = dlg;
-    SkillsPage *raw = this;
+    auto *self = this;
 
-    raw_dlg->connect_done([raw_dlg, raw](SkillDialog *) {
+    raw_dlg->connect_done([raw_dlg, self](SkillDialog *) {
         if (!raw_dlg->wasAccepted()) return;
         auto skill = raw_dlg->getSkill();
-        raw->m_custom_skills->push_back(std::move(skill));
-        raw->refreshList();
-        raw->sig_changed.emit(raw);
+        self->m_custom_skills->push_back(std::move(skill));
+        self->refreshList();
+        self->m_on_changed();
         raw_dlg->close();
     });
     raw_dlg->present();
@@ -214,18 +185,18 @@ void SkillsPage::onEditSkill(std::string_view name)
     auto existing = *it;
     auto dlg = SkillDialog::create(&existing);
     SkillDialog *raw_dlg = dlg;
-    SkillsPage *raw = this;
+    auto *self = this;
     std::string sname {name};
 
-    raw_dlg->connect_done([raw_dlg, raw, sname](SkillDialog *) {
+    raw_dlg->connect_done([raw_dlg, self, sname](SkillDialog *) {
         if (!raw_dlg->wasAccepted()) return;
         auto skill = raw_dlg->getSkill();
-        auto it = std::find_if(raw->m_custom_skills->begin(),
-            raw->m_custom_skills->end(),
+        auto it = std::find_if(self->m_custom_skills->begin(),
+            self->m_custom_skills->end(),
             [&sname](auto& s) { return s.name == sname; });
-        if (it != raw->m_custom_skills->end()) *it = std::move(skill);
-        raw->refreshList();
-        raw->sig_changed.emit(raw);
+        if (it != self->m_custom_skills->end()) *it = std::move(skill);
+        self->refreshList();
+        self->m_on_changed();
         raw_dlg->close();
     });
     raw_dlg->present();
@@ -233,26 +204,26 @@ void SkillsPage::onEditSkill(std::string_view name)
 
 void SkillsPage::onDeleteSkill(std::string_view name)
 {
-    auto msg = std::string("Delete '") + std::string(name) + "'?\nThis cannot be undone.";
+    auto msg = std::string(_("Delete '")) + std::string(name) + std::string(_("'?\nThis cannot be undone."));
 
-    auto dlg = Adw::AlertDialog::create("Delete Skill", msg.c_str());
-    dlg->add_response("cancel", "Cancel");
-    dlg->add_response("delete", "Delete");
+    auto dlg = Adw::AlertDialog::create(_("Delete Skill"), msg.c_str());
+    dlg->add_response("cancel", _("Cancel"));
+    dlg->add_response("delete", _("Delete"));
     dlg->set_response_appearance("delete", Adw::ResponseAppearance::DESTRUCTIVE);
     dlg->set_default_response("cancel");
     dlg->set_close_response("cancel");
 
-    SkillsPage *raw = this;
+    auto *self = this;
     std::string sname {name};
-    dlg->connect_response([raw, sname](Adw::AlertDialog *, const char *resp) {
+    dlg->connect_response([self, sname](Adw::AlertDialog *, const char *resp) {
         if (!g_strcmp0(resp, "delete")) {
-            std::erase_if(*raw->m_custom_skills,
+            std::erase_if(*self->m_custom_skills,
                 [&sname](auto& s) { return s.name == sname; });
-            raw->refreshList();
-            raw->sig_changed.emit(raw);
+            self->refreshList();
+            self->m_on_changed();
         }
     });
-    dlg->present(this);
+    dlg->present(nullptr);
 }
 
 void SkillsPage::onToggleAlwaysOn(std::string_view name, bool enabled)
@@ -260,7 +231,7 @@ void SkillsPage::onToggleAlwaysOn(std::string_view name, bool enabled)
     for (auto& s : *m_custom_skills) {
         if (s.name == name) { s.enabled = enabled; break; }
     }
-    sig_changed.emit(this);
+    m_on_changed();
 }
 
 } // namespace rook::gui

@@ -1,69 +1,53 @@
 #include <glib/gi18n.h>
 #include "llm_settings_page.hpp"
 #include "provider_dialog.hpp"
+#include <peel/Adw/Adw.h>
 #include <gtk/gtk.h>
 
 using namespace peel;
 
 namespace rook::gui {
 
-Signal<LlmSettingsPage, void(void)> LlmSettingsPage::sig_changed;
-
-PEEL_CLASS_IMPL(LlmSettingsPage, "RookLlmSettingsPage", Gtk::Box)
-
-inline void LlmSettingsPage::Class::init()
+std::unique_ptr<LlmSettingsPage> LlmSettingsPage::create(rook::ports::LlmPort &llm,
+                                                           ChangeFn on_changed)
 {
-    sig_changed = Signal<LlmSettingsPage, void(void)>::create("changed");
+    auto page = std::unique_ptr<LlmSettingsPage>(new LlmSettingsPage());
+    page->m_llm = &llm;
+    page->m_on_changed = std::move(on_changed);
+    return page;
 }
 
-inline void LlmSettingsPage::init(Class *)
+void LlmSettingsPage::populate(peel::Adw::PreferencesGroup &group)
 {
-    gtk_orientable_set_orientation(
-        GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
-        GTK_ORIENTATION_VERTICAL);
-    set_vexpand(true);
-    set_margin_start(24);
-    set_margin_end(24);
-    set_margin_top(24);
-}
-
-FloatPtr<LlmSettingsPage> LlmSettingsPage::create(rook::ports::LlmPort &llm)
-{
-    auto page = Object::create<LlmSettingsPage>();
-    auto *raw = static_cast<LlmSettingsPage*>(page);
-    raw->m_llm = &llm;
-
     auto heading = Gtk::Label::create(_("LLM Providers"));
     heading->set_xalign(0.0f);
     heading->add_css_class("title-2");
-    raw->append(std::move(heading));
+    group.add(std::move(heading).release_floating_ptr());
 
     auto desc = Gtk::Label::create(
-        "Configure language model backends. Rook supports Ollama (local), "
-        "OpenAI, DeepSeek, and Anthropic.");
+        _("Configure language model backends. Rook supports Ollama (local), OpenAI, DeepSeek, and Anthropic."));
     desc->set_xalign(0.0f);
     desc->set_wrap(true);
     desc->add_css_class("dim-label");
     desc->set_margin_bottom(12);
-    raw->append(std::move(desc));
+    group.add(std::move(desc).release_floating_ptr());
 
     auto list = Gtk::ListBox::create();
     list->set_hexpand(true);
     list->set_vexpand(true);
     list->add_css_class("boxed-list");
-    raw->m_list = list;
-    raw->append(std::move(list));
+    m_list = list;
+    group.add(std::move(list).release_floating_ptr());
 
     auto add_btn = Gtk::Button::create_with_label(_("Add Provider"));
     add_btn->add_css_class("suggested-action");
     add_btn->set_halign(Gtk::Align::START);
     add_btn->set_margin_top(12);
-    add_btn->connect_clicked([raw](Gtk::Button *) { raw->onAddClicked(nullptr); });
-    raw->append(std::move(add_btn));
+    auto *self = this;
+    add_btn->connect_clicked([self](Gtk::Button *) { self->onAddClicked(); });
+    group.add(std::move(add_btn).release_floating_ptr());
 
-    raw->refreshList();
-
-    return page;
+    refreshList();
 }
 
 void LlmSettingsPage::refreshList()
@@ -84,42 +68,37 @@ void LlmSettingsPage::refreshList()
         sw->set_active(prov.enabled);
         sw->set_valign(Gtk::Align::CENTER);
         std::string pid = prov.id;
-        sw->connect_state_set([this, pid](Gtk::Switch *, bool state) -> bool {
-            onToggleEnabled(pid, state);
+        auto *self = this;
+        sw->connect_state_set([self, pid](Gtk::Switch *, bool state) -> bool {
+            self->onToggleEnabled(pid, state);
             return false;
         });
         row->add_suffix(std::move(sw).release_floating_ptr());
 
         auto edit_btn = Gtk::Button::create_with_label(_("Edit"));
         edit_btn->set_valign(Gtk::Align::CENTER);
-        edit_btn->connect_clicked([this, pid](Gtk::Button *) { onEditClicked(pid); });
+        edit_btn->connect_clicked([self, pid](Gtk::Button *) { self->onEditClicked(pid); });
         row->add_suffix(std::move(edit_btn).release_floating_ptr());
 
-        auto del_btn = Gtk::Button::create_with_label("Delete");
+        auto del_btn = Gtk::Button::create_with_label(_("Delete"));
         del_btn->add_css_class("destructive-action");
         del_btn->set_valign(Gtk::Align::CENTER);
-        del_btn->connect_clicked([this, pid](Gtk::Button *) { onDeleteClicked(pid); });
+        del_btn->connect_clicked([self, pid](Gtk::Button *) { self->onDeleteClicked(pid); });
         row->add_suffix(std::move(del_btn).release_floating_ptr());
 
         m_list->append(std::move(row).release_floating_ptr());
     }
 }
 
-Gtk::Window *LlmSettingsPage::getParentWindow()
-{
-    if (auto *root = get_root())
-        return root->template cast<Gtk::Window>();
-    return nullptr;
-}
-
-void LlmSettingsPage::onAddClicked(Gtk::Button *)
+void LlmSettingsPage::onAddClicked()
 {
     auto dialog = ProviderDialog::create();
-    dialog->connect_done([this](ProviderDialog *dlg) {
+    auto *self = this;
+    dialog->connect_done([self](ProviderDialog *dlg) {
         if (!dlg->wasAccepted()) return;
         auto cfg = dlg->getConfig();
         auto info = rook::ports::ProviderRegistry::instance().find(cfg.type);
-        m_llm->addProvider(rook::ports::LlmProviderConfig{
+        self->m_llm->addProvider(rook::ports::LlmProviderConfig{
             .id = "",
             .display_name = info ? info->display_name : cfg.type,
             .type = cfg.type,
@@ -128,8 +107,8 @@ void LlmSettingsPage::onAddClicked(Gtk::Button *)
             .default_model = info ? info->default_model : "",
             .enabled = true,
         });
-        refreshList();
-        sig_changed.emit(this);
+        self->refreshList();
+        self->m_on_changed();
         dlg->close();
     });
     dialog->present();
@@ -143,11 +122,12 @@ void LlmSettingsPage::onEditClicked(const std::string &provider_id)
             ProviderConfig cfg{prov.type, prov.api_key};
 
             auto dialog = ProviderDialog::create(cfg);
-            dialog->connect_done([this, pid = provider_id](ProviderDialog *dlg) {
+            auto *self = this;
+            dialog->connect_done([self, pid = provider_id](ProviderDialog *dlg) {
                 if (!dlg->wasAccepted()) return;
                 auto new_cfg = dlg->getConfig();
                 auto info = rook::ports::ProviderRegistry::instance().find(new_cfg.type);
-                m_llm->updateProvider(rook::ports::LlmProviderConfig{
+                self->m_llm->updateProvider(rook::ports::LlmProviderConfig{
                     .id = pid,
                     .display_name = info ? info->display_name : new_cfg.type,
                     .type = new_cfg.type,
@@ -156,8 +136,8 @@ void LlmSettingsPage::onEditClicked(const std::string &provider_id)
                     .default_model = info ? info->default_model : "",
                     .enabled = true,
                 });
-                refreshList();
-                sig_changed.emit(this);
+                self->refreshList();
+                self->m_on_changed();
                 dlg->close();
             });
             dialog->present();
@@ -170,7 +150,7 @@ void LlmSettingsPage::onDeleteClicked(const std::string &provider_id)
 {
     m_llm->removeProvider(provider_id);
     refreshList();
-    sig_changed.emit(this);
+    m_on_changed();
 }
 
 void LlmSettingsPage::onToggleEnabled(const std::string &provider_id, bool enabled)
@@ -181,7 +161,7 @@ void LlmSettingsPage::onToggleEnabled(const std::string &provider_id, bool enabl
             auto updated = prov;
             updated.enabled = enabled;
             m_llm->updateProvider(updated);
-            sig_changed.emit(this);
+            m_on_changed();
             return;
         }
     }

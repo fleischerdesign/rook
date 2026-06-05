@@ -3,12 +3,13 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rook 0.1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-06-05 22:24+0200\n"
+"POT-Creation-Date: 2026-06-05 23:58+0200\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 
-#: src/rook-gui/window.cpp:22
+#: src/rook-gui/application.cpp:248 src/rook-gui/window.cpp:22
+#: src/rook-gui/window.cpp:109
 msgid "Rook"
 msgstr "Rook"
 
@@ -16,28 +17,57 @@ msgstr "Rook"
 msgid "Toggle Sidebar"
 msgstr "Toggle Sidebar"
 
+#: src/rook-gui/window.cpp:64
+msgid "_Preferences"
+msgstr "Preferences"
+
+#: src/rook-gui/window.cpp:65
+msgid "_About"
+msgstr "_About"
+
 #: src/rook-gui/window.cpp:71
 msgid "Menu"
 msgstr "Menu"
+
+#: src/rook-gui/window.cpp:114
+msgid "Multi-modal AI assistant with wake-word voice control."
+msgstr "Multi-modal AI assistant with wake-word voice control."
 
 #: src/rook-gui/views/chat_view.cpp:137
 #: src/rook-gui/views/first_run_wizard.cpp:20
 msgid "Welcome to Rook"
 msgstr "Welcome to Rook"
 
+#: src/rook-gui/views/chat_view.cpp:139
+msgid "Your multi-modal AI assistant. Ask anything, explore ideas."
+msgstr "Your multi-modal AI assistant. Ask anything, explore ideas."
+
 #: src/rook-gui/views/chat_view.cpp:149 src/rook-gui/views/chat_view.cpp:248
-#: src/rook-gui/views/preferences_window.cpp:57
-#: src/rook-gui/views/skills_page.cpp:42
+#: src/rook-gui/views/preferences_window.cpp:75
+#: src/rook-gui/views/skills_page.cpp:27
+#: src/rook-gui/views/extension_settings_page.cpp:141
 msgid "Skills"
 msgstr "Skills"
+
+#: src/rook-gui/views/chat_view.cpp:156 src/rook-gui/views/chat_view.cpp:255
+msgid "Loading..."
+msgstr "Loading..."
 
 #: src/rook-gui/views/chat_view.cpp:165 src/rook-gui/views/chat_view.cpp:264
 msgid "Type a message..."
 msgstr "Type a message..."
 
-#: src/rook-gui/views/chat_view.cpp:679
+#: src/rook-gui/views/chat_view.cpp:209 src/rook-gui/views/chat_view.cpp:308
+msgid "Send"
+msgstr "Send"
+
+#: src/rook-gui/views/chat_view.cpp:679 src/rook-gui/views/chat_view.cpp:682
 msgid "Skills for this chat"
 msgstr "Skills for this chat"
+
+#: src/rook-gui/views/chat_view.cpp:761 src/rook-gui/views/skills_page.cpp:134
+msgid "via "
+msgstr "via "
 
 #: src/rook-gui/views/chat_sidebar.cpp:28
 msgid "Search chats..."
@@ -52,14 +82,57 @@ msgid "No matching chats"
 msgstr "No matching chats"
 
 #: src/rook-gui/views/chat_sidebar.cpp:79
-#, fuzzy
 msgid "New Chat"
 msgstr "Chat"
+
+#: src/rook-gui/views/chat_sidebar.cpp:337
+msgid "Unpin"
+msgstr "Unpin"
+
+#: src/rook-gui/views/chat_sidebar.cpp:337
+msgid "Pin"
+msgstr "Pin"
+
+#: src/rook-gui/views/chat_sidebar.cpp:344
+msgid "Rename"
+msgstr "Rename"
+
+#: src/rook-gui/views/chat_sidebar.cpp:356
+#: src/rook-gui/views/chat_sidebar.cpp:432
+#: src/rook-gui/views/llm_settings_page.cpp:83
+#: src/rook-gui/views/mcp_settings_page.cpp:239
+#: src/rook-gui/views/mcp_settings_page.cpp:336
+#: src/rook-gui/views/skills_page.cpp:211
+msgid "Delete"
+msgstr "Delete"
+
+#: src/rook-gui/views/chat_sidebar.cpp:429
+msgid "Delete Conversation"
+msgstr "Delete Conversation"
+
+#: src/rook-gui/views/chat_sidebar.cpp:430
+msgid "This action cannot be undone."
+msgstr "This action cannot be undone."
+
+#: src/rook-gui/views/chat_sidebar.cpp:431
+#: src/rook-gui/views/provider_dialog.cpp:64
+#: src/rook-gui/views/mcp_settings_page.cpp:335
+#: src/rook-gui/views/mcp_settings_page.cpp:486
+#: src/rook-gui/views/mcp_server_dialog.cpp:260
+#: src/rook-gui/views/skills_page.cpp:210
+#: src/rook-gui/views/skill_dialog.cpp:84
+#: src/rook-gui/views/extension_install_dialog.cpp:51
+msgid "Cancel"
+msgstr "Cancel"
 
 #: src/rook-gui/views/message_widget.cpp:59
 #: src/rook-gui/views/message_widget.cpp:120
 msgid "Thinking..."
 msgstr "Thinking..."
+
+#: src/rook-gui/views/tool_call_row.cpp:56
+msgid "<span weight=\"bold\">Tool:</span> "
+msgstr "<span weight=\"bold\">Tool:</span> "
 
 #: src/rook-gui/views/tool_call_row.cpp:62
 msgid "Show details"
@@ -69,6 +142,10 @@ msgstr "Show details"
 msgid "<span weight=\"bold\">Arguments:</span>"
 msgstr "<span weight=\"bold\">Arguments:</span>"
 
+#: src/rook-gui/views/tool_call_row.cpp:121
+msgid "<span weight=\"bold\">Tool used:</span> "
+msgstr "<span weight=\"bold\">Tool used:</span> "
+
 #: src/rook-gui/views/tool_call_row.cpp:130
 msgid "<span weight=\"bold\" foreground=\"#e01b24\">Error:</span>"
 msgstr "<span weight=\"bold\" foreground=\"#e01b24\">Error:</span>"
@@ -77,81 +154,91 @@ msgstr "<span weight=\"bold\" foreground=\"#e01b24\">Error:</span>"
 msgid "<span weight=\"bold\">Result:</span>"
 msgstr "<span weight=\"bold\">Result:</span>"
 
-#: src/rook-gui/views/permission_banner.cpp:84
+#: src/rook-gui/views/permission_banner.cpp:36
+#, c-format
+msgid "Rook requests %lu tool call"
+msgid_plural "Rook requests %lu tool calls"
+msgstr[0] "Rook requests %lu tool call"
+msgstr[1] "Rook requests %lu tool calls"
+
+#: src/rook-gui/views/permission_banner.cpp:88
 msgid "Deny All"
 msgstr "Deny All"
 
-#: src/rook-gui/views/permission_banner.cpp:99
+#: src/rook-gui/views/permission_banner.cpp:103
 msgid "Allow Selected"
 msgstr "Allow Selected"
 
-#: src/rook-gui/views/permission_banner.cpp:113
+#: src/rook-gui/views/permission_banner.cpp:117
 msgid "Always Allow"
 msgstr "Always Allow"
 
-#: src/rook-gui/views/preferences_window.cpp:28
+#: src/rook-gui/views/preferences_window.cpp:37
 msgid "Preferences"
 msgstr "Preferences"
 
-#: src/rook-gui/views/preferences_window.cpp:31
+#: src/rook-gui/views/preferences_window.cpp:56
 msgid "Providers"
 msgstr "Providers"
 
-#: src/rook-gui/views/preferences_window.cpp:43
-#: src/rook-gui/views/mcp_settings_page.cpp:41
+#: src/rook-gui/views/preferences_window.cpp:65
+#: src/rook-gui/views/mcp_settings_page.cpp:26
 msgid "Tools"
 msgstr "Tools"
 
-#: src/rook-gui/views/preferences_window.cpp:71
-#: src/rook-gui/views/extension_settings_page.cpp:42
+#: src/rook-gui/views/preferences_window.cpp:85
+#: src/rook-gui/views/extension_settings_page.cpp:27
 msgid "Extensions"
 msgstr "Extensions"
 
-#: src/rook-gui/views/preferences_window.cpp:84
+#: src/rook-gui/views/preferences_window.cpp:94
 msgid "Voice"
 msgstr "Voice"
 
-#: src/rook-gui/views/preferences_window.cpp:92
-#: src/rook-gui/views/appearance_page.cpp:30
+#: src/rook-gui/views/preferences_window.cpp:102
+#: src/rook-gui/views/appearance_page.cpp:54
 msgid "Appearance"
 msgstr "Appearance"
 
-#: src/rook-gui/views/llm_settings_page.cpp:36
+#: src/rook-gui/views/llm_settings_page.cpp:22
 msgid "LLM Providers"
 msgstr "LLM Providers"
 
-#: src/rook-gui/views/llm_settings_page.cpp:57
+#: src/rook-gui/views/llm_settings_page.cpp:28
+msgid ""
+"Configure language model backends. Rook supports Ollama (local), OpenAI, "
+"DeepSeek, and Anthropic."
+msgstr ""
+"Configure language model backends. Rook supports Ollama (local), OpenAI, "
+"DeepSeek, and Anthropic."
+
+#: src/rook-gui/views/llm_settings_page.cpp:42
 #: src/rook-gui/views/provider_dialog.cpp:20
 msgid "Add Provider"
 msgstr "Add Provider"
 
-#: src/rook-gui/views/llm_settings_page.cpp:93
-#: src/rook-gui/views/mcp_settings_page.cpp:254
+#: src/rook-gui/views/llm_settings_page.cpp:78
+#: src/rook-gui/views/mcp_settings_page.cpp:233
 msgid "Edit"
 msgstr "Edit"
 
 #: src/rook-gui/views/provider_dialog.cpp:30
+#: src/rook-gui/views/first_run_wizard.cpp:52
 msgid "Provider:"
 msgstr "Provider:"
 
 #: src/rook-gui/views/provider_dialog.cpp:48
+#: src/rook-gui/views/first_run_wizard.cpp:70
 msgid "API Key:"
 msgstr "API Key:"
 
 #: src/rook-gui/views/provider_dialog.cpp:53
+#: src/rook-gui/views/first_run_wizard.cpp:76
 msgid "Enter your API key"
 msgstr "Enter your API key"
 
-#: src/rook-gui/views/provider_dialog.cpp:64
-#: src/rook-gui/views/mcp_settings_page.cpp:509
-#: src/rook-gui/views/mcp_server_dialog.cpp:260
-#: src/rook-gui/views/skill_dialog.cpp:84
-#: src/rook-gui/views/extension_install_dialog.cpp:51
-msgid "Cancel"
-msgstr "Cancel"
-
 #: src/rook-gui/views/provider_dialog.cpp:68
-#: src/rook-gui/views/mcp_settings_page.cpp:514
+#: src/rook-gui/views/mcp_settings_page.cpp:491
 msgid "Save"
 msgstr "Save"
 
@@ -159,56 +246,124 @@ msgstr "Save"
 msgid "Edit Provider"
 msgstr "Edit Provider"
 
-#: src/rook-gui/views/mcp_settings_page.cpp:54
+#: src/rook-gui/views/mcp_settings_page.cpp:32
+msgid "Tools the AI assistant can use to read files, search the web, and more."
+msgstr "Tools the AI assistant can use to read files, search the web, and more."
+"Tools the AI assistant can use to read files, search the web, and more.Tools "
+"the AI assistant can use to read files, search the web, and more."
+
+#: src/rook-gui/views/mcp_settings_page.cpp:39
 msgid "Built-in"
 msgstr "Built-in"
 
-#: src/rook-gui/views/mcp_settings_page.cpp:106
+#: src/rook-gui/views/mcp_settings_page.cpp:47
+msgid "Always available, run locally on your computer."
+msgstr "Always available, run locally on your computer."
+
+#: src/rook-gui/views/mcp_settings_page.cpp:58
+msgid "Read the contents of a file at the given path"
+msgstr "Read the contents of a file at the given path"
+
+#: src/rook-gui/views/mcp_settings_page.cpp:59
+msgid "Create or overwrite a file at the given path"
+msgstr "Create or overwrite a file at the given path"
+
+#: src/rook-gui/views/mcp_settings_page.cpp:60
+msgid "List files and directories at the given path"
+msgstr "List files and directories at the given path"
+
+#: src/rook-gui/views/mcp_settings_page.cpp:75
+#: src/rook-gui/views/mcp_settings_page.cpp:142
+#: src/rook-gui/views/mcp_settings_page.cpp:155
+#: src/rook-gui/views/extension_settings_page.cpp:103
+msgid "MCP Servers"
+msgstr "MCP Servers"
+
+#: src/rook-gui/views/mcp_settings_page.cpp:81
+msgid ""
+"External tools from MCP servers. Each server can provide multiple tools."
+msgstr ""
+"External tools from MCP servers. Each server can provide multiple tools."
+
+#: src/rook-gui/views/mcp_settings_page.cpp:91
 msgid "No MCP Servers"
 msgstr "No MCP Servers"
 
-#: src/rook-gui/views/mcp_settings_page.cpp:107
+#: src/rook-gui/views/mcp_settings_page.cpp:92
 msgid "Add servers to give the assistant access to external tools."
 msgstr "Add servers to give the assistant access to external tools."
 
-#: src/rook-gui/views/mcp_settings_page.cpp:128
+#: src/rook-gui/views/mcp_settings_page.cpp:111
 msgid "Add Server"
 msgstr "Add Server"
 
-#: src/rook-gui/views/mcp_settings_page.cpp:240
+#: src/rook-gui/views/mcp_settings_page.cpp:220
 #: src/rook-gui/views/mcp_server_dialog.cpp:160
 msgid "Capabilities"
 msgstr "Capabilities"
 
-#: src/rook-gui/views/mcp_settings_page.cpp:246
+#: src/rook-gui/views/mcp_settings_page.cpp:226
 msgid "via extension"
 msgstr "via extension"
 
-#: src/rook-gui/views/mcp_settings_page.cpp:379
+#: src/rook-gui/views/mcp_settings_page.cpp:332
+#: src/rook-gui/views/skills_page.cpp:207
+msgid "Delete '"
+msgstr "Delete"
+
+#: src/rook-gui/views/mcp_settings_page.cpp:332
+msgid ""
+"'?\n"
+"This server and all its tools will be removed. This cannot be undone."
+msgstr ""
+"'?\n"
+"This server and all its tools will be removed. This cannot be undone."
+
+#: src/rook-gui/views/mcp_settings_page.cpp:334
+msgid "Delete MCP Server"
+msgstr "Delete MCP Server"
+
+#: src/rook-gui/views/mcp_settings_page.cpp:357
 msgid "Capability Override"
 msgstr "Capability Override"
 
-#: src/rook-gui/views/mcp_settings_page.cpp:419
+#: src/rook-gui/views/mcp_settings_page.cpp:373
+msgid ""
+"Override the security bounds for this server. Empty paths and disabled "
+"network mean unrestricted access."
+msgstr ""
+"Override the security bounds for this server. Empty paths and disabled "
+"network mean unrestricted access."
+
+#: src/rook-gui/views/mcp_settings_page.cpp:389
+msgid "Read Paths"
+msgstr "+ Add Read Path"
+
+#: src/rook-gui/views/mcp_settings_page.cpp:396
 #: src/rook-gui/views/mcp_server_dialog.cpp:177
 msgid "+ Add Read Path"
 msgstr "+ Add Read Path"
 
-#: src/rook-gui/views/mcp_settings_page.cpp:451
+#: src/rook-gui/views/mcp_settings_page.cpp:421
+msgid "Write Paths"
+msgstr "+ Add Write Path"
+
+#: src/rook-gui/views/mcp_settings_page.cpp:428
 #: src/rook-gui/views/mcp_server_dialog.cpp:191
 msgid "+ Add Write Path"
 msgstr "+ Add Write Path"
 
-#: src/rook-gui/views/mcp_settings_page.cpp:474
+#: src/rook-gui/views/mcp_settings_page.cpp:451
 #: src/rook-gui/views/mcp_server_dialog.cpp:196
 msgid "Allow Network Access:"
 msgstr "Allow Network Access:"
 
-#: src/rook-gui/views/mcp_settings_page.cpp:484
+#: src/rook-gui/views/mcp_settings_page.cpp:461
 #: src/rook-gui/views/mcp_server_dialog.cpp:207
 msgid "Memory Limit (MB):"
 msgstr "Memory Limit (MB):"
 
-#: src/rook-gui/views/mcp_settings_page.cpp:495
+#: src/rook-gui/views/mcp_settings_page.cpp:472
 #: src/rook-gui/views/mcp_server_dialog.cpp:219
 msgid "CPU Time Limit (sec):"
 msgstr "CPU Time Limit (sec):"
@@ -220,6 +375,14 @@ msgstr "Add MCP Server"
 #: src/rook-gui/views/mcp_server_dialog.cpp:67
 msgid "Transport:"
 msgstr "Transport:"
+
+#: src/rook-gui/views/mcp_server_dialog.cpp:74
+msgid "Command"
+msgstr "Command:"
+
+#: src/rook-gui/views/mcp_server_dialog.cpp:79
+msgid "URL"
+msgstr "URL:"
 
 #: src/rook-gui/views/mcp_server_dialog.cpp:85
 #: src/rook-gui/views/skill_dialog.cpp:30
@@ -270,14 +433,52 @@ msgstr "Edit MCP Server"
 msgid "Testing..."
 msgstr "Testing..."
 
-#: src/rook-gui/views/skills_page.cpp:72
+#: src/rook-gui/views/mcp_server_dialog.cpp:458
+msgid "Key"
+msgstr "Key"
+
+#: src/rook-gui/views/mcp_server_dialog.cpp:463
+msgid "Value"
+msgstr "Value"
+
+#: src/rook-gui/views/skills_page.cpp:33
+msgid ""
+"Skills are system prompts that influence how the AI responds. They can be "
+"created manually or come from installed extensions."
+msgstr ""
+"Skills are system prompts that influence how the AI responds. They can be "
+"created manually or come from installed extensions."
+
+#: src/rook-gui/views/skills_page.cpp:44
+msgid "Custom Skills"
+msgstr "Create Skill"
+
+#: src/rook-gui/views/skills_page.cpp:56
 msgid "+ Create Skill"
 msgstr "+ Create Skill"
 
-#: src/rook-gui/views/skills_page.cpp:124
-#: src/rook-gui/views/skills_page.cpp:180
+#: src/rook-gui/views/skills_page.cpp:65
+msgid "Extension Skills"
+msgstr "Extensions"
+
+#: src/rook-gui/views/skills_page.cpp:95
+msgid "Prompt: "
+msgstr "Prompt:"
+
+#: src/rook-gui/views/skills_page.cpp:106
+#: src/rook-gui/views/skills_page.cpp:152
 msgid "Always ON"
 msgstr "Always ON"
+
+#: src/rook-gui/views/skills_page.cpp:207
+msgid ""
+"'?\n"
+"This cannot be undone."
+msgstr "This action cannot be undone."
+
+#: src/rook-gui/views/skills_page.cpp:209
+msgid "Delete Skill"
+msgstr "Create Skill"
 
 #: src/rook-gui/views/skill_dialog.cpp:20
 msgid "Create Skill"
@@ -311,31 +512,66 @@ msgstr "Save Skill"
 msgid "Edit Skill"
 msgstr "Edit Skill"
 
-#: src/rook-gui/views/extension_settings_page.cpp:59
+#: src/rook-gui/views/extension_settings_page.cpp:33
+msgid ""
+"Install extensions from GitHub to add MCP servers, skills, and commands."
+msgstr ""
+"Install extensions from GitHub to add MCP servers, skills, and commands."
+
+#: src/rook-gui/views/extension_settings_page.cpp:44
 msgid "No Extensions Installed"
 msgstr "No Extensions Installed"
 
-#: src/rook-gui/views/extension_settings_page.cpp:81
+#: src/rook-gui/views/extension_settings_page.cpp:46
+msgid "Install extensions from GitHub to give the assistant new capabilities."
+msgstr "Install extensions from GitHub to give the assistant new capabilities."
+
+#: src/rook-gui/views/extension_settings_page.cpp:63
 msgid "Install from GitHub"
 msgstr "Install from GitHub"
 
-#: src/rook-gui/views/extension_settings_page.cpp:122
-msgid "MCP Servers"
-msgstr "MCP Servers"
+#: src/rook-gui/views/extension_settings_page.cpp:107
+#, c-format
+msgid "%lu server provided"
+msgid_plural "%lu servers provided"
+msgstr[0] "%lu server provided"
+msgstr[1] "%lu servers provided"
 
-#: src/rook-gui/views/extension_settings_page.cpp:164
+#: src/rook-gui/views/extension_settings_page.cpp:130
+msgid "enabled"
+msgstr "Enabled:"
+
+#: src/rook-gui/views/extension_settings_page.cpp:130
+msgid "disabled"
+msgstr "Enabled:"
+
+#: src/rook-gui/views/extension_settings_page.cpp:145
+#, c-format
+msgid "%lu skill provided"
+msgid_plural "%lu skills provided"
+msgstr[0] "%lu skill provided"
+msgstr[1] "%lu skills provided"
+
+#: src/rook-gui/views/extension_settings_page.cpp:155
 msgid "Commands"
 msgstr "Commands"
 
-#: src/rook-gui/views/extension_settings_page.cpp:173
+#: src/rook-gui/views/extension_settings_page.cpp:159
+#, c-format
+msgid "%lu command"
+msgid_plural "%lu commands"
+msgstr[0] "%lu command"
+msgstr[1] "%lu commands"
+
+#: src/rook-gui/views/extension_settings_page.cpp:169
 msgid "Context Files"
 msgstr "Context Files"
 
-#: src/rook-gui/views/extension_settings_page.cpp:186
+#: src/rook-gui/views/extension_settings_page.cpp:182
 msgid "Uninstall"
 msgstr "Uninstall"
 
-#: src/rook-gui/views/extension_settings_page.cpp:198
+#: src/rook-gui/views/extension_settings_page.cpp:194
 msgid "Update"
 msgstr "Update"
 
@@ -343,22 +579,37 @@ msgstr "Update"
 msgid "Install Extension"
 msgstr "Install Extension"
 
+#: src/rook-gui/views/extension_install_dialog.cpp:31
+msgid "Enter the GitHub URL of the extension to install:"
+msgstr "Enter the GitHub URL of the extension to install:"
+
 #: src/rook-gui/views/extension_install_dialog.cpp:58
 msgid "Install"
 msgstr "Install"
 
-#: src/rook-gui/views/voice_settings_page.cpp:11
-#, fuzzy
+#: src/rook-gui/views/voice_settings_page.cpp:16
 msgid "Voice Settings"
 msgstr "Settings"
 
-#: src/rook-gui/views/appearance_page.cpp:36
+#: src/rook-gui/views/appearance_page.cpp:24
+msgid "Restart Required"
+msgstr "Restart Required"
+
+#: src/rook-gui/views/appearance_page.cpp:25
+msgid "Rook must restart to apply the new language. Restart now?"
+msgstr "Rook must restart to apply the new language. Restart now?"
+
+#: src/rook-gui/views/appearance_page.cpp:26
+msgid "Later"
+msgstr "Later"
+
+#: src/rook-gui/views/appearance_page.cpp:27
+msgid "Restart Now"
+msgstr "Restart Now"
+
+#: src/rook-gui/views/appearance_page.cpp:60
 msgid "Language"
 msgstr "Language"
-
-#: src/rook-gui/views/appearance_page.cpp:56
-msgid "Requires restart to take effect."
-msgstr "Requires restart to take effect."
 
 #: src/rook-gui/views/first_run_wizard.cpp:30
 msgid "Set Up Your AI Assistant"
@@ -368,5 +619,5 @@ msgstr "Set Up Your AI Assistant"
 msgid "Get Started"
 msgstr "Get Started"
 
-#~ msgid "Send"
-#~ msgstr "Send"
+#~ msgid "Requires restart to take effect."
+#~ msgstr "Requires restart to take effect."
