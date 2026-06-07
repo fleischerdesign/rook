@@ -18,6 +18,8 @@
 #include "rook/adapters/security/security_guarded_tool_port.hpp"
 #include "rook/adapters/security/security_manager.hpp"
 #include "rook/adapters/extension/extension_manager.hpp"
+#include "rook/adapters/hook/builtin_hooks.hpp"
+#include "rook/adapters/hook/core_api_provider.hpp"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <future>
@@ -165,6 +167,8 @@ inline void RookApplication::init(Class *)
             });
         },
         m_extensions.get(), &m_custom_skills);
+
+    loadHookPlugins();
 
     auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);
     prefs_action->connect_activate(
@@ -339,6 +343,35 @@ void RookApplication::startModelDiscovery(RookWindow &window)
             });
         });
     }
+}
+
+void RookApplication::loadHookPlugins()
+{
+    m_plugin_dir = GLib::get_user_config_dir() + std::string("/rook/plugins/hook");
+
+    if (g_mkdir_with_parents(m_plugin_dir.c_str(), 0755) == 0) {
+        spdlog::info("Plugin directory ready: {}", m_plugin_dir);
+    } else {
+        spdlog::warn("Cannot create plugin directory: {}", m_plugin_dir);
+    }
+
+    auto config_json = m_store->loadConfig();
+    auto core_api = rook::adapters::hook::makeCoreAPI(
+        config_json.empty() ? "{}" : config_json);
+
+    auto hooks = m_plugin_loader.loadFromDirectory(m_plugin_dir, core_api);
+    spdlog::info("Loaded {} hook plugin(s) from {}", hooks.size(), m_plugin_dir);
+
+    for (auto& hook : hooks) {
+        m_actor->hooks().registerHook(std::move(hook));
+    }
+
+    m_actor->hooks().registerHook(
+        rook::adapters::hook::makeExtensionContextHook(
+            m_extensions.get(), &m_custom_skills));
+
+    m_actor->hooks().registerHook(
+        rook::adapters::hook::makeResponseCleanupHook());
 }
 
 void RookApplication::saveConfig()

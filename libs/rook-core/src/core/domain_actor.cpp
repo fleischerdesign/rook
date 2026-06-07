@@ -726,25 +726,6 @@ std::string DomainActor::buildSystemPrompt(std::string_view chat_id) {
         }
     }
 
-    if (m_extensions) {
-        std::string context_index;
-        for (auto& ext : m_extensions->listInstalled()) {
-            if (ext.context_files.empty()) continue;
-            context_index += "\nFrom " + ext.display_name + " v" + ext.version + ":\n";
-            for (auto& cf : ext.context_files) {
-                context_index += "  " + ext.install_path + "/" + cf.path;
-                if (!cf.description.empty())
-                    context_index += " — " + cf.description;
-                context_index += "\n";
-            }
-        }
-        if (!context_index.empty()) {
-            if (!result.empty()) result += "\n\n";
-            result += "Available extension context files (use read_file to access):"
-                   + context_index;
-        }
-    }
-
     return result;
 }
 

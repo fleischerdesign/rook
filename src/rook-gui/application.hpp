@@ -20,6 +20,7 @@
 #include "rook/adapters/extension/extension_manager.hpp"
 #include "rook/ports/extension_port.hpp"
 #include "rook/ports/tool_port.hpp"
+#include "rook/adapters/hook/plugin_loader.hpp"
 
 namespace rook::gui {
 
@@ -37,6 +38,7 @@ class RookApplication final : public peel::Adw::Application
 
     void loadConfig();
     void saveConfig();
+    void loadHookPlugins();
     void startModelDiscovery(RookWindow &window);
     void onFirstRunDone(RookWindow *window);
 
@@ -56,6 +58,8 @@ class RookApplication final : public peel::Adw::Application
     bool m_first_run = true;
     bool m_css_loaded = false;
     std::unique_ptr<TrayIcon> m_tray_icon;
+    rook::adapters::hook::PluginLoader m_plugin_loader;
+    std::string m_plugin_dir;
     RookWindow *m_window = nullptr;
 
 public:

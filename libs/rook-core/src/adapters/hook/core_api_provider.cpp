@@ -1,5 +1,6 @@
 #include "rook/adapters/hook/core_api_provider.hpp"
 
+#include <memory>
 #include <spdlog/spdlog.h>
 
 namespace rook::adapters::hook {
@@ -11,16 +12,19 @@ void log_info_c(const char* msg)  { spdlog::info("{}", msg); }
 void log_warn_c(const char* msg)  { spdlog::warn("{}", msg); }
 void log_error_c(const char* msg) { spdlog::error("{}", msg); }
 
+static std::shared_ptr<std::string> g_config_json;
+
 const char* get_config_json_c(void)
 {
-    static const std::string empty = "{}";
-    return empty.c_str();
+    return g_config_json ? g_config_json->c_str() : "{}";
 }
 
 } // namespace
 
-RookCoreAPI makeCoreAPI()
+RookCoreAPI makeCoreAPI(std::string config_json)
 {
+    g_config_json = std::make_shared<std::string>(std::move(config_json));
+
     RookCoreAPI api{};
     api.log_debug = log_debug_c;
     api.log_info  = log_info_c;
