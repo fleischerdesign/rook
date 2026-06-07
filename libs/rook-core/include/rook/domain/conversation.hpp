@@ -57,6 +57,7 @@ public:
     bool isToolWhitelisted(std::string_view conv_id, std::string_view tool) const;
     void addWhitelistedTool(std::string_view conv_id, std::string_view tool);
     std::vector<ports::LlmMessage> buildLlmMessages(std::string_view conv_id) const;
+    std::string* lastResponse(std::string_view conv_id);
     int32_t estimateTokens(std::string_view conv_id) const;
     void setSystemMessage(std::string_view conv_id, std::string_view content);
     void updateSystemMessage(std::string_view conv_id, std::string_view content);

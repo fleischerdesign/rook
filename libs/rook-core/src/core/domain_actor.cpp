@@ -4,6 +4,7 @@
 #include "rook/core/worker_pool.hpp"
 #include "rook/domain/conversation.hpp"
 #include "rook/domain/events.hpp"
+#include "rook/ports/hook_port.hpp"
 #include "rook/ports/llm_port.hpp"
 #include "rook/ports/tool_port.hpp"
 #include "rook/ports/store_port.hpp"
@@ -51,9 +52,21 @@ void DomainActor::start(ports::LlmPort& llm,
 
     spdlog::info("DomainActor started");
     emitSnapshot();
+
+    {
+        ports::HookContext ctx;
+        ctx.point = ports::HookPoint::OnSystemStartup;
+        m_hooks.trigger(ports::HookPoint::OnSystemStartup, ctx);
+    }
 }
 
 void DomainActor::stop() {
+    {
+        ports::HookContext ctx;
+        ctx.point = ports::HookPoint::OnSystemShutdown;
+        m_hooks.trigger(ports::HookPoint::OnSystemShutdown, ctx);
+    }
+
     if (m_thread.joinable()) {
         m_thread.request_stop();
         m_thread.join();
@@ -148,9 +161,18 @@ void DomainActor::emitSnapshot() {
 void DomainActor::handleUserInput(const domain::ActorUserInput& msg) {
     spdlog::info("Actor: UserInput chat={}", msg.chat_id);
 
+    std::string input = msg.content;
+    {
+        ports::HookContext ctx;
+        ctx.point = ports::HookPoint::PreUserInput;
+        ctx.chat_id = msg.chat_id;
+        ctx.user_input = &input;
+        m_hooks.trigger(ports::HookPoint::PreUserInput, ctx);
+    }
+
     domain::ChatMessage cmsg;
     cmsg.role = "user";
-    cmsg.content = msg.content;
+    cmsg.content = std::move(input);
     m_conv->setModel(msg.chat_id, msg.model);
 
     auto conv = m_conv->open(msg.chat_id);
@@ -201,6 +223,14 @@ void DomainActor::runLlm(std::string chat_id, std::string model) {
 
     auto messages = m_conv->buildLlmMessages(chat_id);
     auto tools_json = buildToolsJson();
+
+    {
+        ports::HookContext ctx;
+        ctx.point = ports::HookPoint::PreLLM;
+        ctx.chat_id = chat_id;
+        ctx.messages = &messages;
+        m_hooks.trigger(ports::HookPoint::PreLLM, ctx);
+    }
 
     auto* inbox = m_inbox.get();
     auto completed = std::make_shared<bool>(false);
@@ -261,6 +291,27 @@ void DomainActor::handleLlmDone(const domain::ActorLlmDone& msg) {
     spdlog::info("Actor: LlmDone chat={}", msg.chat_id);
 
     emitUiEvent(domain::LlmCompleted{msg.chat_id, 0});
+
+    {
+        auto* response = m_conv->lastResponse(msg.chat_id);
+        if (response) {
+            ports::HookContext ctx;
+            ctx.point = ports::HookPoint::PostLLM;
+            ctx.chat_id = msg.chat_id;
+            ctx.response = response;
+            m_hooks.trigger(ports::HookPoint::PostLLM, ctx);
+        }
+    }
+    {
+        auto* response = m_conv->lastResponse(msg.chat_id);
+        if (response) {
+            ports::HookContext ctx;
+            ctx.point = ports::HookPoint::PreResponse;
+            ctx.chat_id = msg.chat_id;
+            ctx.response = response;
+            m_hooks.trigger(ports::HookPoint::PreResponse, ctx);
+        }
+    }
 
     if (m_pending_tool_calls.empty()) {
         m_conv->saveActiveConversation();
@@ -372,6 +423,13 @@ void DomainActor::processTools(std::string chat_id, std::string model) {
     for (auto& call : calls) {
         if (m_perm_port && m_perm_port->isWhitelisted(chat_id, call.name)) {
             spdlog::info("Actor: tool {} whitelisted, executing", call.name);
+            {
+                ports::HookContext ctx;
+                ctx.point = ports::HookPoint::PreToolExecution;
+                ctx.chat_id = chat_id;
+                ctx.tool_args = &call.arguments;
+                m_hooks.trigger(ports::HookPoint::PreToolExecution, ctx);
+            }
             executeTool(chat_id, call);
             whitelisted_count++;
         } else {
@@ -420,10 +478,18 @@ void DomainActor::handleToolResult(const domain::ActorToolResult& msg) {
     tool_msg.tool_name = "";
     m_conv->addMessage(msg.chat_id, std::move(tool_msg));
 
+    {
+        ports::HookContext ctx;
+        ctx.point = ports::HookPoint::PostToolExecution;
+        ctx.chat_id = msg.chat_id;
+        ctx.tool_result = &tool_msg.content;
+        m_hooks.trigger(ports::HookPoint::PostToolExecution, ctx);
+    }
+
     emitUiEvent(domain::ToolCallCompleted{
         .chat_id = msg.chat_id,
         .call_id = msg.call_id,
-        .result = msg.result,
+        .result = tool_msg.content,
         .is_error = msg.is_error,
     });
 
@@ -480,6 +546,13 @@ void DomainActor::handlePermissionDecision(const domain::ActorPermissionDecision
         if (d != decisions.end() && d->second != 1) {
             if (d->second == 2 && m_perm_port)
                 m_perm_port->addToWhitelist(pending.chat_id, call.name);
+            {
+                ports::HookContext ctx;
+                ctx.point = ports::HookPoint::PreToolExecution;
+                ctx.chat_id = pending.chat_id;
+                ctx.tool_args = &call.arguments;
+                m_hooks.trigger(ports::HookPoint::PreToolExecution, ctx);
+            }
             executeTool(pending.chat_id, call);
             newly_executed++;
         } else {

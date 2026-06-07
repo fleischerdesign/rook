@@ -5,6 +5,7 @@
 #include <sstream>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
+#include <ranges>
 
 namespace rook::domain {
 
@@ -181,6 +182,19 @@ int32_t ConversationManager::estimateTokens(std::string_view conv_id) const {
     }
 
     return total;
+}
+
+std::string* ConversationManager::lastResponse(std::string_view conv_id)
+{
+    auto it = std::ranges::find_if(m_conversations,
+        [conv_id](auto& c) { return c.id == conv_id; });
+    if (it == m_conversations.end()) return nullptr;
+
+    for (auto msg = it->messages.rbegin(); msg != it->messages.rend(); ++msg) {
+        if (msg->role == "assistant")
+            return &msg->content;
+    }
+    return nullptr;
 }
 
 std::optional<Conversation> ConversationManager::active() const {

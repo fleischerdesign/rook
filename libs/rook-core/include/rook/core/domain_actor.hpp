@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include "rook/core/actor_messages.hpp"
 #include "rook/domain/events.hpp"
+#include "rook/adapters/hook/hook_registry.hpp"
 
 namespace rook::ports {
 class LlmPort;
@@ -64,6 +65,8 @@ public:
     bool is_running() const { return m_running.load(std::memory_order_acquire); }
 
     domain::ConversationManager& conv() { return *m_conv; }
+
+    rook::adapters::hook::HookRegistry& hooks() { return m_hooks; }
 
 private:
     void run(std::stop_token token);
@@ -132,6 +135,8 @@ private:
         bool finalized = false;
     };
     std::optional<ActiveBatch> m_active_batch;
+
+    rook::adapters::hook::HookRegistry m_hooks;
 };
 
 } // namespace rook::core
