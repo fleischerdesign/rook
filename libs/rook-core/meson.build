@@ -30,6 +30,9 @@ librook_core_sources = files(
   'src/adapters/security/bwrap_executor.cpp',
   'src/adapters/hook/hook_registry.cpp',
   'src/adapters/hook/builtin_hooks.cpp',
+  'src/adapters/hook/plugin_loader.cpp',
+  'src/adapters/hook/plugin_hook_adapter.cpp',
+  'src/adapters/hook/core_api_provider.cpp',
   'src/adapters/extension/extension_manifest.cpp',
   'src/adapters/extension/extension_manager.cpp',
 )

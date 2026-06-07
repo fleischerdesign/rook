@@ -6,6 +6,8 @@ if gtest_dep.found()
     gtest_dep,
   ]
 
+  subdir('fixtures/plugins')
+
   test_executable = executable(
     'rook-tests',
     'unit/test_event_bus.cpp',
@@ -13,6 +15,7 @@ if gtest_dep.found()
     'unit/test_capability.cpp',
     'unit/test_security_manager.cpp',
     'unit/test_extension.cpp',
+    'unit/test_plugin_loader.cpp',
     dependencies: test_deps,
     build_by_default: false,
   )
