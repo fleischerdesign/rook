@@ -39,6 +39,12 @@ public:
     virtual std::vector<HookPoint> triggerPoints() const = 0;
     virtual int priority() const { return 0; }
     virtual void execute(HookContext& ctx) = 0;
+
+    bool isActive() const { return m_active; }
+    void deactivate() { m_active = false; }
+
+private:
+    bool m_active = true;
 };
 
 } // namespace rook::ports

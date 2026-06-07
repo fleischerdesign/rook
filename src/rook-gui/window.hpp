@@ -31,6 +31,7 @@ class RookWindow final : public peel::Adw::ApplicationWindow
     ChatSidebar *m_sidebar = nullptr;
     ChatView *m_chat_view = nullptr;
     std::function<void()> m_save_fn;
+    std::function<void(std::string_view)> m_before_uninstall_fn;
     rook::ports::LlmPort *m_llm = nullptr;
     rook::adapters::mcp::McpServerManager *m_mcp = nullptr;
     rook::adapters::security::SecurityManager *m_security = nullptr;
@@ -53,6 +54,7 @@ public:
                                rook::ports::ExtensionPort *extensions,
                                std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
                                std::function<void()> save_fn,
+                               std::function<void(std::string_view)> before_uninstall_fn = {},
                                rook::ports::ToolPermissionPort *permission_port = nullptr);
 
     void refreshModels();

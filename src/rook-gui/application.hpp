@@ -6,6 +6,7 @@
 #include <peel/GLib/functions.h>
 #include <peel/class.h>
 #include <memory>
+#include <map>
 #include <string_view>
 #include "rook/domain/event_bus.hpp"
 #include "rook/domain/conversation.hpp"
@@ -39,6 +40,7 @@ class RookApplication final : public peel::Adw::Application
     void loadConfig();
     void saveConfig();
     void loadHookPlugins();
+    void deactivateExtensionHooks(std::string_view name);
     void startModelDiscovery(RookWindow &window);
     void onFirstRunDone(RookWindow *window);
 
@@ -59,6 +61,7 @@ class RookApplication final : public peel::Adw::Application
     bool m_css_loaded = false;
     std::unique_ptr<TrayIcon> m_tray_icon;
     rook::adapters::hook::PluginLoader m_plugin_loader;
+    std::map<std::string, std::vector<std::string>, std::less<>> m_ext_hook_ids;
     std::string m_plugin_dir;
     RookWindow *m_window = nullptr;
 

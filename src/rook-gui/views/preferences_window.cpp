@@ -32,7 +32,8 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
                                                         rook::adapters::security::SecurityManager *security,
                                                         rook::ports::ExtensionPort *extensions,
                                                         std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
-                                                        std::function<void()> on_changed)
+                                                        std::function<void()> on_changed,
+                                                        std::function<void(std::string_view)> on_before_uninstall)
 {
     auto dialog = Object::create<PreferencesWindow>();
     dialog->set_title(_("Preferences"));
@@ -51,7 +52,10 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
         dialog->m_impl->skills = SkillsPage::create(custom_skills, extensions, [on_changed] { on_changed(); });
 
     if (extensions)
-        dialog->m_impl->extensions = ExtensionSettingsPage::create(extensions, mcp, [on_changed] { on_changed(); });
+        dialog->m_impl->extensions = ExtensionSettingsPage::create(
+            extensions, mcp,
+            [on_changed] { on_changed(); },
+            on_before_uninstall);
 
     dialog->m_impl->voice = VoiceSettingsPage::create();
     dialog->m_impl->appearance = AppearancePage::create();

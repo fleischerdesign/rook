@@ -7,17 +7,20 @@
 #include <string_view>
 #include "rook/ports/extension_port.hpp"
 #include "rook/adapters/mcp/mcp_server_manager.hpp"
+#include "rook/adapters/hook/hook_registry.hpp"
 
 namespace rook::gui {
 
 class ExtensionSettingsPage {
 public:
     using ChangeFn = std::function<void()>;
+    using BeforeUninstallFn = std::function<void(std::string_view extension_name)>;
 
     static std::unique_ptr<ExtensionSettingsPage> create(
         rook::ports::ExtensionPort *extensions,
         rook::adapters::mcp::McpServerManager *mcp,
-        ChangeFn on_changed);
+        ChangeFn on_changed,
+        BeforeUninstallFn on_before_uninstall = {});
 
     void populate(peel::Adw::PreferencesGroup &group);
 
@@ -29,6 +32,7 @@ private:
     peel::Gtk::ListBox *m_list = nullptr;
     peel::Gtk::Stack *m_stack = nullptr;
     ChangeFn m_on_changed;
+    BeforeUninstallFn m_on_before_uninstall;
 
     void refreshList();
     void onInstallFromUrl();

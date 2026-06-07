@@ -241,6 +241,7 @@ inline void RookApplication::vfunc_activate()
         m_mcp_manager.get(), m_security.get(), m_extensions.get(),
         &m_custom_skills,
         [this]() { saveConfig(); },
+        [this](std::string_view name) { deactivateExtensionHooks(name); },
         m_permission_port.get());
     m_window = window;
     window->present();
@@ -376,7 +377,9 @@ void RookApplication::loadHookPlugins()
                 auto ext_hooks = m_plugin_loader.loadFromDirectory(
                     full, core_api);
                 for (auto& hook : ext_hooks) {
-                    if (!m_actor->hooks().contains(hook->id())) {
+                    auto id = hook->id();
+                    m_ext_hook_ids[std::string(ext.name)].push_back(id);
+                    if (!m_actor->hooks().contains(id)) {
                         m_actor->hooks().registerHook(std::move(hook));
                         loaded++;
                     }
@@ -398,6 +401,18 @@ void RookApplication::loadHookPlugins()
         m_actor->hooks().registerHook(
             rook::adapters::hook::makeResponseCleanupHook());
     }
+}
+
+void RookApplication::deactivateExtensionHooks(std::string_view name)
+{
+    auto it = m_ext_hook_ids.find(std::string(name));
+    if (it == m_ext_hook_ids.end()) return;
+
+    for (auto& id : it->second) {
+        m_actor->hooks().deactivateByPrefix(id);
+    }
+    m_ext_hook_ids.erase(it);
+    spdlog::info("Deactivated hooks for extension '{}'", name);
 }
 
 void RookApplication::saveConfig()

@@ -32,10 +32,12 @@ RookWindow *RookWindow::create(Gtk::Application *app,
                                 rook::ports::ExtensionPort *extensions,
                                 std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
                                 std::function<void()> save_fn,
+                                std::function<void(std::string_view)> before_uninstall_fn,
                                 rook::ports::ToolPermissionPort *permission_port)
 {
     auto *win = Object::create<RookWindow>(prop_application(), app);
     win->m_save_fn = std::move(save_fn);
+    win->m_before_uninstall_fn = std::move(before_uninstall_fn);
     win->m_llm = &llm;
     win->m_mcp = mcp;
     win->m_security = security;
@@ -95,7 +97,8 @@ void RookWindow::refreshModels()
 void RookWindow::onPreferences()
 {
     auto prefs = PreferencesWindow::create(*m_llm, m_mcp, m_security,
-                                            m_extensions, m_custom_skills, m_save_fn);
+                                            m_extensions, m_custom_skills,
+                                            m_save_fn, m_before_uninstall_fn);
     prefs->present(this);
 }
 

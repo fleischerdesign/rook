@@ -13,12 +13,14 @@ namespace rook::gui {
 std::unique_ptr<ExtensionSettingsPage> ExtensionSettingsPage::create(
     rook::ports::ExtensionPort *extensions,
     rook::adapters::mcp::McpServerManager *mcp,
-    ChangeFn on_changed)
+    ChangeFn on_changed,
+    BeforeUninstallFn on_before_uninstall)
 {
     auto page = std::unique_ptr<ExtensionSettingsPage>(new ExtensionSettingsPage());
     page->m_extensions = extensions;
     page->m_mcp = mcp;
     page->m_on_changed = std::move(on_changed);
+    page->m_on_before_uninstall = std::move(on_before_uninstall);
     return page;
 }
 
@@ -194,6 +196,8 @@ void ExtensionSettingsPage::refreshList()
         auto uninstall_btn = Gtk::Button::create_with_label(_("Uninstall"));
         uninstall_btn->add_css_class("destructive-action");
         uninstall_btn->connect_clicked([self, name](Gtk::Button *) {
+            if (self->m_on_before_uninstall)
+                self->m_on_before_uninstall(name);
             if (self->m_extensions->uninstall(name)) {
                 self->m_mcp->stopAll();
                 self->m_mcp->startAll();
@@ -205,6 +209,8 @@ void ExtensionSettingsPage::refreshList()
 
         auto update_btn = Gtk::Button::create_with_label(_("Update"));
         update_btn->connect_clicked([self, name](Gtk::Button *) {
+            if (self->m_on_before_uninstall)
+                self->m_on_before_uninstall(name);
             if (self->m_extensions->update(name)) {
                 self->m_mcp->stopAll();
                 self->m_mcp->startAll();
