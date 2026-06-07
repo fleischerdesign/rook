@@ -78,6 +78,7 @@ bool ExtensionManager::install(std::string_view github_url)
     ext.skills = manifest.skills;
     ext.commands = manifest.commands;
     ext.context_files = manifest.context_files;
+    ext.plugin_paths = manifest.plugin_paths;
 
     registerMcpServers(ext);
 
@@ -209,6 +210,7 @@ void ExtensionManager::loadFromConfig(std::string_view json)
                     ext.skills = manifest.skills;
                     ext.commands = manifest.commands;
                     ext.context_files = manifest.context_files;
+                    ext.plugin_paths = manifest.plugin_paths;
                 }
 
                 if (entry.contains("disabled_servers") &&

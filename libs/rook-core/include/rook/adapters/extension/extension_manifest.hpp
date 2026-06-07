@@ -56,6 +56,7 @@ struct ExtensionManifest {
     std::vector<ExtensionSkill> skills;
     std::vector<ExtensionCommand> commands;
     std::vector<ExtensionContextFile> context_files;
+    std::vector<std::string> plugin_paths;
 
     bool valid = false;
     std::string error;
@@ -75,6 +76,7 @@ struct InstalledExtension {
     std::vector<ExtensionSkill> skills;
     std::vector<ExtensionCommand> commands;
     std::vector<ExtensionContextFile> context_files;
+    std::vector<std::string> plugin_paths;
 };
 
 ExtensionManifest parseManifest(std::string_view json);

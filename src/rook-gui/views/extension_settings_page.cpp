@@ -176,6 +176,18 @@ void ExtensionSettingsPage::refreshList()
             row->add_row(std::move(cf_label).release_floating_ptr());
         }
 
+        if (!ext.plugin_paths.empty()) {
+            auto plug_label = Adw::ActionRow::create();
+            plug_label->set_title(_("Plugins"));
+            std::string names;
+            for (auto& pp : ext.plugin_paths) {
+                if (!names.empty()) names += ", ";
+                names += pp;
+            }
+            plug_label->set_subtitle(names.c_str());
+            row->add_row(std::move(plug_label).release_floating_ptr());
+        }
+
         std::string name = ext.name;
         std::string url = ext.url;
 

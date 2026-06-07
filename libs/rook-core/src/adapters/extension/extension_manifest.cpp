@@ -98,6 +98,13 @@ ExtensionManifest parseManifest(std::string_view json)
             }
         }
 
+        if (j.contains("plugins") && j["plugins"].is_array()) {
+            for (auto& p : j["plugins"]) {
+                if (p.is_string())
+                    m.plugin_paths.push_back(p.get<std::string>());
+            }
+        }
+
         m.valid = true;
     } catch (const std::exception& e) {
         m.error = std::string("failed to parse manifest: ") + e.what();

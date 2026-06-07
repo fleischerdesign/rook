@@ -366,6 +366,19 @@ void RookApplication::loadHookPlugins()
         m_actor->hooks().registerHook(std::move(hook));
     }
 
+    if (m_extensions) {
+        for (auto& ext : m_extensions->listInstalled()) {
+            for (auto& plugin_path : ext.plugin_paths) {
+                auto full = ext.install_path + "/" + plugin_path;
+                auto ext_hooks = m_plugin_loader.loadFromDirectory(
+                    full, core_api);
+                for (auto& hook : ext_hooks) {
+                    m_actor->hooks().registerHook(std::move(hook));
+                }
+            }
+        }
+    }
+
     m_actor->hooks().registerHook(
         rook::adapters::hook::makeExtensionContextHook(
             m_extensions.get(), &m_custom_skills));

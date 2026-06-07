@@ -140,4 +140,18 @@ TEST(ExtensionManifestTest, MinimalValidManifest)
     EXPECT_TRUE(m.mcp_servers.empty());
     EXPECT_TRUE(m.skills.empty());
     EXPECT_TRUE(m.commands.empty());
+    EXPECT_TRUE(m.plugin_paths.empty());
+}
+
+TEST(ExtensionManifestTest, ParsePlugins)
+{
+    auto m = parseManifest(R"({
+        "name": "with-plugins",
+        "plugins": ["hooks/audit.so", "hooks/formatter.so"]
+    })");
+
+    EXPECT_TRUE(m.valid);
+    ASSERT_EQ(m.plugin_paths.size(), 2u);
+    EXPECT_EQ(m.plugin_paths[0], "hooks/audit.so");
+    EXPECT_EQ(m.plugin_paths[1], "hooks/formatter.so");
 }
