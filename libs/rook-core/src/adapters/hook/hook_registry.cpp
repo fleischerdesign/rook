@@ -35,4 +35,12 @@ void HookRegistry::trigger(ports::HookPoint point, ports::HookContext& ctx)
     }
 }
 
+bool HookRegistry::contains(std::string_view id) const
+{
+    for (const auto& h : m_hooks) {
+        if (h->id() == id) return true;
+    }
+    return false;
+}
+
 } // namespace rook::adapters::hook

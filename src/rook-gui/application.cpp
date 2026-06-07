@@ -359,11 +359,14 @@ void RookApplication::loadHookPlugins()
     auto core_api = rook::adapters::hook::makeCoreAPI(
         config_json.empty() ? "{}" : config_json);
 
-    auto hooks = m_plugin_loader.loadFromDirectory(m_plugin_dir, core_api);
-    spdlog::info("Loaded {} hook plugin(s) from {}", hooks.size(), m_plugin_dir);
+    auto standalone = m_plugin_loader.loadFromDirectory(m_plugin_dir, core_api);
+    int loaded = 0;
 
-    for (auto& hook : hooks) {
-        m_actor->hooks().registerHook(std::move(hook));
+    for (auto& hook : standalone) {
+        if (!m_actor->hooks().contains(hook->id())) {
+            m_actor->hooks().registerHook(std::move(hook));
+            loaded++;
+        }
     }
 
     if (m_extensions) {
@@ -373,18 +376,28 @@ void RookApplication::loadHookPlugins()
                 auto ext_hooks = m_plugin_loader.loadFromDirectory(
                     full, core_api);
                 for (auto& hook : ext_hooks) {
-                    m_actor->hooks().registerHook(std::move(hook));
+                    if (!m_actor->hooks().contains(hook->id())) {
+                        m_actor->hooks().registerHook(std::move(hook));
+                        loaded++;
+                    }
                 }
             }
         }
     }
 
-    m_actor->hooks().registerHook(
-        rook::adapters::hook::makeExtensionContextHook(
-            m_extensions.get(), &m_custom_skills));
+    if (loaded > 0)
+        spdlog::info("Loaded {} new hook plugin(s)", loaded);
 
-    m_actor->hooks().registerHook(
-        rook::adapters::hook::makeResponseCleanupHook());
+    if (!m_actor->hooks().contains("builtin.extension_context")) {
+        m_actor->hooks().registerHook(
+            rook::adapters::hook::makeExtensionContextHook(
+                m_extensions.get(), &m_custom_skills));
+    }
+
+    if (!m_actor->hooks().contains("builtin.response_cleanup")) {
+        m_actor->hooks().registerHook(
+            rook::adapters::hook::makeResponseCleanupHook());
+    }
 }
 
 void RookApplication::saveConfig()
@@ -470,6 +483,8 @@ void RookApplication::saveConfig()
 
     m_store->saveConfig(j.dump(2));
     spdlog::info("Config saved to {}", m_data_dir);
+
+    loadHookPlugins();
 }
 
 } // namespace rook::gui
