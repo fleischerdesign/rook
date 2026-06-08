@@ -17,6 +17,8 @@ if gtest_dep.found()
     'unit/test_extension.cpp',
     'unit/test_plugin_loader.cpp',
     'unit/test_ring_buffer.cpp',
+    'unit/test_audio_pipeline.cpp',
+    include_directories: include_directories('..'),
     dependencies: test_deps,
     build_by_default: false,
   )

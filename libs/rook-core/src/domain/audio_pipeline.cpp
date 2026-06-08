@@ -62,7 +62,6 @@ void AudioPipeline::disable() {
 }
 
 void AudioPipeline::mute() {
-    if (!m_enabled.load(std::memory_order_acquire)) return;
     if (m_muted.exchange(true, std::memory_order_acq_rel)) return;
 
     stopListening();
@@ -72,14 +71,15 @@ void AudioPipeline::mute() {
 }
 
 void AudioPipeline::unmute() {
-    if (!m_enabled.load(std::memory_order_acquire)) return;
     if (!m_muted.exchange(false, std::memory_order_acq_rel)) return;
 
-    startListening();
+    if (m_enabled.load(std::memory_order_acquire))
+        startListening();
     SPDLOG_DEBUG("AudioPipeline: unmuted");
 }
 
 void AudioPipeline::startListening() {
+    stopListening();
     m_ring_buffer.clear();
     m_voice_active.store(true, std::memory_order_release);
 
