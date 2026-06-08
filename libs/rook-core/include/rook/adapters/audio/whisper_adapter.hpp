@@ -10,7 +10,7 @@ namespace rook::adapters::audio {
 class WhisperAdapter : public ports::SpeechToTextPort {
 public:
     explicit WhisperAdapter(std::string model_path = {});
-    ~WhisperAdapter() override = default;
+    ~WhisperAdapter() override;
 
     std::string id() const override { return "whisper"; }
     std::string engineName() const override { return "whisper.cpp"; }

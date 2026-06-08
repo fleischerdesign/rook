@@ -14,6 +14,13 @@
 #include "rook/ports/tool_port.hpp"
 #include "rook/adapters/extension/extension_manifest.hpp"
 
+namespace rook::ports {
+class WakewordPort;
+class SpeechToTextPort;
+class TextToSpeechPort;
+class AudioDevicePort;
+}
+
 namespace rook::core { class DomainActor; }
 
 namespace rook::gui {
@@ -38,6 +45,10 @@ class RookWindow final : public peel::Adw::ApplicationWindow
     rook::ports::ExtensionPort *m_extensions = nullptr;
     std::vector<rook::adapters::extension::CustomSkill> *m_custom_skills = nullptr;
     rook::ports::ToolPermissionPort *m_permission_port = nullptr;
+    rook::ports::WakewordPort* m_wakeword = nullptr;
+    rook::ports::SpeechToTextPort* m_stt = nullptr;
+    rook::ports::TextToSpeechPort* m_tts = nullptr;
+    rook::ports::AudioDevicePort* m_audio_device = nullptr;
 
     inline void init(Class *);
 
@@ -55,6 +66,10 @@ public:
                                std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
                                std::function<void()> save_fn,
                                std::function<void(std::string_view)> before_uninstall_fn = {},
+                               rook::ports::WakewordPort* wakeword = nullptr,
+                               rook::ports::SpeechToTextPort* stt = nullptr,
+                               rook::ports::TextToSpeechPort* tts = nullptr,
+                               rook::ports::AudioDevicePort* audio_device = nullptr,
                                rook::ports::ToolPermissionPort *permission_port = nullptr);
 
     void refreshModels();

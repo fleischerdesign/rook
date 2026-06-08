@@ -20,6 +20,10 @@
 #include "rook/adapters/extension/extension_manager.hpp"
 #include "rook/adapters/hook/builtin_hooks.hpp"
 #include "rook/adapters/hook/core_api_provider.hpp"
+#include "rook/adapters/audio/miniaudio_adapter.hpp"
+#include "rook/adapters/audio/openwakeword_adapter.hpp"
+#include "rook/adapters/audio/whisper_adapter.hpp"
+#include "rook/adapters/audio/piper_adapter.hpp"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <future>
@@ -170,6 +174,19 @@ inline void RookApplication::init(Class *)
 
     loadHookPlugins();
 
+    m_audio_device = std::make_unique<rook::adapters::audio::MiniaudioAdapter>();
+    m_wakeword = std::make_unique<rook::adapters::audio::OpenWakeWordAdapter>();
+    m_stt = std::make_unique<rook::adapters::audio::WhisperAdapter>();
+    m_tts = std::make_unique<rook::adapters::audio::PiperAdapter>();
+    m_actor->setupAudio(*m_wakeword, *m_stt, *m_tts, *m_audio_device);
+
+    if (m_wakeword->isReady())
+        SPDLOG_INFO("wakeword engine ready: {}", m_wakeword->engineName());
+    if (m_stt->isReady())
+        SPDLOG_INFO("STT engine ready: {}", m_stt->engineName());
+    if (m_tts->isReady())
+        SPDLOG_INFO("TTS engine ready: {}", m_tts->engineName());
+
     auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);
     prefs_action->connect_activate(
         [this](Gio::SimpleAction *, GLib::Variant *) {
@@ -242,6 +259,7 @@ inline void RookApplication::vfunc_activate()
         &m_custom_skills,
         [this]() { saveConfig(); },
         [this](std::string_view name) { deactivateExtensionHooks(name); },
+        m_wakeword.get(), m_stt.get(), m_tts.get(), m_audio_device.get(),
         m_permission_port.get());
     m_window = window;
     window->present();

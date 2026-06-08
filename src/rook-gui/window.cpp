@@ -33,6 +33,10 @@ RookWindow *RookWindow::create(Gtk::Application *app,
                                 std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
                                 std::function<void()> save_fn,
                                 std::function<void(std::string_view)> before_uninstall_fn,
+                                rook::ports::WakewordPort* wakeword,
+                                rook::ports::SpeechToTextPort* stt,
+                                rook::ports::TextToSpeechPort* tts,
+                                rook::ports::AudioDevicePort* audio_device,
                                 rook::ports::ToolPermissionPort *permission_port)
 {
     auto *win = Object::create<RookWindow>(prop_application(), app);
@@ -43,6 +47,10 @@ RookWindow *RookWindow::create(Gtk::Application *app,
     win->m_security = security;
     win->m_extensions = extensions;
     win->m_custom_skills = custom_skills;
+    win->m_wakeword = wakeword;
+    win->m_stt = stt;
+    win->m_tts = tts;
+    win->m_audio_device = audio_device;
     win->m_permission_port = permission_port;
 
     auto sidebar = ChatSidebar::create(bus, actor);
@@ -98,7 +106,8 @@ void RookWindow::onPreferences()
 {
     auto prefs = PreferencesWindow::create(*m_llm, m_mcp, m_security,
                                             m_extensions, m_custom_skills,
-                                            m_save_fn, m_before_uninstall_fn, nullptr, nullptr, nullptr, nullptr);
+                                            m_save_fn, m_before_uninstall_fn,
+                                            m_wakeword, m_stt, m_tts, m_audio_device);
     prefs->present(this);
 }
 

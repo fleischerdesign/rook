@@ -88,6 +88,8 @@ WhisperAdapter::WhisperAdapter(std::string model_path)
     }
 }
 
+WhisperAdapter::~WhisperAdapter() = default;
+
 bool WhisperAdapter::isReady() const {
     return !m_impl->binary_path.empty() && !m_impl->model_path.empty() &&
            std::filesystem::exists(m_impl->model_path);

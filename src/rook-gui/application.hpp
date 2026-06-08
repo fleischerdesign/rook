@@ -23,6 +23,13 @@
 #include "rook/ports/tool_port.hpp"
 #include "rook/adapters/hook/plugin_loader.hpp"
 
+namespace rook::ports {
+class WakewordPort;
+class SpeechToTextPort;
+class TextToSpeechPort;
+class AudioDevicePort;
+}
+
 namespace rook::gui {
 
 class RookWindow;
@@ -57,6 +64,10 @@ class RookApplication final : public peel::Adw::Application
     std::unique_ptr<rook::adapters::extension::ExtensionManager> m_extensions;
     std::vector<rook::adapters::extension::CustomSkill> m_custom_skills;
     std::unique_ptr<rook::ports::ToolPermissionPort> m_permission_port;
+    std::unique_ptr<rook::ports::WakewordPort> m_wakeword;
+    std::unique_ptr<rook::ports::SpeechToTextPort> m_stt;
+    std::unique_ptr<rook::ports::TextToSpeechPort> m_tts;
+    std::unique_ptr<rook::ports::AudioDevicePort> m_audio_device;
     bool m_first_run = true;
     bool m_css_loaded = false;
     std::unique_ptr<TrayIcon> m_tray_icon;
@@ -73,6 +84,10 @@ public:
     rook::adapters::security::SecurityManager* security() { return m_security.get(); }
     rook::adapters::extension::ExtensionManager* extensions() { return m_extensions.get(); }
     std::vector<rook::adapters::extension::CustomSkill>& customSkills() { return m_custom_skills; }
+    rook::ports::WakewordPort* wakeword() { return m_wakeword.get(); }
+    rook::ports::SpeechToTextPort* stt() { return m_stt.get(); }
+    rook::ports::TextToSpeechPort* tts() { return m_tts.get(); }
+    rook::ports::AudioDevicePort* audioDevice() { return m_audio_device.get(); }
 };
 
 } // namespace rook::gui

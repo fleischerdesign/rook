@@ -63,6 +63,8 @@ PiperAdapter::PiperAdapter(std::string model_path, std::string voice_id)
     }
 }
 
+PiperAdapter::~PiperAdapter() = default;
+
 bool PiperAdapter::isReady() const {
     return !m_impl->binary_path.empty() && !m_impl->model_path.empty() &&
            std::filesystem::exists(m_impl->model_path);

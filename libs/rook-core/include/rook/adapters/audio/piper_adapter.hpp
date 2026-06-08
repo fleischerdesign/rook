@@ -11,7 +11,7 @@ class PiperAdapter : public ports::TextToSpeechPort {
 public:
     explicit PiperAdapter(std::string model_path = {},
                           std::string voice_id = {});
-    ~PiperAdapter() override = default;
+    ~PiperAdapter() override;
 
     std::string id() const override { return "piper"; }
     std::string engineName() const override { return "piper"; }
