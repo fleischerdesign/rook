@@ -33,7 +33,11 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
                                                         rook::ports::ExtensionPort *extensions,
                                                         std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
                                                         std::function<void()> on_changed,
-                                                        std::function<void(std::string_view)> on_before_uninstall)
+                                                        std::function<void(std::string_view)> on_before_uninstall,
+                                                        rook::ports::WakewordPort* wakeword,
+                                                        rook::ports::SpeechToTextPort* stt,
+                                                        rook::ports::TextToSpeechPort* tts,
+                                                        rook::ports::AudioDevicePort* audio_device)
 {
     auto dialog = Object::create<PreferencesWindow>();
     dialog->set_title(_("Preferences"));
@@ -57,7 +61,8 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
             [on_changed] { on_changed(); },
             on_before_uninstall);
 
-    dialog->m_impl->voice = VoiceSettingsPage::create();
+    dialog->m_impl->voice = VoiceSettingsPage::create(wakeword, stt, tts, audio_device,
+                                                       [on_changed] { on_changed(); });
     dialog->m_impl->appearance = AppearancePage::create();
 
     auto llm_page = Adw::PreferencesPage::create();

@@ -98,7 +98,7 @@ void RookWindow::onPreferences()
 {
     auto prefs = PreferencesWindow::create(*m_llm, m_mcp, m_security,
                                             m_extensions, m_custom_skills,
-                                            m_save_fn, m_before_uninstall_fn);
+                                            m_save_fn, m_before_uninstall_fn, nullptr, nullptr, nullptr, nullptr);
     prefs->present(this);
 }
 

@@ -10,6 +10,13 @@
 #include "rook/ports/extension_port.hpp"
 #include "rook/adapters/extension/extension_manifest.hpp"
 
+namespace rook::ports {
+class WakewordPort;
+class SpeechToTextPort;
+class TextToSpeechPort;
+class AudioDevicePort;
+}
+
 namespace rook::gui {
 
 class PreferencesWindow final : public peel::Adw::PreferencesDialog {
@@ -22,7 +29,11 @@ public:
                                                       rook::ports::ExtensionPort *extensions,
                                                       std::vector<rook::adapters::extension::CustomSkill> *custom_skills,
                                                       std::function<void()> on_changed,
-                                                      std::function<void(std::string_view)> on_before_uninstall = {});
+                                                      std::function<void(std::string_view)> on_before_uninstall = {},
+                                                      rook::ports::WakewordPort* wakeword = nullptr,
+                                                      rook::ports::SpeechToTextPort* stt = nullptr,
+                                                      rook::ports::TextToSpeechPort* tts = nullptr,
+                                                      rook::ports::AudioDevicePort* audio_device = nullptr);
 
 private:
     struct Impl;
