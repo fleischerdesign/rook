@@ -9,6 +9,10 @@
 #include "rook/ports/tool_port.hpp"
 #include "rook/ports/store_port.hpp"
 #include "rook/ports/extension_port.hpp"
+#include "rook/ports/wakeword_port.hpp"
+#include "rook/ports/speech_to_text_port.hpp"
+#include "rook/ports/text_to_speech_port.hpp"
+#include "rook/ports/audio_device_port.hpp"
 #include "rook/adapters/extension/extension_manifest.hpp"
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
@@ -129,6 +133,18 @@ void DomainActor::dispatchMessage(const domain::ActorMessage& msg) {
             handleRenameChat(m);
         else if constexpr (std::is_same_v<T, domain::ActorToggleSkill>)
             handleToggleSkill(m);
+        else if constexpr (std::is_same_v<T, domain::ActorVoiceToggle>)
+            handleVoiceToggle(m);
+        else if constexpr (std::is_same_v<T, domain::ActorVoiceMute>)
+            handleVoiceMute(m);
+        else if constexpr (std::is_same_v<T, domain::ActorWakeDetected>)
+            handleWakeDetected(m);
+        else if constexpr (std::is_same_v<T, domain::ActorSttResultText>)
+            handleSttResult(m);
+        else if constexpr (std::is_same_v<T, domain::ActorTtsFinished>)
+            handleTtsFinished(m);
+        else if constexpr (std::is_same_v<T, domain::ActorResponseReady>)
+            handleResponseReady(m);
     }, msg);
 }
 
@@ -819,6 +835,87 @@ void DomainActor::syncAlwaysOnSkills(std::string_view chat_id) {
     m_conv->setActiveSkillIds(chat_id, active_ids);
     auto prompt = buildSystemPrompt(chat_id);
     m_conv->updateSystemMessage(chat_id, prompt.empty() ? "" : prompt);
+}
+
+void DomainActor::setupAudio(ports::WakewordPort& wakeword,
+                              ports::SpeechToTextPort& stt,
+                              ports::TextToSpeechPort& tts,
+                              ports::AudioDevicePort& audio_device) {
+    m_audio_pipeline = std::make_unique<domain::AudioPipeline>(
+        wakeword, stt, tts, audio_device);
+
+    m_audio_pipeline->setEvents({
+        .on_wake = [this](std::string keyword) {
+            domain::ActorWakeDetected msg{std::move(keyword)};
+            m_inbox->push(std::move(msg));
+        },
+        .on_stt_result = [this](std::string transcript, bool is_final) {
+            domain::ActorSttResultText msg{std::move(transcript), is_final};
+            m_inbox->push(std::move(msg));
+        },
+        .on_tts_done = [this]() {
+            m_inbox->push(domain::ActorTtsFinished{});
+        },
+        .on_state_change = [this](ports::AudioState old_state,
+                                   ports::AudioState new_state) {
+            emitUiEvent(domain::AudioStateChanged{
+                static_cast<int>(old_state),
+                static_cast<int>(new_state)
+            });
+        },
+    });
+}
+
+void DomainActor::handleVoiceToggle(const domain::ActorVoiceToggle& msg) {
+    if (!m_audio_pipeline) return;
+    if (msg.enabled)
+        m_audio_pipeline->enable();
+    else
+        m_audio_pipeline->disable();
+}
+
+void DomainActor::handleVoiceMute(const domain::ActorVoiceMute& msg) {
+    if (!m_audio_pipeline) return;
+    if (msg.muted)
+        m_audio_pipeline->mute();
+    else
+        m_audio_pipeline->unmute();
+}
+
+void DomainActor::handleWakeDetected(const domain::ActorWakeDetected& msg) {
+    emitUiEvent(domain::AudioWakeDetected{msg.keyword});
+}
+
+void DomainActor::handleSttResult(const domain::ActorSttResultText& msg) {
+    emitUiEvent(domain::SttResult{msg.transcript, msg.is_final});
+
+    auto active = m_conv->active();
+    if (!active.has_value()) return;
+    auto chat_id = active->id;
+
+    emitUiEvent(domain::UserInputReceived{
+        .chat_id = chat_id,
+        .content = msg.transcript,
+        .source = "voice",
+        .model = active->model,
+    });
+
+    domain::ActorUserInput input_msg{
+        .chat_id = chat_id,
+        .content = msg.transcript,
+        .model = active->model,
+    };
+    handleUserInput(input_msg);
+}
+
+void DomainActor::handleTtsFinished(const domain::ActorTtsFinished&) {
+    emitUiEvent(domain::TtsCompleted{});
+}
+
+void DomainActor::handleResponseReady(const domain::ActorResponseReady& msg) {
+    if (!m_audio_pipeline) return;
+    emitUiEvent(domain::TtsStarted{msg.text});
+    m_audio_pipeline->onResponseReady(msg.text);
 }
 
 void DomainActor::saveActiveConv() {

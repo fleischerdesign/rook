@@ -116,6 +116,30 @@ struct ActorDeleteExtension {
     std::string ext_name;
 };
 
+struct ActorVoiceToggle {
+    bool enabled;
+};
+
+struct ActorVoiceMute {
+    bool muted;
+};
+
+struct ActorWakeDetected {
+    std::string keyword;
+};
+
+struct ActorSttResultText {
+    std::string transcript;
+    bool is_final = false;
+};
+
+struct ActorTtsFinished {};
+
+struct ActorResponseReady {
+    std::string chat_id;
+    std::string text;
+};
+
 using ActorMessage = std::variant<
     ActorUserInput,
     ActorLlmChunk,
@@ -135,7 +159,13 @@ using ActorMessage = std::variant<
     ActorRenameChat,
     ActorToggleSkill,
     ActorCancelChat,
-    ActorDeleteExtension
+    ActorDeleteExtension,
+    ActorVoiceToggle,
+    ActorVoiceMute,
+    ActorWakeDetected,
+    ActorSttResultText,
+    ActorTtsFinished,
+    ActorResponseReady
 >;
 
 struct StateConversation {

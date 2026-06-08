@@ -1,5 +1,6 @@
 librook_core_sources = files(
   'src/domain/conversation.cpp',
+  'src/domain/audio_pipeline.cpp',
   'src/core/domain_actor.cpp',
   'src/core/worker_pool.cpp',
   'src/core/settings.cpp',

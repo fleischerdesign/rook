@@ -13,6 +13,7 @@
 #include "rook/core/actor_messages.hpp"
 #include "rook/domain/events.hpp"
 #include "rook/adapters/hook/hook_registry.hpp"
+#include "rook/domain/audio_pipeline.hpp"
 
 namespace rook::ports {
 class LlmPort;
@@ -20,6 +21,10 @@ class ToolPort;
 class ToolPermissionPort;
 class StorePort;
 class ExtensionPort;
+class WakewordPort;
+class SpeechToTextPort;
+class TextToSpeechPort;
+class AudioDevicePort;
 }
 
 namespace rook::adapters::extension {
@@ -68,6 +73,11 @@ public:
 
     rook::adapters::hook::HookRegistry& hooks() { return m_hooks; }
 
+    void setupAudio(ports::WakewordPort& wakeword,
+                    ports::SpeechToTextPort& stt,
+                    ports::TextToSpeechPort& tts,
+                    ports::AudioDevicePort& audio_device);
+
 private:
     void run(std::stop_token token);
     void dispatchMessage(const domain::ActorMessage& msg);
@@ -88,6 +98,12 @@ private:
     void handleTogglePin(const struct domain::ActorTogglePin& msg);
     void handleRenameChat(const struct domain::ActorRenameChat& msg);
     void handleToggleSkill(const struct domain::ActorToggleSkill& msg);
+    void handleVoiceToggle(const struct domain::ActorVoiceToggle& msg);
+    void handleVoiceMute(const struct domain::ActorVoiceMute& msg);
+    void handleWakeDetected(const struct domain::ActorWakeDetected& msg);
+    void handleSttResult(const struct domain::ActorSttResultText& msg);
+    void handleTtsFinished(const struct domain::ActorTtsFinished& msg);
+    void handleResponseReady(const struct domain::ActorResponseReady& msg);
 
     void runLlm(std::string chat_id, std::string model);
     void processTools(std::string chat_id, std::string model);
@@ -137,6 +153,7 @@ private:
     std::optional<ActiveBatch> m_active_batch;
 
     rook::adapters::hook::HookRegistry m_hooks;
+    std::unique_ptr<domain::AudioPipeline> m_audio_pipeline;
 };
 
 } // namespace rook::core
