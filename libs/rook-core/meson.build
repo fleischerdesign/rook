@@ -35,6 +35,7 @@ librook_core_sources = files(
   'src/adapters/hook/core_api_provider.cpp',
   'src/adapters/extension/extension_manifest.cpp',
   'src/adapters/extension/extension_manager.cpp',
+  'src/adapters/audio/miniaudio_adapter.cpp',
 )
 
 librook_core_deps = [
@@ -44,7 +45,10 @@ librook_core_deps = [
   dependency('libsecret-1'),
 ]
 
-librook_core_inc = include_directories('include')
+librook_core_inc = include_directories(
+  'include',
+  '../../vendor/miniaudio',
+)
 
 librook_core = shared_library(
   'rook-core',

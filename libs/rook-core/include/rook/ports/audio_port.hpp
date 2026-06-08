@@ -1,46 +1,18 @@
 #pragma once
 
-#include <cstdint>
-#include <functional>
-#include <string_view>
-#include <vector>
+#include "rook/ports/wakeword_port.hpp"
+#include "rook/ports/speech_to_text_port.hpp"
+#include "rook/ports/text_to_speech_port.hpp"
+#include "rook/ports/audio_device_port.hpp"
 
 namespace rook::ports {
 
 enum class AudioState {
-    Idle,
-    WakeListening,
-    Listening,
+    Inactive,
+    WaitingForWake,
+    Recording,
     Processing,
     Speaking,
-};
-
-class AudioPort {
-public:
-    virtual ~AudioPort() = default;
-
-    virtual void startWakeWordDetection(
-        std::function<void()> on_wake
-    ) = 0;
-
-    virtual void stopWakeWordDetection() = 0;
-
-    virtual void startSpeechRecognition(
-        std::function<void(std::string_view transcript, bool is_final)> on_result
-    ) = 0;
-
-    virtual void stopSpeechRecognition() = 0;
-
-    virtual void speak(
-        std::string_view text,
-        std::function<void()> on_done
-    ) = 0;
-
-    virtual void stopSpeaking() = 0;
-
-    virtual void setStateCallback(
-        std::function<void(AudioState)> callback
-    ) = 0;
 };
 
 } // namespace rook::ports
