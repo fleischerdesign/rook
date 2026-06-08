@@ -16,6 +16,7 @@ if gtest_dep.found()
     'unit/test_security_manager.cpp',
     'unit/test_extension.cpp',
     'unit/test_plugin_loader.cpp',
+    'unit/test_ring_buffer.cpp',
     dependencies: test_deps,
     build_by_default: false,
   )
