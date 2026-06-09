@@ -877,6 +877,8 @@ void DomainActor::setupAudio(ports::WakewordPort& wakeword,
             if (mode == domain::VoiceMode::LiveChat) {
                 auto active = m_conv->active();
                 if (!active) return;
+                SPDLOG_INFO("Voice: live utterance transcribing '{}' for chat {}",
+                            transcript, active->id);
                 m_inbox->push(domain::ActorLiveUtterance{
                     .chat_id = active->id,
                     .transcript = std::move(transcript),
@@ -884,6 +886,7 @@ void DomainActor::setupAudio(ports::WakewordPort& wakeword,
                     .is_final = is_final,
                 });
             } else {
+                SPDLOG_INFO("Voice: wakeword query '{}'", transcript);
                 m_inbox->push(domain::ActorWakeQuery{
                     .transcript = std::move(transcript),
                     .is_final = is_final,
@@ -995,10 +998,13 @@ void DomainActor::handleTtsFinished(const domain::ActorTtsFinished&) {
 
 void DomainActor::handleVoiceLiveToggle(const domain::ActorVoiceLiveToggle& msg) {
     if (!m_audio_pipeline) return;
-    if (msg.enabled)
+    if (msg.enabled) {
+        SPDLOG_INFO("Voice: live-chat mode enabled for chat {}", msg.chat_id);
         m_audio_pipeline->startLiveMode();
-    else
+    } else {
+        SPDLOG_INFO("Voice: live-chat mode ended for chat {}", msg.chat_id);
         m_audio_pipeline->stopLiveMode();
+    }
 }
 
 void DomainActor::handleBargeIn(const domain::ActorBargeIn&) {

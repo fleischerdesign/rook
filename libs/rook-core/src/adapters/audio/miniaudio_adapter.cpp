@@ -121,7 +121,7 @@ bool MiniaudioAdapter::startCapture(std::string_view device_id,
         if (ma_device_start(&m_impl->capture_device) == MA_SUCCESS) {
             m_impl->capture_cb = std::move(callback);
             m_impl->capture_open = true;
-            SPDLOG_DEBUG("miniaudio capture started (16kHz mono s16)");
+        SPDLOG_INFO("miniaudio capture started (16kHz mono s16)");
             return true;
         }
         SPDLOG_ERROR("miniaudio capture device start failed");
@@ -157,7 +157,7 @@ bool MiniaudioAdapter::startCapture(std::string_view device_id,
 
         m_impl->capture_cb = std::move(callback);
         m_impl->capture_open = true;
-        SPDLOG_DEBUG("miniaudio capture started on fallback device (16kHz mono s16)");
+        SPDLOG_INFO("miniaudio capture started on fallback device '{}' (16kHz mono s16)", devices[i].name);
         return true;
     }
 
@@ -213,7 +213,7 @@ bool MiniaudioAdapter::startPlayback(std::string_view device_id, int sample_rate
     }
 
     m_impl->playback_open = true;
-    SPDLOG_DEBUG("miniaudio playback started ({}Hz mono f32)", sample_rate);
+    SPDLOG_INFO("miniaudio playback started ({}Hz mono f32)", sample_rate);
     return true;
 }
 

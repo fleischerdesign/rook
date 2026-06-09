@@ -41,7 +41,7 @@ void AudioPipeline::enable() {
     }
 
     m_enabled.store(true, std::memory_order_release);
-    SPDLOG_DEBUG("AudioPipeline: voice enabled (mode={})",
+    SPDLOG_INFO("AudioPipeline: voice enabled (mode={})",
                  mode == VoiceMode::Wakeword ? "wakeword" : "live");
 
     if (!m_muted.load(std::memory_order_acquire)) {
@@ -62,7 +62,7 @@ void AudioPipeline::disable() {
     m_audio_device.stopPlayback();
     transition(ports::AudioState::Inactive);
 
-    SPDLOG_DEBUG("AudioPipeline: voice disabled");
+    SPDLOG_INFO("AudioPipeline: voice disabled");
 }
 
 void AudioPipeline::setMode(VoiceMode mode) {
@@ -85,6 +85,7 @@ void AudioPipeline::stopLiveMode() {
         auto audio = std::move(m_recording_buffer);
         m_recording_buffer.clear();
         transition(ports::AudioState::Processing);
+        SPDLOG_INFO("AudioPipeline: live-chat recording stopped, transcribing {} samples", audio.size());
 
         auto cur_mode = VoiceMode::LiveChat;
         m_stt.transcribe(audio.data(), audio.size(), 16000,
@@ -108,7 +109,7 @@ void AudioPipeline::onBargeInDetected() {
     if (state != ports::AudioState::Speaking) return;
     if (m_mode.load(std::memory_order_acquire) != VoiceMode::LiveChat) return;
 
-    SPDLOG_DEBUG("AudioPipeline: barge-in detected");
+    SPDLOG_INFO("AudioPipeline: barge-in detected");
     stopSpeaking();
     m_recording_buffer.clear();
     m_silence_counter = 0;
@@ -161,13 +162,15 @@ void AudioPipeline::startListening() {
     m_worker = std::jthread(&AudioPipeline::runWorker, this);
 
     auto mode = m_mode.load(std::memory_order_acquire);
+    SPDLOG_INFO("AudioPipeline: capture started, worker running (mode={})",
+                mode == VoiceMode::LiveChat ? "live" : "wakeword");
 
     if (mode == VoiceMode::LiveChat) {
         m_recording_buffer.clear();
         m_silence_counter = 0;
         m_recording_frames = 0;
         transition(ports::AudioState::Recording);
-        SPDLOG_DEBUG("AudioPipeline: live-chat recording started");
+        SPDLOG_INFO("AudioPipeline: live-chat recording started (mic active)");
     } else {
         transition(ports::AudioState::WaitingForWake);
     }
@@ -248,7 +251,7 @@ void AudioPipeline::runWorker() {
 
 void AudioPipeline::processWakeword(const int16_t* pcm, std::size_t) {
     if (m_wakeword.processFrame(pcm)) {
-        SPDLOG_DEBUG("AudioPipeline: wakeword detected");
+        SPDLOG_INFO("AudioPipeline: wakeword detected");
         m_recording_buffer.clear();
         m_silence_counter = 0;
         m_recording_frames = 0;
@@ -298,7 +301,7 @@ void AudioPipeline::processRecording(const int16_t* pcm, std::size_t count) {
                                            result.is_final, cur_mode);
             });
 
-        SPDLOG_DEBUG("AudioPipeline: recording done ({} samples, reason={})",
+        SPDLOG_INFO("AudioPipeline: recording done ({} samples, reason={})",
                      audio.size(), timeout ? "silence" : "max_dur");
     }
 }
@@ -338,7 +341,7 @@ void AudioPipeline::startSpeaking(std::string text) {
         (void)sample_rate;
         m_audio_device.writePlayback(pcm, sample_count);
         if (is_last) {
-            SPDLOG_DEBUG("AudioPipeline: TTS finished");
+            SPDLOG_INFO("AudioPipeline: TTS finished");
             m_audio_device.stopPlayback();
             if (m_events.on_tts_done) {
                 m_events.on_tts_done();
@@ -369,7 +372,7 @@ void AudioPipeline::transition(ports::AudioState to) {
     auto from = m_state.exchange(to, std::memory_order_acq_rel);
     if (from == to) return;
 
-    SPDLOG_DEBUG("AudioPipeline: {} -> {}", static_cast<int>(from), static_cast<int>(to));
+    SPDLOG_INFO("AudioPipeline: state {} -> {}", static_cast<int>(from), static_cast<int>(to));
 
     if (m_events.on_state_change)
         m_events.on_state_change(from, to);
