@@ -103,30 +103,66 @@ bool MiniaudioAdapter::startCapture(std::string_view device_id,
     config.dataCallback     = Impl::onCapture;
     config.pUserData        = m_impl.get();
 
+    ma_device_info* devices = nullptr;
+    ma_uint32 count = 0;
+    if (device_id.empty()) {
+        ma_context_get_devices(&m_impl->context, nullptr, nullptr, &devices, &count);
+    }
+
     ma_device_id did;
+
     if (!device_id.empty()) {
         std::memset(&did, 0, sizeof(did));
         std::strncpy(did.alsa, device_id.data(), std::min(sizeof(did.alsa) - 1, device_id.size()));
         config.capture.pDeviceID = &did;
     }
 
-    if (ma_device_init(&m_impl->context, &config, &m_impl->capture_device) != MA_SUCCESS) {
+    if (ma_device_init(&m_impl->context, &config, &m_impl->capture_device) == MA_SUCCESS) {
+        if (ma_device_start(&m_impl->capture_device) == MA_SUCCESS) {
+            m_impl->capture_cb = std::move(callback);
+            m_impl->capture_open = true;
+            SPDLOG_DEBUG("miniaudio capture started (16kHz mono s16)");
+            return true;
+        }
+        SPDLOG_ERROR("miniaudio capture device start failed");
+        ma_device_uninit(&m_impl->capture_device);
+        std::memset(&m_impl->capture_device, 0, sizeof(m_impl->capture_device));
+    }
+
+    if (!device_id.empty() || count == 0) {
         SPDLOG_ERROR("miniaudio capture device init failed");
         return false;
     }
 
-    m_impl->capture_cb = std::move(callback);
+    for (ma_uint32 i = 0; i < count; ++i) {
+        if (devices[i].id.alsa[0] == '\0') continue;
+        SPDLOG_INFO("miniaudio: falling back to capture device '{}'", devices[i].name);
 
-    if (ma_device_start(&m_impl->capture_device) != MA_SUCCESS) {
-        SPDLOG_ERROR("miniaudio capture device start failed");
-        ma_device_uninit(&m_impl->capture_device);
-        std::memset(&m_impl->capture_device, 0, sizeof(m_impl->capture_device));
-        return false;
+        auto fb_config = ma_device_config_init(ma_device_type_capture);
+        fb_config.capture.format   = ma_format_s16;
+        fb_config.capture.channels = 1;
+        fb_config.sampleRate       = 16000;
+        fb_config.periodSizeInFrames = 480;
+        fb_config.dataCallback     = Impl::onCapture;
+        fb_config.pUserData        = m_impl.get();
+        fb_config.capture.pDeviceID = &devices[i].id;
+
+        if (ma_device_init(&m_impl->context, &fb_config, &m_impl->capture_device) != MA_SUCCESS)
+            continue;
+        if (ma_device_start(&m_impl->capture_device) != MA_SUCCESS) {
+            ma_device_uninit(&m_impl->capture_device);
+            std::memset(&m_impl->capture_device, 0, sizeof(m_impl->capture_device));
+            continue;
+        }
+
+        m_impl->capture_cb = std::move(callback);
+        m_impl->capture_open = true;
+        SPDLOG_DEBUG("miniaudio capture started on fallback device (16kHz mono s16)");
+        return true;
     }
 
-    m_impl->capture_open = true;
-    SPDLOG_DEBUG("miniaudio capture started (16kHz mono s16)");
-    return true;
+    SPDLOG_ERROR("miniaudio: no capture device available");
+    return false;
 }
 
 void MiniaudioAdapter::stopCapture() {

@@ -80,6 +80,22 @@ void AudioPipeline::stopLiveMode() {
     m_live_mode_active.store(false, std::memory_order_release);
     setMode(VoiceMode::Wakeword);
 
+    auto state = m_state.load(std::memory_order_acquire);
+    if (state == ports::AudioState::Recording && !m_recording_buffer.empty()) {
+        auto audio = std::move(m_recording_buffer);
+        m_recording_buffer.clear();
+        transition(ports::AudioState::Processing);
+
+        auto cur_mode = VoiceMode::LiveChat;
+        m_stt.transcribe(audio.data(), audio.size(), 16000,
+            [this, cur_mode](ports::SttResult result) {
+                if (m_events.on_stt_result)
+                    m_events.on_stt_result(std::move(result.transcript),
+                                           result.is_final, cur_mode);
+            });
+        return;
+    }
+
     if (m_enabled.load(std::memory_order_acquire) &&
         !m_muted.load(std::memory_order_acquire)) {
         stopListening();
@@ -129,9 +145,17 @@ void AudioPipeline::startListening() {
     g_free(mic_device);
     g_object_unref(s);
 
-    m_audio_device.startCapture(device_id, [this](const int16_t* pcm, std::size_t frame_count) {
-        m_ring_buffer.write(pcm, frame_count);
-    });
+    bool capture_ok = m_audio_device.startCapture(device_id,
+        [this](const int16_t* pcm, std::size_t frame_count) {
+            m_ring_buffer.write(pcm, frame_count);
+        });
+
+    if (!capture_ok) {
+        SPDLOG_ERROR("AudioPipeline: capture start failed, voice unavailable");
+        m_voice_active.store(false, std::memory_order_release);
+        transition(ports::AudioState::Inactive);
+        return;
+    }
 
     m_worker_running.store(true, std::memory_order_release);
     m_worker = std::jthread(&AudioPipeline::runWorker, this);
