@@ -121,7 +121,8 @@ bool MiniaudioAdapter::startCapture(std::string_view device_id,
         if (ma_device_start(&m_impl->capture_device) == MA_SUCCESS) {
             m_impl->capture_cb = std::move(callback);
             m_impl->capture_open = true;
-        SPDLOG_INFO("miniaudio capture started (16kHz mono s16)");
+            SPDLOG_INFO("miniaudio capture started on '{}' (16kHz mono s16)",
+                        device_id.empty() ? "default" : device_id);
             return true;
         }
         SPDLOG_ERROR("miniaudio capture device start failed");
@@ -194,6 +195,12 @@ bool MiniaudioAdapter::startPlayback(std::string_view device_id, int sample_rate
     config.dataCallback      = Impl::onPlayback;
     config.pUserData         = m_impl.get();
 
+    ma_device_info* devices = nullptr;
+    ma_uint32 count = 0;
+    if (device_id.empty()) {
+        ma_context_get_devices(&m_impl->context, &devices, &count, nullptr, nullptr);
+    }
+
     ma_device_id did;
     if (!device_id.empty()) {
         std::memset(&did, 0, sizeof(did));
@@ -201,20 +208,52 @@ bool MiniaudioAdapter::startPlayback(std::string_view device_id, int sample_rate
         config.playback.pDeviceID = &did;
     }
 
-    if (ma_device_init(&m_impl->context, &config, &m_impl->playback_device) != MA_SUCCESS) {
+    if (ma_device_init(&m_impl->context, &config, &m_impl->playback_device) == MA_SUCCESS) {
+        if (ma_device_start(&m_impl->playback_device) == MA_SUCCESS) {
+            m_impl->playback_open = true;
+            SPDLOG_INFO("miniaudio playback started on '{}' ({}Hz mono f32)",
+                        device_id.empty() ? "default" : device_id, sample_rate);
+            return true;
+        }
+        SPDLOG_ERROR("miniaudio playback device start failed");
+        ma_device_uninit(&m_impl->playback_device);
+        std::memset(&m_impl->playback_device, 0, sizeof(m_impl->playback_device));
+    }
+
+    if (!device_id.empty() || count == 0) {
         SPDLOG_ERROR("miniaudio playback device init failed");
         return false;
     }
 
-    if (ma_device_start(&m_impl->playback_device) != MA_SUCCESS) {
-        SPDLOG_ERROR("miniaudio playback device start failed");
-        ma_device_uninit(&m_impl->playback_device);
-        return false;
+    for (ma_uint32 i = 0; i < count; ++i) {
+        if (devices[i].id.alsa[0] == '\0') continue;
+        SPDLOG_INFO("miniaudio: falling back to playback device '{}'", devices[i].name);
+
+        auto fb_config = ma_device_config_init(ma_device_type_playback);
+        fb_config.playback.format   = ma_format_f32;
+        fb_config.playback.channels = 1;
+        fb_config.sampleRate        = static_cast<ma_uint32>(sample_rate);
+        fb_config.periodSizeInFrames = 512;
+        fb_config.dataCallback      = Impl::onPlayback;
+        fb_config.pUserData         = m_impl.get();
+        fb_config.playback.pDeviceID = &devices[i].id;
+
+        if (ma_device_init(&m_impl->context, &fb_config, &m_impl->playback_device) != MA_SUCCESS)
+            continue;
+        if (ma_device_start(&m_impl->playback_device) != MA_SUCCESS) {
+            ma_device_uninit(&m_impl->playback_device);
+            std::memset(&m_impl->playback_device, 0, sizeof(m_impl->playback_device));
+            continue;
+        }
+
+        m_impl->playback_open = true;
+        SPDLOG_INFO("miniaudio playback started on fallback device '{}' ({}Hz mono f32)",
+                     devices[i].name, sample_rate);
+        return true;
     }
 
-    m_impl->playback_open = true;
-    SPDLOG_INFO("miniaudio playback started ({}Hz mono f32)", sample_rate);
-    return true;
+    SPDLOG_ERROR("miniaudio: no playback device available");
+    return false;
 }
 
 bool MiniaudioAdapter::writePlayback(const float* pcm, std::size_t sample_count) {

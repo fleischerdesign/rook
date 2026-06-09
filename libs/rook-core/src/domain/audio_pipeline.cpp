@@ -271,9 +271,6 @@ void AudioPipeline::processRecording(const int16_t* pcm, std::size_t count) {
     m_recording_buffer.insert(m_recording_buffer.end(), pcm, pcm + count);
     m_recording_frames++;
 
-    auto mode = m_mode.load(std::memory_order_acquire);
-    if (mode == VoiceMode::LiveChat) return;
-
     double sum = 0.0;
     for (std::size_t i = 0; i < count; ++i)
         sum += static_cast<double>(pcm[i]) * static_cast<double>(pcm[i]);
@@ -285,8 +282,10 @@ void AudioPipeline::processRecording(const int16_t* pcm, std::size_t count) {
         m_silence_counter = 0;
     }
 
-    bool timeout = m_silence_counter >= k_silence_max;
-    bool max_dur = m_recording_frames >= k_max_recording_frames;
+    auto mode = m_mode.load(std::memory_order_acquire);
+    bool timeout = m_silence_counter >= (mode == VoiceMode::LiveChat ? k_live_silence_max : k_silence_max);
+    bool max_dur = (mode == VoiceMode::LiveChat) ? false
+                   : (m_recording_frames >= k_max_recording_frames);
 
     if (timeout || max_dur) {
         std::vector<int16_t> audio = std::move(m_recording_buffer);

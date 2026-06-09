@@ -71,7 +71,8 @@ PiperAdapter::~PiperAdapter() = default;
 
 bool PiperAdapter::isReady() const {
     return !m_impl->binary_path.empty() && !m_impl->model_path.empty() &&
-           std::filesystem::exists(m_impl->model_path);
+           std::filesystem::exists(m_impl->model_path) &&
+           std::filesystem::exists(m_impl->model_path + ".json");
 }
 
 std::vector<ports::VoiceInfo> PiperAdapter::listVoices() const {
@@ -199,11 +200,21 @@ std::string PiperAdapter::defaultModelUrl() const {
 void PiperAdapter::downloadModel(ProgressFn on_progress, DoneFn on_done) {
     auto path = defaultModelPath();
     std::filesystem::create_directories(std::filesystem::path(path).parent_path());
+
+    auto json_path = path + ".json";
+    auto json_url = defaultModelUrl() + ".json";
+
     downloadFile(defaultModelUrl(), path,
-        [on_progress](float p) { if (on_progress) on_progress(p); },
-        [this, path, on_done](bool success) {
-            if (success) m_impl->model_path = path;
-            if (on_done) on_done(success);
+        [on_progress](float p) { if (on_progress) on_progress(p * 0.8f); },
+        [this, path, json_path, json_url, on_progress, on_done](bool success) {
+            if (!success) { if (on_done) on_done(false); return; }
+
+            downloadFile(json_url, json_path,
+                [on_progress](float p) { if (on_progress) on_progress(0.8f + p * 0.2f); },
+                [this, path, on_done](bool json_success) {
+                    if (json_success) m_impl->model_path = path;
+                    if (on_done) on_done(json_success);
+                });
         });
 }
 
