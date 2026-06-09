@@ -276,6 +276,39 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
         }), settings);
     whisper_list->append(std::move(thold_row).release_floating_ptr());
 
+    auto ent_row = Adw::SpinRow::create_with_range(0.0, 6.0, 0.1);
+    ent_row->set_title(_("Entropy Threshold"));
+    ent_row->set_subtitle(_("Higher = less low-confidence hallucinated text"));
+    ent_row->set_digits(2);
+    auto* raw_ent = reinterpret_cast<::AdwSpinRow*>(
+        static_cast<peel::Adw::SpinRow*>(ent_row));
+    adw_spin_row_set_value(raw_ent,
+        g_settings_get_double(settings, "whisper-entropy-thold"));
+    g_signal_connect(raw_ent, "notify::value",
+        G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
+            auto* s = static_cast<GSettings*>(data);
+            g_settings_set_double(s, "whisper-entropy-thold",
+                adw_spin_row_get_value(row));
+            g_settings_sync();
+        }), settings);
+    whisper_list->append(std::move(ent_row).release_floating_ptr());
+
+    auto nf_switch = Adw::SwitchRow::create();
+    nf_switch->set_title(_("No Temperature Fallback"));
+    nf_switch->set_subtitle(_("Prevents whisper from guessing when uncertain"));
+    auto* raw_nf = reinterpret_cast<::AdwSwitchRow*>(
+        static_cast<peel::Adw::SwitchRow*>(nf_switch));
+    adw_switch_row_set_active(raw_nf,
+        g_settings_get_boolean(settings, "whisper-no-fallback"));
+    g_signal_connect(raw_nf, "notify::active",
+        G_CALLBACK(+[](::AdwSwitchRow* sw, GParamSpec*, gpointer data) {
+            auto* s = static_cast<GSettings*>(data);
+            g_settings_set_boolean(s, "whisper-no-fallback",
+                adw_switch_row_get_active(sw));
+            g_settings_sync();
+        }), settings);
+    whisper_list->append(std::move(nf_switch).release_floating_ptr());
+
     group.add(std::move(whisper_list).release_floating_ptr());
 
     if (m_audio_device) {

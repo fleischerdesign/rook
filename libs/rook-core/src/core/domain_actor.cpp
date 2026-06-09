@@ -875,21 +875,25 @@ void DomainActor::setupAudio(ports::WakewordPort& wakeword,
         },
         .on_stt_result = [this](std::string transcript, bool is_final,
                                  domain::VoiceMode mode) {
+            auto trimmed = transcript;
+            trimmed.erase(0, trimmed.find_first_not_of(" \n\r\t"));
+            trimmed.erase(trimmed.find_last_not_of(" \n\r\t") + 1);
+            if (trimmed.empty()) return;
             if (mode == domain::VoiceMode::LiveChat) {
                 auto active = m_conv->active();
                 if (!active) return;
                 SPDLOG_INFO("Voice: live utterance transcribing '{}' for chat {}",
-                            transcript, active->id);
+                            trimmed, active->id);
                 m_inbox->push(domain::ActorLiveUtterance{
                     .chat_id = active->id,
-                    .transcript = std::move(transcript),
+                    .transcript = std::move(trimmed),
                     .model = active->model,
                     .is_final = is_final,
                 });
             } else {
-                SPDLOG_INFO("Voice: wakeword query '{}'", transcript);
+                SPDLOG_INFO("Voice: wakeword query '{}'", trimmed);
                 m_inbox->push(domain::ActorWakeQuery{
-                    .transcript = std::move(transcript),
+                    .transcript = std::move(trimmed),
                     .is_final = is_final,
                 });
             }

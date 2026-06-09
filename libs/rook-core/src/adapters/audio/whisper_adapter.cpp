@@ -161,9 +161,12 @@ void WhisperAdapter::transcribe(const int16_t* audio, std::size_t sample_count,
 
         auto* s = g_settings_new("io.github.fleischerdesign.Rook");
         bool suppress = g_settings_get_boolean(s, "whisper-suppress-nst");
+        bool no_fallback = g_settings_get_boolean(s, "whisper-no-fallback");
         double thold = g_settings_get_double(s, "whisper-no-speech-thold");
-        char thold_buf[16];
+        double ethold = g_settings_get_double(s, "whisper-entropy-thold");
+        char thold_buf[16], ethold_buf[16];
         std::snprintf(thold_buf, sizeof(thold_buf), "%.2f", thold);
+        std::snprintf(ethold_buf, sizeof(ethold_buf), "%.2f", ethold);
         g_object_unref(s);
 
         std::vector<const char*> argv = {
@@ -174,9 +177,12 @@ void WhisperAdapter::transcribe(const int16_t* audio, std::size_t sample_count,
             "--output-txt",
             "--no-timestamps",
             "--no-speech-thold", thold_buf,
+            "--entropy-thold", ethold_buf,
         };
         if (suppress)
             argv.push_back("--suppress-nst");
+        if (no_fallback)
+            argv.push_back("--no-fallback");
         argv.push_back(nullptr);
 
         ::execvp(m_impl->binary_path.c_str(),
