@@ -36,8 +36,7 @@ void AudioPipeline::enable() {
 
     auto mode = m_mode.load(std::memory_order_acquire);
     if (mode == VoiceMode::Wakeword && !m_wakeword.isReady()) {
-        SPDLOG_WARN("AudioPipeline: wakeword engine not ready");
-        return;
+        SPDLOG_WARN("AudioPipeline: wakeword engine not ready, wakeword detection disabled");
     }
 
     m_enabled.store(true, std::memory_order_release);

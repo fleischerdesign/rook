@@ -187,6 +187,23 @@ inline void RookApplication::init(Class *)
     if (m_tts->isReady())
         SPDLOG_INFO("TTS engine ready: {}", m_tts->engineName());
 
+    auto* voice_settings = g_settings_new("io.github.fleischerdesign.Rook");
+    if (g_settings_get_boolean(voice_settings, "wake-word-enabled")) {
+        m_actor->enableVoice();
+        m_actor->unmuteVoice();
+    }
+
+    g_signal_connect(voice_settings, "changed::wake-word-enabled",
+        G_CALLBACK(+[](GSettings* s, const gchar*, gpointer data) {
+            auto* actor = static_cast<rook::core::DomainActor*>(data);
+            if (g_settings_get_boolean(s, "wake-word-enabled")) {
+                actor->enableVoice();
+                actor->unmuteVoice();
+            } else {
+                actor->disableVoice();
+            }
+        }), m_actor.get());
+
     auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);
     prefs_action->connect_activate(
         [this](Gio::SimpleAction *, GLib::Variant *) {

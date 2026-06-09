@@ -903,6 +903,22 @@ void DomainActor::setupAudio(ports::WakewordPort& wakeword,
     });
 }
 
+void DomainActor::enableVoice() {
+    if (m_audio_pipeline) m_audio_pipeline->enable();
+}
+
+void DomainActor::disableVoice() {
+    if (m_audio_pipeline) m_audio_pipeline->disable();
+}
+
+void DomainActor::muteVoice() {
+    if (m_audio_pipeline) m_audio_pipeline->mute();
+}
+
+void DomainActor::unmuteVoice() {
+    if (m_audio_pipeline) m_audio_pipeline->unmute();
+}
+
 void DomainActor::handleVoiceToggle(const domain::ActorVoiceToggle& msg) {
     if (!m_audio_pipeline) return;
     if (msg.enabled)

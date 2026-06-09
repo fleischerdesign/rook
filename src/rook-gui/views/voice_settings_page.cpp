@@ -4,6 +4,7 @@
 #include <gtk/gtk.h>
 #include <gio/gio.h>
 #include <string>
+#include <future>
 
 #include "rook/adapters/audio/whisper_adapter.hpp"
 #include "rook/adapters/audio/piper_adapter.hpp"
@@ -33,39 +34,97 @@ void VoiceSettingsPage::addEngineRow(Adw::PreferencesGroup &group,
                                       std::string_view name,
                                       bool ready,
                                       std::string_view status_msg,
-                                      std::function<void()> on_download_start)
+                                      std::function<void(VoiceProgressFn, VoiceDoneFn)> on_download)
 {
     auto row = Adw::ActionRow::create();
     row->set_title(std::string(name).c_str());
     row->set_subtitle(std::string(status_msg).c_str());
+    row->set_activatable(false);
 
     if (ready) {
         auto icon = Gtk::Image::create_from_icon_name("emblem-ok-symbolic");
         row->add_suffix(std::move(icon).release_floating_ptr());
-    } else if (on_download_start) {
-        auto btn = Gtk::Button::create_with_label(_("Download Model"));
-        btn->add_css_class("pill");
-        btn->add_css_class("suggested-action");
-        auto* raw_btn = static_cast<Gtk::Button*>(btn);
-        auto fn = std::move(on_download_start);
-        btn->connect_clicked([raw_btn, fn](Gtk::Button*) {
-            raw_btn->set_sensitive(false);
-            raw_btn->set_label(_("Downloading…"));
-            fn();
-            raw_btn->set_label(_("Downloaded ✓"));
-        });
-        row->add_suffix(std::move(btn).release_floating_ptr());
+    } else if (on_download) {
+        auto suffix_stack = Gtk::Stack::create();
+
+        auto download_btn = Gtk::Button::create_with_label(_("Download Model"));
+        download_btn->add_css_class("pill");
+        suffix_stack->add_named(std::move(download_btn).release_floating_ptr(), "button");
+
+        auto prog_box = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 6);
+        auto prog_bar = Gtk::ProgressBar::create();
+        prog_bar->set_hexpand(true);
+        prog_bar->set_valign(Gtk::Align::CENTER);
+        auto prog_label = Gtk::Label::create("0%");
+        prog_label->add_css_class("dim-label");
+        prog_box->append(std::move(prog_bar).release_floating_ptr());
+        prog_box->append(std::move(prog_label).release_floating_ptr());
+        suffix_stack->add_named(std::move(prog_box).release_floating_ptr(), "progress");
+
+        auto done_icon = Gtk::Image::create_from_icon_name("emblem-ok-symbolic");
+        suffix_stack->add_named(std::move(done_icon).release_floating_ptr(), "done");
+
+        suffix_stack->set_visible_child_name("button");
+
+        auto* raw_stack = static_cast<Gtk::Stack*>(suffix_stack);
+        row->add_suffix(std::move(suffix_stack).release_floating_ptr());
+
+        auto* btn_page = gtk_stack_get_child_by_name(
+            reinterpret_cast<::GtkStack*>(raw_stack), "button");
+        auto* raw_btn = GTK_BUTTON(gtk_widget_get_first_child(
+            GTK_WIDGET(btn_page)));
+
+        auto* pb_page = gtk_stack_get_child_by_name(
+            reinterpret_cast<::GtkStack*>(raw_stack), "progress");
+        auto* pb_child = gtk_widget_get_first_child(GTK_WIDGET(pb_page));
+        auto* raw_prog_bar = GTK_PROGRESS_BAR(pb_child);
+        auto* raw_prog_label = GTK_LABEL(gtk_widget_get_next_sibling(pb_child));
+
+        g_signal_connect_data(raw_btn, "clicked",
+            G_CALLBACK(+[](GtkButton*, gpointer data) {
+                auto* d = static_cast<std::function<void()>*>(data);
+                (*d)();
+            }),
+            new std::function<void()>([on_download = std::move(on_download),
+                                        raw_stack, raw_prog_bar, raw_prog_label]() mutable {
+                gtk_stack_set_visible_child_name(reinterpret_cast<::GtkStack*>(raw_stack),
+                                                  "progress");
+                on_download(
+                    [raw_prog_bar, raw_prog_label](float p) {
+                        GLib::idle_add_once([raw_prog_bar, raw_prog_label, p]() {
+                            gtk_progress_bar_set_fraction(raw_prog_bar, p);
+                            auto s = std::to_string(static_cast<int>(p * 100)) + "%";
+                            gtk_label_set_text(raw_prog_label, s.c_str());
+                        });
+                    },
+                    [raw_stack](bool ok) {
+                        if (ok) {
+                            GLib::idle_add_once([raw_stack]() {
+                                gtk_stack_set_visible_child_name(
+                                    reinterpret_cast<::GtkStack*>(raw_stack), "done");
+                            });
+                        } else {
+                            GLib::idle_add_once([raw_stack]() {
+                                gtk_stack_set_visible_child_name(
+                                    reinterpret_cast<::GtkStack*>(raw_stack), "button");
+                            });
+                        }
+                    });
+            }),
+            +[](void* p, GClosure*) { delete static_cast<std::function<void()>*>(p); },
+            GConnectFlags(0));
     } else {
         auto icon = Gtk::Image::create_from_icon_name("dialog-warning-symbolic");
         row->add_suffix(std::move(icon).release_floating_ptr());
     }
 
-    row->set_activatable(false);
     group.add(std::move(row).release_floating_ptr());
 }
 
 void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
 {
+    m_group = &group;
+
     auto heading = Gtk::Label::create(_("Voice"));
     heading->set_xalign(0.0f);
     heading->add_css_class("title-2");
@@ -113,10 +172,12 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
                   : (m_wakeword->needsKey()
                         ? _("Access key required")
                         : _("Engine not available — check installation")),
-            ready ? std::function<void()>{} : [ww]() {
-                auto* oww = dynamic_cast<rook::adapters::audio::OpenWakeWordAdapter*>(ww);
-                if (oww) oww->downloadModel(nullptr, nullptr);
-            });
+            ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{} 
+                  : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
+                      [ww](VoiceProgressFn p, VoiceDoneFn d) {
+                          auto* oww = dynamic_cast<rook::adapters::audio::OpenWakeWordAdapter*>(ww);
+                          if (oww) oww->downloadModel(p, d);
+                      }});
     } else {
         addEngineRow(group, _("Wake Word"), false, _("No engine loaded"), {});
     }
@@ -127,10 +188,12 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
         addEngineRow(group, m_stt->engineName(), ready,
             ready ? _("Ready — speech recognition active")
                   : _("Engine not available — check installation"),
-            ready ? std::function<void()>{} : [stt]() {
-                auto* wa = dynamic_cast<rook::adapters::audio::WhisperAdapter*>(stt);
-                if (wa) wa->downloadModel(nullptr, nullptr);
-            });
+            ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
+                  : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
+                      [stt](VoiceProgressFn p, VoiceDoneFn d) {
+                          auto* wa = dynamic_cast<rook::adapters::audio::WhisperAdapter*>(stt);
+                          if (wa) wa->downloadModel(p, d);
+                      }});
     } else {
         addEngineRow(group, _("Speech Recognition"), false, _("No engine loaded"), {});
     }
@@ -141,10 +204,12 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
         addEngineRow(group, m_tts->engineName(), ready,
             ready ? _("Ready — text-to-speech active")
                   : _("Engine not available — check installation"),
-            ready ? std::function<void()>{} : [tts]() {
-                auto* pa = dynamic_cast<rook::adapters::audio::PiperAdapter*>(tts);
-                if (pa) pa->downloadModel(nullptr, nullptr);
-            });
+            ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
+                  : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
+                      [tts](VoiceProgressFn p, VoiceDoneFn d) {
+                          auto* pa = dynamic_cast<rook::adapters::audio::PiperAdapter*>(tts);
+                          if (pa) pa->downloadModel(p, d);
+                      }});
     } else {
         addEngineRow(group, _("Text-to-Speech"), false, _("No engine loaded"), {});
     }

@@ -80,6 +80,11 @@ public:
                     ports::TextToSpeechPort& tts,
                     ports::AudioDevicePort& audio_device);
 
+    void enableVoice();
+    void disableVoice();
+    void muteVoice();
+    void unmuteVoice();
+
 private:
     void run(std::stop_token token);
     void dispatchMessage(const domain::ActorMessage& msg);

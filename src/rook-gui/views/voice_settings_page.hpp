@@ -1,6 +1,7 @@
 #pragma once
 #include <peel/Gtk/Gtk.h>
 #include <peel/Adw/Adw.h>
+#include <peel/GLib/functions.h>
 #include <memory>
 #include <functional>
 #include "rook/ports/wakeword_port.hpp"
@@ -15,6 +16,9 @@ class OpenWakeWordAdapter;
 }
 
 namespace rook::gui {
+
+using VoiceProgressFn = std::function<void(float progress)>;
+using VoiceDoneFn = std::function<void(bool success)>;
 
 class VoiceSettingsPage {
 public:
@@ -37,12 +41,13 @@ private:
     rook::ports::TextToSpeechPort* m_tts = nullptr;
     rook::ports::AudioDevicePort* m_audio_device = nullptr;
     ChangeFn m_on_changed;
+    peel::Adw::PreferencesGroup* m_group = nullptr;
 
     void addEngineRow(peel::Adw::PreferencesGroup &group,
                       std::string_view name,
                       bool ready,
                       std::string_view status_msg,
-                      std::function<void()> on_download_start);
+                      std::function<void(VoiceProgressFn, VoiceDoneFn)> on_download);
 };
 
 } // namespace rook::gui

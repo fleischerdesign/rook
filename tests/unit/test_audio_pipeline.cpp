@@ -85,7 +85,7 @@ TEST(AudioPipelineTest, EnableTransitionsToWaitingForWake) {
     EXPECT_GE(dev.m_capture_start_count.load(), 1);
 }
 
-TEST(AudioPipelineTest, EnableWhenWakewordNotReadyStaysInactive) {
+TEST(AudioPipelineTest, EnableWhenWakewordNotReadyStartsWithoutWakeword) {
     MockWakewordPort ww;
     ww.m_ready.store(false);
     MockSpeechToTextPort stt;
@@ -96,8 +96,8 @@ TEST(AudioPipelineTest, EnableWhenWakewordNotReadyStaysInactive) {
     pipeline.unmute();
     pipeline.enable();
 
-    EXPECT_EQ(pipeline.state(), AudioState::Inactive);
-    EXPECT_FALSE(pipeline.isVoiceEnabled());
+    EXPECT_TRUE(pipeline.isVoiceEnabled());
+    EXPECT_EQ(pipeline.state(), AudioState::WaitingForWake);
 }
 
 TEST(AudioPipelineTest, WakewordDetectionTransitionsToRecording) {
