@@ -41,6 +41,16 @@
       <summary>Speaker device</summary>
       <description>Audio output device. Empty for system default.</description>
     </key>
+    <key name="whisper-suppress-nst" type="b">
+      <default>true</default>
+      <summary>Suppress noise markers</summary>
+      <description>Filter non-speech tokens like [Music], [Applause], [Laughter] from transcription output.</description>
+    </key>
+    <key name="whisper-no-speech-thold" type="d">
+      <default>0.8</default>
+      <summary>No-speech threshold</summary>
+      <description>Silence detection threshold for whisper. Range 0.0–1.0. Higher = less false positives in silence.</description>
+    </key>
     <key name="language" type="s">
       <default>"de"</default>
       <summary>Interface language</summary>

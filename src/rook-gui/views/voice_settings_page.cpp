@@ -237,6 +237,47 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
 
     group.add(std::move(engine_list).release_floating_ptr());
 
+    addSectionHeading(group, _("Speech Recognition"), 16);
+
+    auto whisper_list = Gtk::ListBox::create();
+    whisper_list->add_css_class("boxed-list");
+    whisper_list->set_selection_mode(Gtk::SelectionMode::NONE);
+
+    auto nst_switch = Adw::SwitchRow::create();
+    nst_switch->set_title(_("Suppress Noise Markers"));
+    nst_switch->set_subtitle(_("Filter [Music], [Applause], [Laughter] from transcriptions"));
+    auto* raw_nst = reinterpret_cast<::AdwSwitchRow*>(
+        static_cast<peel::Adw::SwitchRow*>(nst_switch));
+    adw_switch_row_set_active(raw_nst,
+        g_settings_get_boolean(settings, "whisper-suppress-nst"));
+    g_signal_connect(raw_nst, "notify::active",
+        G_CALLBACK(+[](::AdwSwitchRow* sw, GParamSpec*, gpointer data) {
+            auto* s = static_cast<GSettings*>(data);
+            g_settings_set_boolean(s, "whisper-suppress-nst",
+                adw_switch_row_get_active(sw));
+            g_settings_sync();
+        }), settings);
+    whisper_list->append(std::move(nst_switch).release_floating_ptr());
+
+    auto thold_row = Adw::SpinRow::create_with_range(0.0, 1.0, 0.05);
+    thold_row->set_title(_("No-Speech Threshold"));
+    thold_row->set_subtitle(_("Higher = less false positives in silence"));
+    thold_row->set_digits(2);
+    auto* raw_thold = reinterpret_cast<::AdwSpinRow*>(
+        static_cast<peel::Adw::SpinRow*>(thold_row));
+    adw_spin_row_set_value(raw_thold,
+        g_settings_get_double(settings, "whisper-no-speech-thold"));
+    g_signal_connect(raw_thold, "notify::value",
+        G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
+            auto* s = static_cast<GSettings*>(data);
+            g_settings_set_double(s, "whisper-no-speech-thold",
+                adw_spin_row_get_value(row));
+            g_settings_sync();
+        }), settings);
+    whisper_list->append(std::move(thold_row).release_floating_ptr());
+
+    group.add(std::move(whisper_list).release_floating_ptr());
+
     if (m_audio_device) {
         auto inputs = m_audio_device->enumerateInputs();
         auto outputs = m_audio_device->enumerateOutputs();

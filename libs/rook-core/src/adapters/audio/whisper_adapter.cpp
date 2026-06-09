@@ -2,6 +2,7 @@
 #include "rook/adapters/audio/model_downloader.hpp"
 
 #include <spdlog/spdlog.h>
+#include <gio/gio.h>
 
 #include <array>
 #include <cstdio>
@@ -10,6 +11,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <sstream>
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -157,14 +159,28 @@ void WhisperAdapter::transcribe(const int16_t* audio, std::size_t sample_count,
         const char* lang = ::getenv("LANG");
         const char* slang = (lang && std::string_view(lang).starts_with("de")) ? "de" : "en";
 
-        ::execlp(m_impl->binary_path.c_str(),
-                 "whisper-cli",
-                 "-m", m_impl->model_path.c_str(),
-                 "-f", tmpname,
-                 "-l", slang,
-                 "--output-txt",
-                 "--no-timestamps",
-                 nullptr);
+        auto* s = g_settings_new("io.github.fleischerdesign.Rook");
+        bool suppress = g_settings_get_boolean(s, "whisper-suppress-nst");
+        double thold = g_settings_get_double(s, "whisper-no-speech-thold");
+        char thold_buf[16];
+        std::snprintf(thold_buf, sizeof(thold_buf), "%.2f", thold);
+        g_object_unref(s);
+
+        std::vector<const char*> argv = {
+            "whisper-cli",
+            "-m", m_impl->model_path.c_str(),
+            "-f", tmpname,
+            "-l", slang,
+            "--output-txt",
+            "--no-timestamps",
+            "--no-speech-thold", thold_buf,
+        };
+        if (suppress)
+            argv.push_back("--suppress-nst");
+        argv.push_back(nullptr);
+
+        ::execvp(m_impl->binary_path.c_str(),
+                 const_cast<char* const*>(argv.data()));
         _exit(127);
     }
 
@@ -209,8 +225,29 @@ void WhisperAdapter::transcribe(const int16_t* audio, std::size_t sample_count,
            (transcript.back() == '\n' || transcript.back() == ' ' || transcript.back() == '\r'))
         transcript.pop_back();
 
-    SPDLOG_DEBUG("WhisperAdapter: transcription done ({} chars)", transcript.size());
-    on_result({std::move(transcript), true});
+    std::string clean;
+    for (auto& ch : transcript) {
+        if (ch == '\n') ch = ' ';
+    }
+    std::istringstream iss(transcript);
+    std::string line;
+    while (std::getline(iss, line)) {
+        while (!line.empty() && line.back() == ' ') line.pop_back();
+        while (!line.empty() && line.front() == ' ') line.erase(0, 1);
+        if (line.empty()) continue;
+        if (line.size() > 2 && line.front() == '[' && line.back() == ']')
+            continue;
+        if (!clean.empty()) clean += ' ';
+        clean += line;
+    }
+    if (clean.empty()) {
+        SPDLOG_DEBUG("WhisperAdapter: transcription was noise-only, discarding");
+        on_result({"", false});
+        return;
+    }
+
+    SPDLOG_DEBUG("WhisperAdapter: transcription done ({} chars)", clean.size());
+    on_result({std::move(clean), true});
 }
 
 void WhisperAdapter::cancel() {
