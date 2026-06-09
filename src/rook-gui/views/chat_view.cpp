@@ -48,6 +48,7 @@ inline void ChatView::vfunc_dispose()
         m_bus->unsubscribe(m_perm_request_handler);
         m_bus->unsubscribe(m_perm_timeout_handler);
         m_bus->unsubscribe(m_snapshot_handler);
+        m_bus->unsubscribe(m_voice_input_handler);
         m_bus = nullptr;
     }
     m_snapshot.~SnapshotReady();
@@ -128,6 +129,22 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
     v->m_snapshot_handler = bus.subscribe<rook::domain::SnapshotReady>(
         [v](const rook::domain::SnapshotReady& event) {
             GLib::idle_add_once([v, snap = event]() { v->onSnapshot(snap); });
+        });
+
+    v->m_voice_input_handler = bus.subscribe<rook::domain::UserInputReceived>(
+        [v](const rook::domain::UserInputReceived& event) {
+            if (event.source == "voice_live" || event.source == "voice_wake") {
+                GLib::idle_add_once([v, content = event.content, chat_id = event.chat_id]() {
+                    if (v->m_chat_id == chat_id) {
+                        auto* msg = MessageWidget::create("user", content)
+                            .release_floating_ptr();
+                        v->m_message_list->append(msg);
+                        auto* row = GTK_LIST_BOX_ROW(
+                            gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(msg)));
+                        if (row) gtk_list_box_row_set_activatable(row, FALSE);
+                    }
+                });
+            }
         });
 
     auto stack = Gtk::Stack::create();

@@ -73,6 +73,7 @@ class ChatView final : public peel::Gtk::Box
     rook::domain::EventBus::HandlerId m_perm_request_handler;
     rook::domain::EventBus::HandlerId m_perm_timeout_handler;
     rook::domain::EventBus::HandlerId m_snapshot_handler;
+    rook::domain::EventBus::HandlerId m_voice_input_handler;
 
     peel::Gtk::MenuButton *m_skills_btn = nullptr;
     peel::Gtk::MenuButton *m_welcome_skills_btn = nullptr;
