@@ -93,19 +93,22 @@ std::vector<ports::DeviceInfo> MiniaudioAdapter::enumerateOutputs() const {
 
 bool MiniaudioAdapter::startCapture(std::string_view device_id,
                                      ports::AudioCaptureCallback callback) {
-    (void)device_id;
     if (!m_impl->context_ok || m_impl->capture_open) return false;
 
     auto config = ma_device_config_init(ma_device_type_capture);
     config.capture.format   = ma_format_s16;
     config.capture.channels = 1;
     config.sampleRate       = 16000;
-    config.periodSizeInFrames = 480; // ~10ms at 48kHz, ok for 16kHz too
+    config.periodSizeInFrames = 480;
     config.dataCallback     = Impl::onCapture;
     config.pUserData        = m_impl.get();
 
-    if (!device_id.empty())
-        config.capture.pDeviceID = nullptr; // use default; per-device via context is more complex
+    ma_device_id did;
+    if (!device_id.empty()) {
+        std::memset(&did, 0, sizeof(did));
+        std::strncpy(did.alsa, device_id.data(), std::min(sizeof(did.alsa) - 1, device_id.size()));
+        config.capture.pDeviceID = &did;
+    }
 
     if (ma_device_init(&m_impl->context, &config, &m_impl->capture_device) != MA_SUCCESS) {
         SPDLOG_ERROR("miniaudio capture device init failed");
@@ -142,7 +145,6 @@ bool MiniaudioAdapter::isCaptureActive() const {
 }
 
 bool MiniaudioAdapter::startPlayback(std::string_view device_id, int sample_rate) {
-    (void)device_id;
     if (!m_impl->context_ok || m_impl->playback_open) return false;
 
     m_impl->playback_buffer.clear();
@@ -155,6 +157,13 @@ bool MiniaudioAdapter::startPlayback(std::string_view device_id, int sample_rate
     config.periodSizeInFrames = 512;
     config.dataCallback      = Impl::onPlayback;
     config.pUserData         = m_impl.get();
+
+    ma_device_id did;
+    if (!device_id.empty()) {
+        std::memset(&did, 0, sizeof(did));
+        std::strncpy(did.alsa, device_id.data(), std::min(sizeof(did.alsa) - 1, device_id.size()));
+        config.playback.pDeviceID = &did;
+    }
 
     if (ma_device_init(&m_impl->context, &config, &m_impl->playback_device) != MA_SUCCESS) {
         SPDLOG_ERROR("miniaudio playback device init failed");

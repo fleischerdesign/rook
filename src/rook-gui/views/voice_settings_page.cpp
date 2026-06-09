@@ -14,6 +14,11 @@ using namespace peel;
 
 namespace rook::gui {
 
+struct DeviceData {
+    GSettings* settings;
+    std::vector<rook::ports::DeviceInfo> devices;
+};
+
 std::unique_ptr<VoiceSettingsPage> VoiceSettingsPage::create(
     rook::ports::WakewordPort* wakeword,
     rook::ports::SpeechToTextPort* stt,
@@ -217,12 +222,117 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     if (m_audio_device) {
         auto inputs = m_audio_device->enumerateInputs();
         auto outputs = m_audio_device->enumerateOutputs();
-        auto ok = !inputs.empty() && !outputs.empty();
-        std::string text = ok
-            ? std::string(_("Inputs: ")) + std::to_string(inputs.size()) +
-              std::string(_(", Outputs: ")) + std::to_string(outputs.size())
-            : std::string(_("No audio devices found"));
-        addEngineRow(group, _("Audio Devices"), ok, text, {});
+
+        auto* settings = g_settings_new("io.github.fleischerdesign.Rook");
+
+        auto mic_label = Gtk::Label::create(_("Microphone"));
+        mic_label->set_xalign(0.0f);
+        mic_label->add_css_class("heading");
+        mic_label->set_margin_top(12);
+        group.add(std::move(mic_label).release_floating_ptr());
+
+        auto mic_row = Adw::ComboRow::create();
+        mic_row->set_title(_("Input Device"));
+
+        const char* no_items[] = {nullptr};
+        auto mic_model = Gtk::StringList::create(no_items);
+        int mic_default_idx = 0;
+        for (std::size_t i = 0; i < inputs.size(); ++i) {
+            mic_model->append(inputs[i].name.c_str());
+            if (inputs[i].is_default) mic_default_idx = static_cast<int>(i);
+        }
+        if (inputs.empty())
+            mic_model->append(_("Default"));
+        adw_combo_row_set_model(
+            reinterpret_cast<::AdwComboRow*>(static_cast<peel::Adw::ComboRow*>(mic_row)),
+            G_LIST_MODEL(reinterpret_cast<::GtkStringList*>(
+                static_cast<Gtk::StringList*>(mic_model))));
+
+        char* saved_mic = g_settings_get_string(settings, "microphone-device");
+        if (saved_mic && saved_mic[0]) {
+            for (std::size_t i = 0; i < inputs.size(); ++i) {
+                if (inputs[i].id == saved_mic) {
+                    mic_default_idx = static_cast<int>(i);
+                    break;
+                }
+            }
+        }
+        g_free(saved_mic);
+        mic_row->set_selected(static_cast<unsigned>(mic_default_idx));
+
+        auto* raw_mic = reinterpret_cast<::AdwComboRow*>(
+            static_cast<peel::Adw::ComboRow*>(mic_row));
+        auto* dd_mic = new DeviceData{settings, inputs};
+        g_signal_connect(raw_mic, "notify::selected",
+            G_CALLBACK(+[](::AdwComboRow* row, GParamSpec*, gpointer data) {
+                auto* d = static_cast<DeviceData*>(data);
+                guint sel = adw_combo_row_get_selected(row);
+                if (sel < d->devices.size()) {
+                    g_settings_set_string(d->settings, "microphone-device",
+                                          d->devices[sel].id.c_str());
+                } else {
+                    g_settings_set_string(d->settings, "microphone-device", "");
+                }
+                g_settings_sync();
+            }),
+            dd_mic);
+        (void)raw_mic;
+
+        group.add(std::move(mic_row).release_floating_ptr());
+
+        auto spk_label = Gtk::Label::create(_("Speaker"));
+        spk_label->set_xalign(0.0f);
+        spk_label->add_css_class("heading");
+        spk_label->set_margin_top(8);
+        group.add(std::move(spk_label).release_floating_ptr());
+
+        auto spk_row = Adw::ComboRow::create();
+        spk_row->set_title(_("Output Device"));
+
+        auto spk_model = Gtk::StringList::create(no_items);
+        int spk_default_idx = 0;
+        for (std::size_t i = 0; i < outputs.size(); ++i) {
+            spk_model->append(outputs[i].name.c_str());
+            if (outputs[i].is_default) spk_default_idx = static_cast<int>(i);
+        }
+        if (outputs.empty())
+            spk_model->append(_("Default"));
+        adw_combo_row_set_model(
+            reinterpret_cast<::AdwComboRow*>(static_cast<peel::Adw::ComboRow*>(spk_row)),
+            G_LIST_MODEL(reinterpret_cast<::GtkStringList*>(
+                static_cast<Gtk::StringList*>(spk_model))));
+
+        char* saved_spk = g_settings_get_string(settings, "speaker-device");
+        if (saved_spk && saved_spk[0]) {
+            for (std::size_t i = 0; i < outputs.size(); ++i) {
+                if (outputs[i].id == saved_spk) {
+                    spk_default_idx = static_cast<int>(i);
+                    break;
+                }
+            }
+        }
+        g_free(saved_spk);
+        spk_row->set_selected(static_cast<unsigned>(spk_default_idx));
+
+        auto* raw_spk = reinterpret_cast<::AdwComboRow*>(
+            static_cast<peel::Adw::ComboRow*>(spk_row));
+        auto* dd_spk = new DeviceData{settings, outputs};
+        g_signal_connect(raw_spk, "notify::selected",
+            G_CALLBACK(+[](::AdwComboRow* row, GParamSpec*, gpointer data) {
+                auto* d = static_cast<DeviceData*>(data);
+                guint sel = adw_combo_row_get_selected(row);
+                if (sel < d->devices.size()) {
+                    g_settings_set_string(d->settings, "speaker-device",
+                                          d->devices[sel].id.c_str());
+                } else {
+                    g_settings_set_string(d->settings, "speaker-device", "");
+                }
+                g_settings_sync();
+            }),
+            dd_spk);
+        (void)raw_spk;
+
+        group.add(std::move(spk_row).release_floating_ptr());
     }
 }
 

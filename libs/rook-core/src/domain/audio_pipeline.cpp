@@ -5,6 +5,7 @@
 #include "rook/ports/audio_device_port.hpp"
 
 #include <spdlog/spdlog.h>
+#include <gio/gio.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -122,7 +123,13 @@ void AudioPipeline::startListening() {
     m_ring_buffer.clear();
     m_voice_active.store(true, std::memory_order_release);
 
-    m_audio_device.startCapture("", [this](const int16_t* pcm, std::size_t frame_count) {
+    auto* s = g_settings_new("io.github.fleischerdesign.Rook");
+    char* mic_device = g_settings_get_string(s, "microphone-device");
+    std::string device_id(mic_device ? mic_device : "");
+    g_free(mic_device);
+    g_object_unref(s);
+
+    m_audio_device.startCapture(device_id, [this](const int16_t* pcm, std::size_t frame_count) {
         m_ring_buffer.write(pcm, frame_count);
     });
 
@@ -294,7 +301,13 @@ void AudioPipeline::onResponseReady(std::string_view text) {
 void AudioPipeline::startSpeaking(std::string text) {
     transition(ports::AudioState::Speaking);
 
-    m_audio_device.startPlayback("", 22050);
+    auto* s = g_settings_new("io.github.fleischerdesign.Rook");
+    char* spk_device = g_settings_get_string(s, "speaker-device");
+    std::string device_id(spk_device ? spk_device : "");
+    g_free(spk_device);
+    g_object_unref(s);
+
+    m_audio_device.startPlayback(device_id, 22050);
 
     m_tts.speak(text, [this](const float* pcm, std::size_t sample_count,
                               int sample_rate, bool is_last) {
