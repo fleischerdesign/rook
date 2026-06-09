@@ -145,6 +145,8 @@ void DomainActor::dispatchMessage(const domain::ActorMessage& msg) {
             handleLiveUtterance(m);
         else if constexpr (std::is_same_v<T, domain::ActorTtsFinished>)
             handleTtsFinished(m);
+        else if constexpr (std::is_same_v<T, domain::ActorSttEmpty>)
+            handleSttEmpty(m);
         else if constexpr (std::is_same_v<T, domain::ActorVoiceLiveToggle>)
             handleVoiceLiveToggle(m);
         else if constexpr (std::is_same_v<T, domain::ActorBargeIn>)
@@ -878,7 +880,10 @@ void DomainActor::setupAudio(ports::WakewordPort& wakeword,
             auto trimmed = transcript;
             trimmed.erase(0, trimmed.find_first_not_of(" \n\r\t"));
             trimmed.erase(trimmed.find_last_not_of(" \n\r\t") + 1);
-            if (trimmed.empty()) return;
+            if (trimmed.empty()) {
+                m_inbox->push(domain::ActorSttEmpty{});
+                return;
+            }
             if (mode == domain::VoiceMode::LiveChat) {
                 auto active = m_conv->active();
                 if (!active) return;
@@ -999,6 +1004,12 @@ void DomainActor::handleLiveUtterance(const domain::ActorLiveUtterance& msg) {
 
 void DomainActor::handleTtsFinished(const domain::ActorTtsFinished&) {
     emitUiEvent(domain::TtsCompleted{});
+}
+
+void DomainActor::handleSttEmpty(const domain::ActorSttEmpty&) {
+    SPDLOG_INFO("Voice: STT produced empty transcript, recovering pipeline");
+    if (m_audio_pipeline)
+        m_audio_pipeline->onResponseReady("");
 }
 
 void DomainActor::handleVoiceLiveToggle(const domain::ActorVoiceLiveToggle& msg) {

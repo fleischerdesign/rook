@@ -113,6 +113,7 @@ private:
     void handleWakeQuery(const struct domain::ActorWakeQuery& msg);
     void handleLiveUtterance(const struct domain::ActorLiveUtterance& msg);
     void handleTtsFinished(const struct domain::ActorTtsFinished& msg);
+    void handleSttEmpty(const struct domain::ActorSttEmpty& msg);
     void handleVoiceLiveToggle(const struct domain::ActorVoiceLiveToggle& msg);
     void handleBargeIn(const struct domain::ActorBargeIn& msg);
 

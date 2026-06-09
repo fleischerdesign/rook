@@ -142,6 +142,8 @@ struct ActorLiveUtterance {
 
 struct ActorTtsFinished {};
 
+struct ActorSttEmpty {};
+
 struct ActorVoiceLiveToggle {
     std::string chat_id;
     bool enabled;
@@ -175,6 +177,7 @@ using ActorMessage = std::variant<
     ActorWakeQuery,
     ActorLiveUtterance,
     ActorTtsFinished,
+    ActorSttEmpty,
     ActorVoiceLiveToggle,
     ActorBargeIn
 >;

@@ -47,12 +47,12 @@
       <description>Filter non-speech tokens like [Music], [Applause], [Laughter] from transcription output.</description>
     </key>
     <key name="whisper-no-speech-thold" type="d">
-      <default>0.9</default>
+      <default>0.7</default>
       <summary>No-speech threshold</summary>
       <description>Silence detection threshold for whisper. Range 0.0–1.0. Higher = less false positives in silence.</description>
     </key>
     <key name="whisper-entropy-thold" type="d">
-      <default>3.50</default>
+      <default>2.80</default>
       <summary>Entropy threshold</summary>
       <description>Decoder entropy threshold for whisper. Range 0.0–6.0. Higher = discards more low-confidence output, reducing hallucinations.</description>
     </key>
