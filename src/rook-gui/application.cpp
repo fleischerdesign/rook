@@ -204,6 +204,20 @@ inline void RookApplication::init(Class *)
             }
         }), m_actor.get());
 
+    g_signal_connect(voice_settings, "changed::microphone-device",
+        G_CALLBACK(+[](GSettings*, const gchar*, gpointer data) {
+            auto* actor = static_cast<rook::core::DomainActor*>(data);
+            if (actor->isVoiceEnabled()) {
+                bool was_unmuted = !actor->isVoiceMuted();
+                actor->disableVoice();
+                actor->enableVoice();
+                if (was_unmuted) actor->unmuteVoice();
+            }
+        }), m_actor.get());
+
+    g_signal_connect(voice_settings, "changed::speaker-device",
+        G_CALLBACK(+[](GSettings*, const gchar*, gpointer) {}), m_actor.get());
+
     auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);
     prefs_action->connect_activate(
         [this](Gio::SimpleAction *, GLib::Variant *) {

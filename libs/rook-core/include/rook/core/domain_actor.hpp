@@ -84,6 +84,8 @@ public:
     void disableVoice();
     void muteVoice();
     void unmuteVoice();
+    bool isVoiceEnabled() const;
+    bool isVoiceMuted() const;
 
 private:
     void run(std::stop_token token);

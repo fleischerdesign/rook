@@ -919,6 +919,14 @@ void DomainActor::unmuteVoice() {
     if (m_audio_pipeline) m_audio_pipeline->unmute();
 }
 
+bool DomainActor::isVoiceEnabled() const {
+    return m_audio_pipeline && m_audio_pipeline->isVoiceEnabled();
+}
+
+bool DomainActor::isVoiceMuted() const {
+    return m_audio_pipeline && m_audio_pipeline->isMuted();
+}
+
 void DomainActor::handleVoiceToggle(const domain::ActorVoiceToggle& msg) {
     if (!m_audio_pipeline) return;
     if (msg.enabled)
