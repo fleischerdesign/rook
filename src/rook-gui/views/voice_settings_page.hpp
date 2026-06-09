@@ -41,13 +41,16 @@ private:
     rook::ports::TextToSpeechPort* m_tts = nullptr;
     rook::ports::AudioDevicePort* m_audio_device = nullptr;
     ChangeFn m_on_changed;
-    peel::Adw::PreferencesGroup* m_group = nullptr;
 
-    void addEngineRow(peel::Adw::PreferencesGroup &group,
+    void addEngineRow(peel::Gtk::ListBox &list,
                       std::string_view name,
                       bool ready,
                       std::string_view status_msg,
                       std::function<void(VoiceProgressFn, VoiceDoneFn)> on_download);
+
+    void addSectionHeading(peel::Adw::PreferencesGroup &group,
+                           std::string_view text,
+                           int margin_top);
 };
 
 } // namespace rook::gui

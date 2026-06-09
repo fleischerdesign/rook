@@ -4,7 +4,6 @@
 #include <gtk/gtk.h>
 #include <gio/gio.h>
 #include <string>
-#include <future>
 
 #include "rook/adapters/audio/whisper_adapter.hpp"
 #include "rook/adapters/audio/piper_adapter.hpp"
@@ -35,7 +34,21 @@ std::unique_ptr<VoiceSettingsPage> VoiceSettingsPage::create(
     return page;
 }
 
-void VoiceSettingsPage::addEngineRow(Adw::PreferencesGroup &group,
+void VoiceSettingsPage::addSectionHeading(Adw::PreferencesGroup &group,
+                                           std::string_view text,
+                                           int margin_top)
+{
+    auto label = Gtk::Label::create("");
+    label->set_xalign(0.0f);
+    label->set_use_markup(true);
+    auto markup = "<span weight=\"bold\" size=\"small\">" +
+                  std::string(text) + "</span>";
+    label->set_markup(markup.c_str());
+    label->set_margin_top(margin_top);
+    group.add(std::move(label).release_floating_ptr());
+}
+
+void VoiceSettingsPage::addEngineRow(Gtk::ListBox &list,
                                       std::string_view name,
                                       bool ready,
                                       std::string_view status_msg,
@@ -123,13 +136,11 @@ void VoiceSettingsPage::addEngineRow(Adw::PreferencesGroup &group,
         row->add_suffix(std::move(icon).release_floating_ptr());
     }
 
-    group.add(std::move(row).release_floating_ptr());
+    list.append(std::move(row).release_floating_ptr());
 }
 
 void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
 {
-    m_group = &group;
-
     auto heading = Gtk::Label::create(_("Voice"));
     heading->set_xalign(0.0f);
     heading->add_css_class("title-2");
@@ -140,10 +151,16 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     desc->set_xalign(0.0f);
     desc->add_css_class("dim-label");
     desc->set_wrap(true);
-    desc->set_margin_bottom(8);
+    desc->set_margin_bottom(4);
     group.add(std::move(desc).release_floating_ptr());
 
     GSettings* settings = g_settings_new("io.github.fleischerdesign.Rook");
+
+    addSectionHeading(group, _("Wake Word"), 8);
+
+    auto wake_list = Gtk::ListBox::create();
+    wake_list->add_css_class("boxed-list");
+    wake_list->set_selection_mode(Gtk::SelectionMode::NONE);
 
     auto voice_switch = Adw::SwitchRow::create();
     voice_switch->set_title(_("Wake Word"));
@@ -152,7 +169,6 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
         static_cast<peel::Adw::SwitchRow*>(voice_switch));
     adw_switch_row_set_active(raw_switch,
         g_settings_get_boolean(settings, "wake-word-enabled"));
-
     g_signal_connect(raw_switch, "notify::active",
         G_CALLBACK(+[](::AdwSwitchRow* sw, GParamSpec*, gpointer data) {
             auto* s = static_cast<GSettings*>(data);
@@ -160,37 +176,37 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
                 adw_switch_row_get_active(sw));
             g_settings_sync();
         }), settings);
+    wake_list->append(std::move(voice_switch).release_floating_ptr());
+    group.add(std::move(wake_list).release_floating_ptr());
 
-    group.add(std::move(voice_switch).release_floating_ptr());
+    addSectionHeading(group, _("Engine Status"), 16);
 
-    auto sechead = Gtk::Label::create(_("Engine Status"));
-    sechead->set_xalign(0.0f);
-    sechead->add_css_class("heading");
-    sechead->set_margin_top(12);
-    group.add(std::move(sechead).release_floating_ptr());
+    auto engine_list = Gtk::ListBox::create();
+    engine_list->add_css_class("boxed-list");
+    engine_list->set_selection_mode(Gtk::SelectionMode::NONE);
 
     if (m_wakeword) {
         auto ready = m_wakeword->isReady();
         auto* ww = m_wakeword;
-        addEngineRow(group, m_wakeword->engineName(), ready,
+        addEngineRow(*engine_list, m_wakeword->engineName(), ready,
             ready ? _("Ready — wake word detection active")
                   : (m_wakeword->needsKey()
                         ? _("Access key required")
                         : _("Engine not available — check installation")),
-            ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{} 
+            ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
                   : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
                       [ww](VoiceProgressFn p, VoiceDoneFn d) {
                           auto* oww = dynamic_cast<rook::adapters::audio::OpenWakeWordAdapter*>(ww);
                           if (oww) oww->downloadModel(p, d);
                       }});
     } else {
-        addEngineRow(group, _("Wake Word"), false, _("No engine loaded"), {});
+        addEngineRow(*engine_list, _("Wake Word"), false, _("No engine loaded"), {});
     }
 
     if (m_stt) {
         auto ready = m_stt->isReady();
         auto* stt = m_stt;
-        addEngineRow(group, m_stt->engineName(), ready,
+        addEngineRow(*engine_list, m_stt->engineName(), ready,
             ready ? _("Ready — speech recognition active")
                   : _("Engine not available — check installation"),
             ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
@@ -200,13 +216,13 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
                           if (wa) wa->downloadModel(p, d);
                       }});
     } else {
-        addEngineRow(group, _("Speech Recognition"), false, _("No engine loaded"), {});
+        addEngineRow(*engine_list, _("Speech Recognition"), false, _("No engine loaded"), {});
     }
 
     if (m_tts) {
         auto ready = m_tts->isReady();
         auto* tts = m_tts;
-        addEngineRow(group, m_tts->engineName(), ready,
+        addEngineRow(*engine_list, m_tts->engineName(), ready,
             ready ? _("Ready — text-to-speech active")
                   : _("Engine not available — check installation"),
             ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
@@ -216,20 +232,20 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
                           if (pa) pa->downloadModel(p, d);
                       }});
     } else {
-        addEngineRow(group, _("Text-to-Speech"), false, _("No engine loaded"), {});
+        addEngineRow(*engine_list, _("Text-to-Speech"), false, _("No engine loaded"), {});
     }
+
+    group.add(std::move(engine_list).release_floating_ptr());
 
     if (m_audio_device) {
         auto inputs = m_audio_device->enumerateInputs();
         auto outputs = m_audio_device->enumerateOutputs();
 
-        auto* settings = g_settings_new("io.github.fleischerdesign.Rook");
+        addSectionHeading(group, _("Audio Devices"), 16);
 
-        auto devhead = Gtk::Label::create(_("Audio Devices"));
-        devhead->set_xalign(0.0f);
-        devhead->add_css_class("heading");
-        devhead->set_margin_top(16);
-        group.add(std::move(devhead).release_floating_ptr());
+        auto dev_list = Gtk::ListBox::create();
+        dev_list->add_css_class("boxed-list");
+        dev_list->set_selection_mode(Gtk::SelectionMode::NONE);
 
         auto mic_row = Adw::ComboRow::create();
         mic_row->set_title(_("Input Device"));
@@ -280,7 +296,7 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
             dd_mic);
         (void)raw_mic;
 
-        group.add(std::move(mic_row).release_floating_ptr());
+        dev_list->append(std::move(mic_row).release_floating_ptr());
 
         auto spk_row = Adw::ComboRow::create();
         spk_row->set_title(_("Output Device"));
@@ -330,7 +346,8 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
             dd_spk);
         (void)raw_spk;
 
-        group.add(std::move(spk_row).release_floating_ptr());
+        dev_list->append(std::move(spk_row).release_floating_ptr());
+        group.add(std::move(dev_list).release_floating_ptr());
     }
 }
 
