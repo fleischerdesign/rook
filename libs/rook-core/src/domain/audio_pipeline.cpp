@@ -72,8 +72,9 @@ void AudioPipeline::setMode(VoiceMode mode) {
 void AudioPipeline::startLiveMode() {
     setMode(VoiceMode::LiveChat);
     m_live_mode_active.store(true, std::memory_order_release);
-    unmute();
-    enable();
+    m_muted.store(false, std::memory_order_release);
+    m_enabled.store(true, std::memory_order_release);
+    startListening();
 }
 
 void AudioPipeline::stopLiveMode() {
@@ -152,7 +153,8 @@ void AudioPipeline::startListening() {
         });
 
     if (!capture_ok) {
-        SPDLOG_ERROR("AudioPipeline: capture start failed, voice unavailable");
+        SPDLOG_ERROR("AudioPipeline: capture start failed (device='{}'), voice unavailable",
+                     device_id);
         m_voice_active.store(false, std::memory_order_release);
         transition(ports::AudioState::Inactive);
         return;
