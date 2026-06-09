@@ -128,17 +128,26 @@ struct ActorWakeDetected {
     std::string keyword;
 };
 
-struct ActorSttResultText {
+struct ActorWakeQuery {
     std::string transcript;
+    bool is_final = false;
+};
+
+struct ActorLiveUtterance {
+    std::string chat_id;
+    std::string transcript;
+    std::string model;
     bool is_final = false;
 };
 
 struct ActorTtsFinished {};
 
-struct ActorResponseReady {
+struct ActorVoiceLiveToggle {
     std::string chat_id;
-    std::string text;
+    bool enabled;
 };
+
+struct ActorBargeIn {};
 
 using ActorMessage = std::variant<
     ActorUserInput,
@@ -163,9 +172,11 @@ using ActorMessage = std::variant<
     ActorVoiceToggle,
     ActorVoiceMute,
     ActorWakeDetected,
-    ActorSttResultText,
+    ActorWakeQuery,
+    ActorLiveUtterance,
     ActorTtsFinished,
-    ActorResponseReady
+    ActorVoiceLiveToggle,
+    ActorBargeIn
 >;
 
 struct StateConversation {

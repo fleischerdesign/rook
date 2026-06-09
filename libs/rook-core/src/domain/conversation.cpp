@@ -57,6 +57,20 @@ Conversation ConversationManager::create(std::string_view title, std::string_vie
     return conv;
 }
 
+std::optional<Conversation> ConversationManager::openEphemeral(std::string_view model_hint) {
+    Conversation conv;
+    conv.id = generateId();
+    conv.title = "[Voice]";
+    conv.model = std::string(model_hint);
+    conv.created_at = std::chrono::system_clock::now();
+    conv.updated_at = conv.created_at;
+    conv.ephemeral = true;
+
+    m_conversations.push_back(conv);
+    spdlog::debug("Created ephemeral conversation: {}", conv.id);
+    return conv;
+}
+
 void ConversationManager::remove(std::string_view id) {
     std::erase_if(m_conversations,
         [id](const auto& c) { return c.id == id; });

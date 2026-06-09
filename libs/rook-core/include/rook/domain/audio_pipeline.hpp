@@ -22,9 +22,14 @@ class AudioDevicePort;
 
 namespace rook::domain {
 
+enum class VoiceMode {
+    Wakeword,
+    LiveChat,
+};
+
 struct AudioPipelineEvents {
     std::function<void(std::string keyword)> on_wake;
-    std::function<void(std::string transcript, bool is_final)> on_stt_result;
+    std::function<void(std::string transcript, bool is_final, VoiceMode mode)> on_stt_result;
     std::function<void()> on_tts_done;
     std::function<void(ports::AudioState old_state, ports::AudioState new_state)> on_state_change;
 };
@@ -47,9 +52,16 @@ public:
     void mute();
     void unmute();
 
+    void setMode(VoiceMode mode);
+    VoiceMode mode() const { return m_mode.load(std::memory_order_acquire); }
+    void startLiveMode();
+    void stopLiveMode();
+    void onBargeInDetected();
+
     ports::AudioState state() const { return m_state.load(std::memory_order_acquire); }
     bool isVoiceEnabled() const { return m_enabled.load(std::memory_order_acquire); }
     bool isMuted() const { return m_muted.load(std::memory_order_acquire); }
+    bool isLiveModeActive() const { return m_live_mode_active.load(std::memory_order_acquire); }
 
     void onResponseReady(std::string_view text);
 
@@ -57,7 +69,7 @@ public:
 
 private:
     void runWorker();
-    void processWakeword(const int16_t* pcm, std::size_t count);
+    void processWakeword(const int16_t* pcm, std::size_t);
     void processRecording(const int16_t* pcm, std::size_t count);
     void transition(ports::AudioState to);
     void startListening();
@@ -82,13 +94,14 @@ private:
     std::atomic<bool> m_enabled{false};
     std::atomic<bool> m_muted{true};
 
-    std::atomic<bool> m_listening{false};
-    std::atomic<bool> m_speaking{false};
+    std::atomic<VoiceMode> m_mode{VoiceMode::Wakeword};
+    std::atomic<bool> m_live_mode_active{false};
 
     int m_silence_counter = 0;
     int m_recording_frames = 0;
 
     static constexpr int k_silence_threshold = 100;
+    static constexpr int k_barge_in_threshold = 2000;
     static constexpr int k_silence_max = 60;
     static constexpr int k_max_recording_frames = 750;
 };

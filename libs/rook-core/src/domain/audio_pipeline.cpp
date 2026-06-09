@@ -33,13 +33,16 @@ void AudioPipeline::setEvents(AudioPipelineEvents events) {
 
 void AudioPipeline::enable() {
     if (m_enabled.load(std::memory_order_acquire)) return;
-    if (!m_wakeword.isReady()) {
+
+    auto mode = m_mode.load(std::memory_order_acquire);
+    if (mode == VoiceMode::Wakeword && !m_wakeword.isReady()) {
         SPDLOG_WARN("AudioPipeline: wakeword engine not ready");
         return;
     }
 
     m_enabled.store(true, std::memory_order_release);
-    SPDLOG_DEBUG("AudioPipeline: voice enabled");
+    SPDLOG_DEBUG("AudioPipeline: voice enabled (mode={})",
+                 mode == VoiceMode::Wakeword ? "wakeword" : "live");
 
     if (!m_muted.load(std::memory_order_acquire)) {
         startListening();
@@ -53,6 +56,7 @@ void AudioPipeline::disable() {
 
     m_muted.store(true, std::memory_order_release);
     m_enabled.store(false, std::memory_order_release);
+    m_live_mode_active.store(false, std::memory_order_release);
     stopListening();
     m_audio_device.stopCapture();
     m_audio_device.stopPlayback();
@@ -61,11 +65,47 @@ void AudioPipeline::disable() {
     SPDLOG_DEBUG("AudioPipeline: voice disabled");
 }
 
+void AudioPipeline::setMode(VoiceMode mode) {
+    m_mode.store(mode, std::memory_order_release);
+}
+
+void AudioPipeline::startLiveMode() {
+    setMode(VoiceMode::LiveChat);
+    m_live_mode_active.store(true, std::memory_order_release);
+    unmute();
+    enable();
+}
+
+void AudioPipeline::stopLiveMode() {
+    m_live_mode_active.store(false, std::memory_order_release);
+    setMode(VoiceMode::Wakeword);
+
+    if (m_enabled.load(std::memory_order_acquire) &&
+        !m_muted.load(std::memory_order_acquire)) {
+        stopListening();
+        startListening();
+    }
+}
+
+void AudioPipeline::onBargeInDetected() {
+    auto state = m_state.load(std::memory_order_acquire);
+    if (state != ports::AudioState::Speaking) return;
+    if (m_mode.load(std::memory_order_acquire) != VoiceMode::LiveChat) return;
+
+    SPDLOG_DEBUG("AudioPipeline: barge-in detected");
+    stopSpeaking();
+    m_recording_buffer.clear();
+    m_silence_counter = 0;
+    m_recording_frames = 0;
+    transition(ports::AudioState::Recording);
+}
+
 void AudioPipeline::mute() {
     if (m_muted.exchange(true, std::memory_order_acq_rel)) return;
 
     stopListening();
     m_audio_device.stopCapture();
+    m_live_mode_active.store(false, std::memory_order_release);
     transition(ports::AudioState::Inactive);
     SPDLOG_DEBUG("AudioPipeline: muted");
 }
@@ -90,7 +130,17 @@ void AudioPipeline::startListening() {
     m_worker_running.store(true, std::memory_order_release);
     m_worker = std::jthread(&AudioPipeline::runWorker, this);
 
-    transition(ports::AudioState::WaitingForWake);
+    auto mode = m_mode.load(std::memory_order_acquire);
+
+    if (mode == VoiceMode::LiveChat) {
+        m_recording_buffer.clear();
+        m_silence_counter = 0;
+        m_recording_frames = 0;
+        transition(ports::AudioState::Recording);
+        SPDLOG_DEBUG("AudioPipeline: live-chat recording started");
+    } else {
+        transition(ports::AudioState::WaitingForWake);
+    }
 }
 
 void AudioPipeline::stopListening() {
@@ -110,10 +160,38 @@ void AudioPipeline::runWorker() {
         auto state = m_state.load(std::memory_order_acquire);
 
         if (state == ports::AudioState::Inactive ||
-            state == ports::AudioState::Processing ||
-            state == ports::AudioState::Speaking) {
+            state == ports::AudioState::Processing) {
             m_ring_buffer.drain(512);
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
+
+        if (state == ports::AudioState::Speaking) {
+            auto mode = m_mode.load(std::memory_order_acquire);
+            if (mode == VoiceMode::LiveChat) {
+                std::size_t pos = 0;
+                while (pos < frame_size && m_worker_running.load(std::memory_order_acquire)) {
+                    auto n = m_ring_buffer.read(frame.data() + pos, frame_size - pos);
+                    if (n == 0) {
+                        std::this_thread::sleep_for(std::chrono::microseconds(500));
+                        continue;
+                    }
+                    pos += n;
+                }
+                if (pos < frame_size) continue;
+
+                double sum = 0.0;
+                for (std::size_t i = 0; i < frame_size; ++i)
+                    sum += static_cast<double>(frame[i]) * static_cast<double>(frame[i]);
+                double rms = std::sqrt(sum / static_cast<double>(frame_size));
+
+                if (rms > k_barge_in_threshold) {
+                    onBargeInDetected();
+                }
+            } else {
+                m_ring_buffer.drain(512);
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
             continue;
         }
 
@@ -158,6 +236,9 @@ void AudioPipeline::processRecording(const int16_t* pcm, std::size_t count) {
     m_recording_buffer.insert(m_recording_buffer.end(), pcm, pcm + count);
     m_recording_frames++;
 
+    auto mode = m_mode.load(std::memory_order_acquire);
+    if (mode == VoiceMode::LiveChat) return;
+
     double sum = 0.0;
     for (std::size_t i = 0; i < count; ++i)
         sum += static_cast<double>(pcm[i]) * static_cast<double>(pcm[i]);
@@ -179,10 +260,12 @@ void AudioPipeline::processRecording(const int16_t* pcm, std::size_t count) {
         transition(ports::AudioState::Processing);
 
         int sr = 16000;
+        auto cur_mode = m_mode.load(std::memory_order_acquire);
         m_stt.transcribe(audio.data(), audio.size(), sr,
-            [this](ports::SttResult result) {
+            [this, cur_mode](ports::SttResult result) {
                 if (m_events.on_stt_result)
-                    m_events.on_stt_result(std::move(result.transcript), result.is_final);
+                    m_events.on_stt_result(std::move(result.transcript),
+                                           result.is_final, cur_mode);
             });
 
         SPDLOG_DEBUG("AudioPipeline: recording done ({} samples, reason={})",
@@ -197,7 +280,15 @@ void AudioPipeline::onResponseReady(std::string_view text) {
     if (m_tts.isReady() && !m_muted.load(std::memory_order_acquire)) {
         startSpeaking(std::string(text));
     } else {
-        transition(ports::AudioState::WaitingForWake);
+        auto mode = m_mode.load(std::memory_order_acquire);
+        if (mode == VoiceMode::LiveChat) {
+            m_recording_buffer.clear();
+            m_silence_counter = 0;
+            m_recording_frames = 0;
+            transition(ports::AudioState::Recording);
+        } else {
+            transition(ports::AudioState::WaitingForWake);
+        }
     }
 }
 
@@ -218,7 +309,16 @@ void AudioPipeline::startSpeaking(std::string text) {
             }
             if (m_enabled.load(std::memory_order_acquire) &&
                 !m_muted.load(std::memory_order_acquire)) {
-                startListening();
+
+                auto mode = m_mode.load(std::memory_order_acquire);
+                if (mode == VoiceMode::LiveChat) {
+                    m_recording_buffer.clear();
+                    m_silence_counter = 0;
+                    m_recording_frames = 0;
+                    transition(ports::AudioState::Recording);
+                } else {
+                    startListening();
+                }
             }
         }
     });

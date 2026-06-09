@@ -139,12 +139,16 @@ void DomainActor::dispatchMessage(const domain::ActorMessage& msg) {
             handleVoiceMute(m);
         else if constexpr (std::is_same_v<T, domain::ActorWakeDetected>)
             handleWakeDetected(m);
-        else if constexpr (std::is_same_v<T, domain::ActorSttResultText>)
-            handleSttResult(m);
+        else if constexpr (std::is_same_v<T, domain::ActorWakeQuery>)
+            handleWakeQuery(m);
+        else if constexpr (std::is_same_v<T, domain::ActorLiveUtterance>)
+            handleLiveUtterance(m);
         else if constexpr (std::is_same_v<T, domain::ActorTtsFinished>)
             handleTtsFinished(m);
-        else if constexpr (std::is_same_v<T, domain::ActorResponseReady>)
-            handleResponseReady(m);
+        else if constexpr (std::is_same_v<T, domain::ActorVoiceLiveToggle>)
+            handleVoiceLiveToggle(m);
+        else if constexpr (std::is_same_v<T, domain::ActorBargeIn>)
+            handleBargeIn(m);
     }, msg);
 }
 
@@ -330,7 +334,26 @@ void DomainActor::handleLlmDone(const domain::ActorLlmDone& msg) {
     }
 
     if (m_pending_tool_calls.empty()) {
-        m_conv->saveActiveConversation();
+        auto* last = m_conv->lastResponse(msg.chat_id);
+        bool ephemeral = m_conv->open(msg.chat_id).ephemeral;
+
+        if (m_audio_pipeline && last) {
+            auto it = m_voice_triggered_chats.find(msg.chat_id);
+            if (it != m_voice_triggered_chats.end()) {
+                emitUiEvent(domain::TtsStarted{*last});
+                m_audio_pipeline->onResponseReady(*last);
+                m_voice_triggered_chats.erase(it);
+
+                if (ephemeral) {
+                    m_conv->remove(msg.chat_id);
+                    return;
+                }
+            }
+        }
+
+        if (!ephemeral) {
+            m_conv->saveActiveConversation();
+        }
 
         auto conv = m_conv->open(msg.chat_id);
         if (conv.title == "New Chat") {
@@ -849,9 +872,23 @@ void DomainActor::setupAudio(ports::WakewordPort& wakeword,
             domain::ActorWakeDetected msg{std::move(keyword)};
             m_inbox->push(std::move(msg));
         },
-        .on_stt_result = [this](std::string transcript, bool is_final) {
-            domain::ActorSttResultText msg{std::move(transcript), is_final};
-            m_inbox->push(std::move(msg));
+        .on_stt_result = [this](std::string transcript, bool is_final,
+                                 domain::VoiceMode mode) {
+            if (mode == domain::VoiceMode::LiveChat) {
+                auto active = m_conv->active();
+                if (!active) return;
+                m_inbox->push(domain::ActorLiveUtterance{
+                    .chat_id = active->id,
+                    .transcript = std::move(transcript),
+                    .model = active->model,
+                    .is_final = is_final,
+                });
+            } else {
+                m_inbox->push(domain::ActorWakeQuery{
+                    .transcript = std::move(transcript),
+                    .is_final = is_final,
+                });
+            }
         },
         .on_tts_done = [this]() {
             m_inbox->push(domain::ActorTtsFinished{});
@@ -886,24 +923,44 @@ void DomainActor::handleWakeDetected(const domain::ActorWakeDetected& msg) {
     emitUiEvent(domain::AudioWakeDetected{msg.keyword});
 }
 
-void DomainActor::handleSttResult(const domain::ActorSttResultText& msg) {
-    emitUiEvent(domain::SttResult{msg.transcript, msg.is_final});
-
-    auto active = m_conv->active();
-    if (!active.has_value()) return;
-    auto chat_id = active->id;
-
+void DomainActor::handleWakeQuery(const domain::ActorWakeQuery& msg) {
     emitUiEvent(domain::UserInputReceived{
-        .chat_id = chat_id,
+        .chat_id = "",
         .content = msg.transcript,
-        .source = "voice",
-        .model = active->model,
+        .source = "voice_wake",
+        .model = "",
     });
 
-    domain::ActorUserInput input_msg{
-        .chat_id = chat_id,
+    auto temp_conv = m_conv->openEphemeral(m_llm ? "default" : "");
+    if (!temp_conv.has_value()) return;
+    auto chat_id = temp_conv->id;
+
+    m_voice_triggered_chats.insert(chat_id);
+
+    domain::ChatMessage user_msg;
+    user_msg.role = "user";
+    user_msg.content = msg.transcript;
+    m_conv->addMessage(chat_id, user_msg);
+
+    if (m_llm) {
+        runLlm(chat_id, temp_conv->model);
+    }
+}
+
+void DomainActor::handleLiveUtterance(const domain::ActorLiveUtterance& msg) {
+    emitUiEvent(domain::UserInputReceived{
+        .chat_id = msg.chat_id,
         .content = msg.transcript,
-        .model = active->model,
+        .source = "voice_live",
+        .model = msg.model,
+    });
+
+    m_voice_triggered_chats.insert(msg.chat_id);
+
+    domain::ActorUserInput input_msg{
+        .chat_id = msg.chat_id,
+        .content = msg.transcript,
+        .model = msg.model,
     };
     handleUserInput(input_msg);
 }
@@ -912,10 +969,17 @@ void DomainActor::handleTtsFinished(const domain::ActorTtsFinished&) {
     emitUiEvent(domain::TtsCompleted{});
 }
 
-void DomainActor::handleResponseReady(const domain::ActorResponseReady& msg) {
+void DomainActor::handleVoiceLiveToggle(const domain::ActorVoiceLiveToggle& msg) {
     if (!m_audio_pipeline) return;
-    emitUiEvent(domain::TtsStarted{msg.text});
-    m_audio_pipeline->onResponseReady(msg.text);
+    if (msg.enabled)
+        m_audio_pipeline->startLiveMode();
+    else
+        m_audio_pipeline->stopLiveMode();
+}
+
+void DomainActor::handleBargeIn(const domain::ActorBargeIn&) {
+    if (m_audio_pipeline)
+        m_audio_pipeline->onBargeInDetected();
 }
 
 void DomainActor::saveActiveConv() {

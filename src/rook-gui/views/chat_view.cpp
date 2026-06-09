@@ -311,6 +311,23 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
         v->m_chat_send = send;
         chat_bar->append(std::move(send));
     }
+    {
+        auto mic = Gtk::ToggleButton::create();
+        mic->set_icon_name("microphone-symbolic");
+        mic->set_tooltip_text(_("Voice Chat"));
+        mic->connect_toggled([v](Gtk::ToggleButton* btn) {
+            if (!v->m_chat_id.empty()) {
+                auto actor = v->m_actor;
+                auto cid = v->m_chat_id;
+                GLib::idle_add_once([actor, cid, active = btn->get_active()]() {
+                    actor->post(rook::domain::ActorVoiceLiveToggle{
+                        .chat_id = cid, .enabled = active});
+                });
+            }
+        });
+        v->m_chat_mic = mic;
+        chat_bar->append(std::move(mic));
+    }
 
     chat_page->append(std::move(chat_bar));
 

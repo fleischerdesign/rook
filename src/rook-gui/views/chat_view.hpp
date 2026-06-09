@@ -49,6 +49,7 @@ class ChatView final : public peel::Gtk::Box
     peel::Gtk::Entry *m_chat_entry = nullptr;
     peel::Gtk::Button *m_welcome_send = nullptr;
     peel::Gtk::Button *m_chat_send = nullptr;
+    peel::Gtk::ToggleButton *m_chat_mic = nullptr;
 
     std::vector<std::string> m_welcome_ids;
     std::vector<std::string> m_chat_ids;

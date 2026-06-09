@@ -15,6 +15,8 @@
 #include "rook/adapters/hook/hook_registry.hpp"
 #include "rook/domain/audio_pipeline.hpp"
 
+#include <unordered_set>
+
 namespace rook::ports {
 class LlmPort;
 class ToolPort;
@@ -101,9 +103,11 @@ private:
     void handleVoiceToggle(const struct domain::ActorVoiceToggle& msg);
     void handleVoiceMute(const struct domain::ActorVoiceMute& msg);
     void handleWakeDetected(const struct domain::ActorWakeDetected& msg);
-    void handleSttResult(const struct domain::ActorSttResultText& msg);
+    void handleWakeQuery(const struct domain::ActorWakeQuery& msg);
+    void handleLiveUtterance(const struct domain::ActorLiveUtterance& msg);
     void handleTtsFinished(const struct domain::ActorTtsFinished& msg);
-    void handleResponseReady(const struct domain::ActorResponseReady& msg);
+    void handleVoiceLiveToggle(const struct domain::ActorVoiceLiveToggle& msg);
+    void handleBargeIn(const struct domain::ActorBargeIn& msg);
 
     void runLlm(std::string chat_id, std::string model);
     void processTools(std::string chat_id, std::string model);
@@ -154,6 +158,7 @@ private:
 
     rook::adapters::hook::HookRegistry m_hooks;
     std::unique_ptr<domain::AudioPipeline> m_audio_pipeline;
+    std::unordered_set<std::string> m_voice_triggered_chats;
 };
 
 } // namespace rook::core

@@ -41,7 +41,7 @@ struct TestEvents {
 AudioPipelineEvents makeEvents(TestEvents& te) {
     return {
         .on_wake = [&](std::string) { te.wake_count.fetch_add(1); },
-        .on_stt_result = [&](std::string t, bool f) {
+        .on_stt_result = [&](std::string t, bool f, VoiceMode) {
             te.stt_result_count.fetch_add(1);
             te.last_stt_transcript = t;
             te.last_stt_final = f;

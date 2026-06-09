@@ -77,9 +77,40 @@ RookWindow *RookWindow::create(Gtk::Application *app,
 
     auto menu_button = Gtk::MenuButton::create();
     menu_button->set_icon_name("open-menu-symbolic");
-    menu_button->set_popover(std::move(popover));
     menu_button->set_tooltip_text(_("Menu"));
     win->m_header->pack_end(std::move(menu_button));
+
+    {
+        auto* icon = gtk_image_new_from_icon_name("microphone-disabled-symbolic");
+        gtk_widget_set_tooltip_text(GTK_WIDGET(icon), _("Voice inactive"));
+        adw_header_bar_pack_end(reinterpret_cast<::AdwHeaderBar*>(
+            static_cast<peel::Adw::HeaderBar*>(win->m_header)), icon);
+        win->m_voice_icon = icon;
+    }
+
+    win->m_voice_indicator_handler = bus.subscribe<domain::AudioStateChanged>(
+        [win](const domain::AudioStateChanged& ev) {
+            auto* img = static_cast<::GtkImage*>(win->m_voice_icon);
+            if (!img) return;
+            const char* icon = nullptr;
+            const char* tip = nullptr;
+            switch (static_cast<ports::AudioState>(ev.new_state)) {
+            case ports::AudioState::Inactive:
+                icon = "microphone-disabled-symbolic"; tip = "Voice inactive"; break;
+            case ports::AudioState::WaitingForWake:
+                icon = "microphone-sensitivity-muted-symbolic"; tip = "Waiting for wake word"; break;
+            case ports::AudioState::Recording:
+                icon = "microphone-sensitivity-high-symbolic"; tip = "Recording"; break;
+            case ports::AudioState::Processing:
+                icon = "content-loading-symbolic"; tip = "Processing"; break;
+            case ports::AudioState::Speaking:
+                icon = "audio-speakers-symbolic"; tip = "Speaking"; break;
+            }
+            if (icon) {
+                gtk_image_set_from_icon_name(img, icon);
+                gtk_widget_set_tooltip_text(GTK_WIDGET(img), tip);
+            }
+        });
 
     auto split = Adw::OverlaySplitView::create();
     split->set_sidebar(win->m_sidebar);

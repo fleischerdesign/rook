@@ -36,6 +36,7 @@ struct Conversation {
     uint64_t pinned_at = 0;
     std::vector<std::string> whitelisted_tools;
     bool title_is_manual = false;
+    bool ephemeral = false;
 };
 
 class ConversationManager {
@@ -72,6 +73,7 @@ public:
     void setStore(ports::StorePort* store) { m_store = store; }
     void saveActiveConversation();
     void loadFromStore(ports::StorePort& store);
+    std::optional<Conversation> openEphemeral(std::string_view model_hint = {});
 
 private:
     std::vector<Conversation> m_conversations;
