@@ -200,6 +200,7 @@ void DomainActor::handleUserInput(const domain::ActorUserInput& msg) {
 
     m_conv->addMessage(msg.chat_id, std::move(cmsg));
     saveActiveConv();
+    emitSnapshot();
 
     if (is_first) {
         injectSkillsOnFirstMessage(msg.chat_id);
