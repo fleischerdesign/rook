@@ -522,6 +522,14 @@ void ChatSidebar::onSnapshot(const rook::domain::SnapshotReady &event)
         m_snapshot = snap;
         rebuildList();
         if (m_search) { m_search->set_text(""); onSearchChanged(); }
+        if (!snap.active_chat_id.empty()) {
+            for (int i = 0; auto *row = m_list->get_row_at_index(i); ++i) {
+                if (std::string(row->get_name()) == snap.active_chat_id) {
+                    m_list->select_row(row);
+                    return;
+                }
+            }
+        }
     });
 }
 
