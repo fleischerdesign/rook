@@ -225,11 +225,11 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
 
         auto* settings = g_settings_new("io.github.fleischerdesign.Rook");
 
-        auto mic_label = Gtk::Label::create(_("Microphone"));
-        mic_label->set_xalign(0.0f);
-        mic_label->add_css_class("heading");
-        mic_label->set_margin_top(12);
-        group.add(std::move(mic_label).release_floating_ptr());
+        auto devhead = Gtk::Label::create(_("Audio Devices"));
+        devhead->set_xalign(0.0f);
+        devhead->add_css_class("heading");
+        devhead->set_margin_top(16);
+        group.add(std::move(devhead).release_floating_ptr());
 
         auto mic_row = Adw::ComboRow::create();
         mic_row->set_title(_("Input Device"));
@@ -238,7 +238,9 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
         auto mic_model = Gtk::StringList::create(no_items);
         int mic_default_idx = 0;
         for (std::size_t i = 0; i < inputs.size(); ++i) {
-            mic_model->append(inputs[i].name.c_str());
+            auto label = inputs[i].name;
+            if (label.empty()) label = _("Default");
+            mic_model->append(label.c_str());
             if (inputs[i].is_default) mic_default_idx = static_cast<int>(i);
         }
         if (inputs.empty())
@@ -280,19 +282,15 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
 
         group.add(std::move(mic_row).release_floating_ptr());
 
-        auto spk_label = Gtk::Label::create(_("Speaker"));
-        spk_label->set_xalign(0.0f);
-        spk_label->add_css_class("heading");
-        spk_label->set_margin_top(8);
-        group.add(std::move(spk_label).release_floating_ptr());
-
         auto spk_row = Adw::ComboRow::create();
         spk_row->set_title(_("Output Device"));
 
         auto spk_model = Gtk::StringList::create(no_items);
         int spk_default_idx = 0;
         for (std::size_t i = 0; i < outputs.size(); ++i) {
-            spk_model->append(outputs[i].name.c_str());
+            auto label = outputs[i].name;
+            if (label.empty()) label = _("Default");
+            spk_model->append(label.c_str());
             if (outputs[i].is_default) spk_default_idx = static_cast<int>(i);
         }
         if (outputs.empty())
