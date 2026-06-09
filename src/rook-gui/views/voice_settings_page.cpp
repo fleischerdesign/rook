@@ -5,6 +5,10 @@
 #include <gio/gio.h>
 #include <string>
 
+#include "rook/adapters/audio/whisper_adapter.hpp"
+#include "rook/adapters/audio/piper_adapter.hpp"
+#include "rook/adapters/audio/openwakeword_adapter.hpp"
+
 using namespace peel;
 
 namespace rook::gui {
@@ -25,20 +29,38 @@ std::unique_ptr<VoiceSettingsPage> VoiceSettingsPage::create(
     return page;
 }
 
-void VoiceSettingsPage::addStatusRow(Adw::PreferencesGroup &group,
-                                      std::string_view label,
-                                      std::string_view status,
-                                      bool ok)
+void VoiceSettingsPage::addEngineRow(Adw::PreferencesGroup &group,
+                                      std::string_view name,
+                                      bool ready,
+                                      std::string_view status_msg,
+                                      std::function<void()> on_download_start)
 {
     auto row = Adw::ActionRow::create();
-    row->set_title(std::string(label).c_str());
-    row->set_subtitle(std::string(status).c_str());
+    row->set_title(std::string(name).c_str());
+    row->set_subtitle(std::string(status_msg).c_str());
 
-    auto icon = Gtk::Image::create_from_icon_name(
-        ok ? "emblem-ok-symbolic" : "dialog-warning-symbolic");
-    row->add_suffix(std::move(icon).release_floating_ptr());
+    if (ready) {
+        auto icon = Gtk::Image::create_from_icon_name("emblem-ok-symbolic");
+        row->add_suffix(std::move(icon).release_floating_ptr());
+    } else if (on_download_start) {
+        auto btn = Gtk::Button::create_with_label(_("Download Model"));
+        btn->add_css_class("pill");
+        btn->add_css_class("suggested-action");
+        auto* raw_btn = static_cast<Gtk::Button*>(btn);
+        auto fn = std::move(on_download_start);
+        btn->connect_clicked([raw_btn, fn](Gtk::Button*) {
+            raw_btn->set_sensitive(false);
+            raw_btn->set_label(_("Downloading…"));
+            fn();
+            raw_btn->set_label(_("Downloaded ✓"));
+        });
+        row->add_suffix(std::move(btn).release_floating_ptr());
+    } else {
+        auto icon = Gtk::Image::create_from_icon_name("dialog-warning-symbolic");
+        row->add_suffix(std::move(icon).release_floating_ptr());
+    }
+
     row->set_activatable(false);
-
     group.add(std::move(row).release_floating_ptr());
 }
 
@@ -85,37 +107,46 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
 
     if (m_wakeword) {
         auto ready = m_wakeword->isReady();
-        addStatusRow(group,
-            m_wakeword->engineName(),
+        auto* ww = m_wakeword;
+        addEngineRow(group, m_wakeword->engineName(), ready,
             ready ? _("Ready — wake word detection active")
                   : (m_wakeword->needsKey()
                         ? _("Access key required")
                         : _("Engine not available — check installation")),
-            ready);
+            ready ? std::function<void()>{} : [ww]() {
+                auto* oww = dynamic_cast<rook::adapters::audio::OpenWakeWordAdapter*>(ww);
+                if (oww) oww->downloadModel(nullptr, nullptr);
+            });
     } else {
-        addStatusRow(group, _("Wake Word"), _("No engine loaded"), false);
+        addEngineRow(group, _("Wake Word"), false, _("No engine loaded"), {});
     }
 
     if (m_stt) {
         auto ready = m_stt->isReady();
-        addStatusRow(group,
-            m_stt->engineName(),
+        auto* stt = m_stt;
+        addEngineRow(group, m_stt->engineName(), ready,
             ready ? _("Ready — speech recognition active")
                   : _("Engine not available — check installation"),
-            ready);
+            ready ? std::function<void()>{} : [stt]() {
+                auto* wa = dynamic_cast<rook::adapters::audio::WhisperAdapter*>(stt);
+                if (wa) wa->downloadModel(nullptr, nullptr);
+            });
     } else {
-        addStatusRow(group, _("Speech Recognition"), _("No engine loaded"), false);
+        addEngineRow(group, _("Speech Recognition"), false, _("No engine loaded"), {});
     }
 
     if (m_tts) {
         auto ready = m_tts->isReady();
-        addStatusRow(group,
-            m_tts->engineName(),
+        auto* tts = m_tts;
+        addEngineRow(group, m_tts->engineName(), ready,
             ready ? _("Ready — text-to-speech active")
                   : _("Engine not available — check installation"),
-            ready);
+            ready ? std::function<void()>{} : [tts]() {
+                auto* pa = dynamic_cast<rook::adapters::audio::PiperAdapter*>(tts);
+                if (pa) pa->downloadModel(nullptr, nullptr);
+            });
     } else {
-        addStatusRow(group, _("Text-to-Speech"), _("No engine loaded"), false);
+        addEngineRow(group, _("Text-to-Speech"), false, _("No engine loaded"), {});
     }
 
     if (m_audio_device) {
@@ -126,9 +157,8 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
             ? std::string(_("Inputs: ")) + std::to_string(inputs.size()) +
               std::string(_(", Outputs: ")) + std::to_string(outputs.size())
             : std::string(_("No audio devices found"));
-        addStatusRow(group, _("Audio Devices"), text, ok);
+        addEngineRow(group, _("Audio Devices"), ok, text, {});
     }
-
 }
 
 } // namespace rook::gui

@@ -1,4 +1,5 @@
 #include "rook/adapters/audio/openwakeword_adapter.hpp"
+#include "rook/adapters/audio/model_downloader.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -201,6 +202,31 @@ void OpenWakeWordAdapter::reset() {
 
 void OpenWakeWordAdapter::setSensitivity(float value) {
     m_impl->sensitivity = value;
+}
+
+std::string OpenWakeWordAdapter::defaultModelPath() const {
+    auto* d = ::getenv("XDG_DATA_HOME");
+    std::string base = d ? std::string(d) : std::string(::getenv("HOME")) + "/.local/share";
+    return base + "/rook/models/wakewords/openwakeword.onnx";
+}
+
+std::string OpenWakeWordAdapter::defaultModelUrl() const {
+    return "https://huggingface.co/datasets/roskiroskiroskiroskiroskiroski/open-wake-word-models/resolve/main/openwakeword.onnx";
+}
+
+void OpenWakeWordAdapter::downloadModel(ProgressFn on_progress, DoneFn on_done) {
+    auto path = defaultModelPath();
+    std::filesystem::create_directories(std::filesystem::path(path).parent_path());
+    downloadFile(defaultModelUrl(), path,
+        [on_progress](float p) { if (on_progress) on_progress(p); },
+        [this, path, on_done](bool success) {
+            if (success) {
+                ::dlclose(m_impl->onnx_lib);
+                m_impl->onnx_lib = nullptr;
+                m_impl->ready = false;
+            }
+            if (on_done) on_done(success);
+        });
 }
 
 } // namespace rook::adapters::audio

@@ -40,6 +40,7 @@ librook_core_sources = files(
   'src/adapters/audio/whisper_adapter.cpp',
   'src/adapters/audio/piper_adapter.cpp',
   'src/adapters/audio/openwakeword_adapter.cpp',
+  'src/adapters/audio/model_downloader.cpp',
 )
 
 librook_core_deps = [

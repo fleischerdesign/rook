@@ -2,10 +2,14 @@
 
 #include "rook/ports/wakeword_port.hpp"
 
+#include <functional>
 #include <memory>
 #include <string>
 
 namespace rook::adapters::audio {
+
+using ProgressFn = std::function<void(float progress)>;
+using DoneFn = std::function<void(bool success)>;
 
 class OpenWakeWordAdapter : public ports::WakewordPort {
 public:
@@ -21,6 +25,10 @@ public:
     bool processFrame(const int16_t* pcm) override;
     void reset() override;
     void setSensitivity(float value) override;
+
+    std::string defaultModelPath() const;
+    std::string defaultModelUrl() const;
+    void downloadModel(ProgressFn on_progress, DoneFn on_done);
 
 private:
     struct Impl;

@@ -1,4 +1,5 @@
 #include "rook/adapters/audio/whisper_adapter.hpp"
+#include "rook/adapters/audio/model_downloader.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -86,6 +87,9 @@ WhisperAdapter::WhisperAdapter(std::string model_path)
     } else {
         SPDLOG_WARN("WhisperAdapter: whisper-cli not found in PATH");
     }
+
+    if (m_impl->model_path.empty())
+        m_impl->model_path = defaultModelPath();
 }
 
 WhisperAdapter::~WhisperAdapter() = default;
@@ -219,6 +223,27 @@ void WhisperAdapter::setModel(std::string_view path) {
 
 std::vector<std::string> WhisperAdapter::availableModels() const {
     return {"tiny", "base", "small", "medium", "large-v3"};
+}
+
+std::string WhisperAdapter::defaultModelPath() const {
+    auto* d = ::getenv("XDG_DATA_HOME");
+    std::string base = d ? std::string(d) : std::string(::getenv("HOME")) + "/.local/share";
+    return base + "/rook/models/whisper/ggml-small.bin";
+}
+
+std::string WhisperAdapter::defaultModelUrl() const {
+    return "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin";
+}
+
+void WhisperAdapter::downloadModel(ProgressFn on_progress, DoneFn on_done) {
+    auto path = defaultModelPath();
+    std::filesystem::create_directories(std::filesystem::path(path).parent_path());
+    downloadFile(defaultModelUrl(), path,
+        [on_progress](float p) { if (on_progress) on_progress(p); },
+        [this, path, on_done](bool success) {
+            if (success) m_impl->model_path = path;
+            if (on_done) on_done(success);
+        });
 }
 
 } // namespace rook::adapters::audio

@@ -1,4 +1,5 @@
 #include "rook/adapters/audio/piper_adapter.hpp"
+#include "rook/adapters/audio/model_downloader.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -61,6 +62,9 @@ PiperAdapter::PiperAdapter(std::string model_path, std::string voice_id)
     } else {
         SPDLOG_WARN("PiperAdapter: piper not found in PATH");
     }
+
+    if (m_impl->model_path.empty())
+        m_impl->model_path = defaultModelPath();
 }
 
 PiperAdapter::~PiperAdapter() = default;
@@ -180,6 +184,27 @@ void PiperAdapter::stop() {
     if (m_impl->speech_thread.joinable()) {
         m_impl->speech_thread.join();
     }
+}
+
+std::string PiperAdapter::defaultModelPath() const {
+    auto* d = ::getenv("XDG_DATA_HOME");
+    std::string base = d ? std::string(d) : std::string(::getenv("HOME")) + "/.local/share";
+    return base + "/rook/models/piper/de_DE-thorsten-medium.onnx";
+}
+
+std::string PiperAdapter::defaultModelUrl() const {
+    return "https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx";
+}
+
+void PiperAdapter::downloadModel(ProgressFn on_progress, DoneFn on_done) {
+    auto path = defaultModelPath();
+    std::filesystem::create_directories(std::filesystem::path(path).parent_path());
+    downloadFile(defaultModelUrl(), path,
+        [on_progress](float p) { if (on_progress) on_progress(p); },
+        [this, path, on_done](bool success) {
+            if (success) m_impl->model_path = path;
+            if (on_done) on_done(success);
+        });
 }
 
 } // namespace rook::adapters::audio

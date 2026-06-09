@@ -8,6 +8,12 @@
 #include "rook/ports/text_to_speech_port.hpp"
 #include "rook/ports/audio_device_port.hpp"
 
+namespace rook::adapters::audio {
+class WhisperAdapter;
+class PiperAdapter;
+class OpenWakeWordAdapter;
+}
+
 namespace rook::gui {
 
 class VoiceSettingsPage {
@@ -32,10 +38,11 @@ private:
     rook::ports::AudioDevicePort* m_audio_device = nullptr;
     ChangeFn m_on_changed;
 
-    void addStatusRow(peel::Adw::PreferencesGroup &group,
-                      std::string_view label,
-                      std::string_view status,
-                      bool ok);
+    void addEngineRow(peel::Adw::PreferencesGroup &group,
+                      std::string_view name,
+                      bool ready,
+                      std::string_view status_msg,
+                      std::function<void()> on_download_start);
 };
 
 } // namespace rook::gui

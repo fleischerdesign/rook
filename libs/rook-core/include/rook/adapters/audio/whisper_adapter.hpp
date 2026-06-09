@@ -2,10 +2,14 @@
 
 #include "rook/ports/speech_to_text_port.hpp"
 
+#include <functional>
 #include <memory>
 #include <string>
 
 namespace rook::adapters::audio {
+
+using ProgressFn = std::function<void(float progress)>;
+using DoneFn = std::function<void(bool success)>;
 
 class WhisperAdapter : public ports::SpeechToTextPort {
 public:
@@ -23,6 +27,10 @@ public:
     void cancel() override;
     void setModel(std::string_view path) override;
     std::vector<std::string> availableModels() const override;
+
+    std::string defaultModelPath() const;
+    std::string defaultModelUrl() const;
+    void downloadModel(ProgressFn on_progress, DoneFn on_done);
 
 private:
     struct Impl;

@@ -2,10 +2,14 @@
 
 #include "rook/ports/text_to_speech_port.hpp"
 
+#include <functional>
 #include <memory>
 #include <string>
 
 namespace rook::adapters::audio {
+
+using ProgressFn = std::function<void(float progress)>;
+using DoneFn = std::function<void(bool success)>;
 
 class PiperAdapter : public ports::TextToSpeechPort {
 public:
@@ -25,6 +29,10 @@ public:
                                   int sample_rate, bool is_last)> on_chunk) override;
 
     void stop() override;
+
+    std::string defaultModelPath() const;
+    std::string defaultModelUrl() const;
+    void downloadModel(ProgressFn on_progress, DoneFn on_done);
 
 private:
     struct Impl;
