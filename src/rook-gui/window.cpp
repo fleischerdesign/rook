@@ -78,6 +78,7 @@ RookWindow *RookWindow::create(Gtk::Application *app,
     auto menu_button = Gtk::MenuButton::create();
     menu_button->set_icon_name("open-menu-symbolic");
     menu_button->set_tooltip_text(_("Menu"));
+    menu_button->set_popover(std::move(popover));
     win->m_header->pack_end(std::move(menu_button));
 
     {
