@@ -1,3 +1,0 @@
-#pragma once
-
-#mesondefine ROOK_HAS_ONNXRUNTIME

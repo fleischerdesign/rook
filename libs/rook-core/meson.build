@@ -48,43 +48,24 @@ librook_core_deps = [
   dependency('spdlog'),
   dependency('libcurl'),
   dependency('libsecret-1'),
+  dependency('alsa'),
 ]
 
-onnx_dep = dependency('libonnxruntime', required: false)
-
-librook_core_inc = include_directories(
-  'include',
-  '../../vendor/miniaudio',
-)
-
-if onnx_dep.found()
-  librook_core_inc += include_directories(
-    onnx_dep.get_variable(pkgconfig: 'includedir'),
-  )
-  librook_core_deps += onnx_dep
-endif
-
-rook_config = configuration_data()
-rook_config.set('ROOK_HAS_ONNXRUNTIME', onnx_dep.found())
-
-configure_file(
-  input: 'rook_config.h.in',
-  output: 'rook_config.h',
-  configuration: rook_config,
-  install: true,
-  install_dir: get_option('includedir') / 'rook',
-)
+librook_core_inc_list = [
+  include_directories('include'),
+  include_directories('../../vendor/miniaudio'),
+]
 
 librook_core = shared_library(
   'rook-core',
   librook_core_sources,
-  include_directories: librook_core_inc,
+  include_directories: librook_core_inc_list,
   dependencies: librook_core_deps,
   install: true,
 )
 
 librook_core_dep = declare_dependency(
   link_with: librook_core,
-  include_directories: librook_core_inc,
+  include_directories: librook_core_inc_list,
   dependencies: librook_core_deps,
 )

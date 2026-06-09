@@ -44,6 +44,7 @@
             protobuf
             gtest
             onnxruntime
+            alsa-lib
             piper-tts
             whisper-cpp
             ollama
