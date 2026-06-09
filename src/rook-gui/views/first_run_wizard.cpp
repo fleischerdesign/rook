@@ -1,6 +1,9 @@
 #include <glib/gi18n.h>
 #include "first_run_wizard.hpp"
 #include "rook/ports/llm_port.hpp"
+#include <peel/Adw/Adw.h>
+#include <gio/gio.h>
+#include <adwaita.h>
 
 using namespace peel;
 
@@ -77,6 +80,51 @@ inline void FirstRunWizard::init(Class *)
         entry->set_visibility(false);
         m_api_key = entry;
         box->append(std::move(entry));
+    }
+
+    {
+        auto sep = Gtk::Separator::create(Gtk::Orientation::HORIZONTAL);
+        sep->set_margin_top(8);
+        sep->set_margin_bottom(8);
+        box->append(std::move(sep));
+    }
+
+    {
+        auto voice_title = Gtk::Label::create(_("Voice Control"));
+        voice_title->add_css_class("title-3");
+        voice_title->set_xalign(0.0f);
+        box->append(std::move(voice_title));
+
+        auto voice_desc = Gtk::Label::create(
+            _("Speak to Rook using your microphone. Wake-word and text-to-speech "
+              "can be configured later in Preferences → Voice."));
+        voice_desc->add_css_class("dim-label");
+        voice_desc->set_wrap(true);
+        box->append(std::move(voice_desc));
+    }
+
+    {
+        auto voice_switch = Adw::SwitchRow::create();
+        voice_switch->set_title(_("Enable Voice Control"));
+        voice_switch->set_subtitle(_("Microphone access required"));
+
+        auto settings = g_settings_new("io.github.fleischerdesign.Rook");
+        gboolean enabled = g_settings_get_boolean(settings, "wake-word-enabled");
+        adw_switch_row_set_active(
+            reinterpret_cast<::AdwSwitchRow*>(static_cast<peel::Adw::SwitchRow*>(voice_switch)),
+            enabled);
+
+        g_signal_connect(
+            reinterpret_cast<::AdwSwitchRow*>(static_cast<peel::Adw::SwitchRow*>(voice_switch)),
+            "notify::active",
+            G_CALLBACK(+[](::AdwSwitchRow* sw, GParamSpec*, gpointer data) {
+                auto* s = static_cast<GSettings*>(data);
+                g_settings_set_boolean(s, "wake-word-enabled",
+                    adw_switch_row_get_active(sw));
+                g_settings_sync();
+            }), settings);
+
+        box->append(std::move(voice_switch).release_floating_ptr());
     }
 
     auto finish = Gtk::Button::create_with_label(_("Get Started"));

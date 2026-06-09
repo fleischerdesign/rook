@@ -43,6 +43,7 @@
             grpc
             protobuf
             gtest
+            onnxruntime
             piper-tts
             whisper-cpp
             ollama

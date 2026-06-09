@@ -49,9 +49,29 @@ librook_core_deps = [
   dependency('libsecret-1'),
 ]
 
+onnx_dep = dependency('libonnxruntime', required: false)
+
 librook_core_inc = include_directories(
   'include',
   '../../vendor/miniaudio',
+)
+
+if onnx_dep.found()
+  librook_core_inc += include_directories(
+    onnx_dep.get_variable(pkgconfig: 'includedir'),
+  )
+  librook_core_deps += onnx_dep
+endif
+
+rook_config = configuration_data()
+rook_config.set('ROOK_HAS_ONNXRUNTIME', onnx_dep.found())
+
+configure_file(
+  input: 'rook_config.h.in',
+  output: 'rook_config.h',
+  configuration: rook_config,
+  install: true,
+  install_dir: get_option('includedir') / 'rook',
 )
 
 librook_core = shared_library(
