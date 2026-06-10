@@ -34,6 +34,12 @@ std::unique_ptr<VoiceSettingsPage> VoiceSettingsPage::create(
     return page;
 }
 
+VoiceSettingsPage::~VoiceSettingsPage()
+{
+    if (m_engine_list_raw)
+        g_object_unref(reinterpret_cast<::GObject*>(m_engine_list_raw));
+}
+
 void VoiceSettingsPage::addSectionHeading(Adw::PreferencesGroup &group,
                                            std::string_view text,
                                            int margin_top)
@@ -143,11 +149,12 @@ void VoiceSettingsPage::rebuildEngineStatus()
 {
     if (!m_engine_list_raw) return;
 
+    auto* gobj = reinterpret_cast<::GObject*>(m_engine_list_raw);
     GtkWidget* child;
-    while ((child = gtk_widget_get_first_child(GTK_WIDGET(m_engine_list_raw))))
-        gtk_list_box_remove(m_engine_list_raw, child);
+    while ((child = gtk_widget_get_first_child(GTK_WIDGET(gobj))))
+        gtk_list_box_remove(GTK_LIST_BOX(gobj), child);
 
-    auto& list = *reinterpret_cast<peel::Gtk::ListBox*>(m_engine_list_raw);
+    auto& list = *m_engine_list_raw;
 
     if (m_wakeword) {
         auto ready = m_wakeword->isReady();
@@ -246,7 +253,8 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     engine_list->add_css_class("boxed-list");
     engine_list->set_selection_mode(Gtk::SelectionMode::NONE);
 
-    m_engine_list_raw = GTK_LIST_BOX(reinterpret_cast<::GObject*>(static_cast<Gtk::ListBox*>(engine_list)));
+    m_engine_list_raw = engine_list.operator->();
+    g_object_ref(reinterpret_cast<::GObject*>(m_engine_list_raw));
 
     if (m_wakeword) {
         auto ready = m_wakeword->isReady();
