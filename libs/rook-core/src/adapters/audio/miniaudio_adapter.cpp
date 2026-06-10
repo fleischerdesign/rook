@@ -15,7 +15,7 @@ namespace {
 
 constexpr std::size_t k_ma_device_id_size = sizeof(ma_device_id);
 
-std::string serialize_device_id(const ma_device_id& id) {
+std::string serialize_device_id(const ma_device_id& id, std::string_view backend) {
     std::string hex(k_ma_device_id_size * 2, '0');
     auto* raw = reinterpret_cast<const unsigned char*>(&id);
     for (std::size_t i = 0; i < k_ma_device_id_size; ++i) {
@@ -23,10 +23,24 @@ std::string serialize_device_id(const ma_device_id& id) {
         hex[i * 2]     = nib[(raw[i] >> 4) & 0xf];
         hex[i * 2 + 1] = nib[raw[i] & 0xf];
     }
-    return hex;
+    return std::string(backend) + ":" + hex;
 }
 
-bool deserialize_device_id(std::string_view hex, ma_device_id& out) {
+bool deserialize_device_id(std::string_view full, ma_device_id& out,
+                           ma_backend* out_backend) {
+    std::string_view hex = full;
+    if (out_backend) *out_backend = ma_backend_null;
+
+    auto colon = full.find(':');
+    if (colon != std::string_view::npos) {
+        auto prefix = full.substr(0, colon);
+        hex = full.substr(colon + 1);
+        if (out_backend) {
+            if (prefix == "PulseAudio") *out_backend = ma_backend_pulseaudio;
+            else if (prefix == "ALSA") *out_backend = ma_backend_alsa;
+        }
+    }
+
     if (hex.size() < k_ma_device_id_size * 2) return false;
     std::memset(&out, 0, sizeof(out));
     auto* raw = reinterpret_cast<unsigned char*>(&out);
@@ -152,7 +166,7 @@ static std::vector<ports::DeviceInfo> do_enumerate(
 
     for (ma_uint32 i = 0; i < count; ++i) {
         auto& d = devices[i];
-        auto id_hex = serialize_device_id(d.id);
+        auto id_hex = serialize_device_id(d.id, backend_label);
         auto name = std::string(d.name);
 
         result.push_back(ports::DeviceInfo{
@@ -205,12 +219,17 @@ static bool init_device(ma_context& ctx, ma_device& dev, ma_device_type type,
     bool has_explicit_device = false;
 
     if (!device_id_hex.empty()) {
-        if (deserialize_device_id(device_id_hex, did)) {
-            if (capture)
-                config.capture.pDeviceID = &did;
-            else
-                config.playback.pDeviceID = &did;
-            has_explicit_device = true;
+        ma_backend stored_backend = ma_backend_null;
+        if (deserialize_device_id(device_id_hex, did, &stored_backend)) {
+            bool backend_ok = (stored_backend == ma_backend_null)
+                           || (stored_backend == ctx.backend);
+            if (backend_ok) {
+                if (capture)
+                    config.capture.pDeviceID = &did;
+                else
+                    config.playback.pDeviceID = &did;
+                has_explicit_device = true;
+            }
         }
     }
 
