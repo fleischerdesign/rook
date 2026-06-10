@@ -20,7 +20,7 @@ WorkerPool::WorkerPool(std::size_t num_threads)
                         spdlog::error("WorkerPool: task threw unknown exception");
                     }
                 } else {
-                    std::this_thread::sleep_for(std::chrono::microseconds(100));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 }
             }
 

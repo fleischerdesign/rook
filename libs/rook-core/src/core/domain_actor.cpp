@@ -88,7 +88,7 @@ void DomainActor::run(std::stop_token token) {
     while (!token.stop_requested()) {
         auto msg = m_inbox->pop();
         if (!msg) {
-            std::this_thread::sleep_for(std::chrono::microseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
             continue;
         }
         dispatchMessage(*msg);

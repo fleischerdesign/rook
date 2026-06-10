@@ -99,7 +99,7 @@ bool MiniaudioAdapter::startCapture(std::string_view device_id,
     config.capture.format   = ma_format_s16;
     config.capture.channels = 1;
     config.sampleRate       = 16000;
-    config.periodSizeInFrames = 480;
+    config.periodSizeInFrames = 512;
     config.dataCallback     = Impl::onCapture;
     config.pUserData        = m_impl.get();
 
@@ -143,7 +143,7 @@ bool MiniaudioAdapter::startCapture(std::string_view device_id,
         fb_config.capture.format   = ma_format_s16;
         fb_config.capture.channels = 1;
         fb_config.sampleRate       = 16000;
-        fb_config.periodSizeInFrames = 480;
+        fb_config.periodSizeInFrames = 512;
         fb_config.dataCallback     = Impl::onCapture;
         fb_config.pUserData        = m_impl.get();
         fb_config.capture.pDeviceID = &devices[i].id;
