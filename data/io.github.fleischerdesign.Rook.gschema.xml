@@ -61,6 +61,31 @@
       <summary>No temperature fallback</summary>
       <description>Disable temperature fallback during decoding. Prevents whisper from generating text when uncertain.</description>
     </key>
+    <key name="whisper-threads" type="i">
+      <default>8</default>
+      <summary>CPU threads</summary>
+      <description>Number of threads for whisper inference. Range 1–16. Higher = faster on multi-core CPUs.</description>
+    </key>
+    <key name="whisper-beam-size" type="i">
+      <default>1</default>
+      <summary>Beam size</summary>
+      <description>Beam search width. Range 1–5. 1 = fastest, 5 = best accuracy.</description>
+    </key>
+    <key name="whisper-best-of" type="i">
+      <default>1</default>
+      <summary>Best-of candidates</summary>
+      <description>Number of best candidates. Range 1–5. 1 = fastest, 5 = best accuracy.</description>
+    </key>
+    <key name="whisper-audio-ctx" type="i">
+      <default>512</default>
+      <summary>Audio context size</summary>
+      <description>Audio context window in tokens. Range 0–2048. 0 = auto, 512 = fast. Smaller = faster encode.</description>
+    </key>
+    <key name="whisper-model" type="s">
+      <default>"small"</default>
+      <summary>Whisper model</summary>
+      <description>Model size for speech recognition. tiny (fastest/75MB), base (142MB), small (466MB, default), medium (1.5GB), large-v3 (2.9GB, best).</description>
+    </key>
     <key name="voice-silence-threshold" type="d">
       <default>80.0</default>
       <summary>Silence energy threshold</summary>

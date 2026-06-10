@@ -12,6 +12,7 @@
 #include <optional>
 #include <string>
 #include <sstream>
+#include <unordered_map>
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -179,6 +180,22 @@ void WhisperAdapter::transcribe(const int16_t* audio, std::size_t sample_count,
             "--no-speech-thold", thold_buf,
             "--entropy-thold", ethold_buf,
         };
+
+        int threads = g_settings_get_int(s, "whisper-threads");
+        int beam = g_settings_get_int(s, "whisper-beam-size");
+        int best = g_settings_get_int(s, "whisper-best-of");
+        int actx = g_settings_get_int(s, "whisper-audio-ctx");
+        char tbuf[8], bbuf[8], bofbuf[8], ctxbuf[8];
+        std::snprintf(tbuf, sizeof(tbuf), "%d", threads);
+        std::snprintf(bbuf, sizeof(bbuf), "%d", beam);
+        std::snprintf(bofbuf, sizeof(bofbuf), "%d", best);
+        std::snprintf(ctxbuf, sizeof(ctxbuf), "%d", actx);
+
+        argv.push_back("--threads"); argv.push_back(tbuf);
+        argv.push_back("--beam-size"); argv.push_back(bbuf);
+        argv.push_back("--best-of"); argv.push_back(bofbuf);
+        argv.push_back("--audio-ctx"); argv.push_back(ctxbuf);
+
         if (suppress)
             argv.push_back("--suppress-nst");
         if (no_fallback)
@@ -271,11 +288,35 @@ std::vector<std::string> WhisperAdapter::availableModels() const {
 std::string WhisperAdapter::defaultModelPath() const {
     auto* d = ::getenv("XDG_DATA_HOME");
     std::string base = d ? std::string(d) : std::string(::getenv("HOME")) + "/.local/share";
-    return base + "/rook/models/whisper/ggml-small.bin";
+    auto* s = g_settings_new("io.github.fleischerdesign.Rook");
+    char* model = g_settings_get_string(s, "whisper-model");
+    std::string name = model && model[0] ? std::string(model) : std::string("small");
+    g_free(model);
+    g_object_unref(s);
+    return base + "/rook/models/whisper/ggml-" + name + ".bin";
+}
+
+std::string WhisperAdapter::modelUrlForName(std::string_view name) {
+    std::string mn(name);
+    static const std::unordered_map<std::string, std::string> urls = {
+        {"tiny",     "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"},
+        {"base",     "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"},
+        {"small",    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"},
+        {"medium",   "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin"},
+        {"large-v3", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin"},
+    };
+    auto it = urls.find(mn);
+    if (it != urls.end()) return it->second;
+    return urls.at("small");
 }
 
 std::string WhisperAdapter::defaultModelUrl() const {
-    return "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin";
+    auto* s = g_settings_new("io.github.fleischerdesign.Rook");
+    char* model = g_settings_get_string(s, "whisper-model");
+    std::string name = model && model[0] ? std::string(model) : std::string("small");
+    g_free(model);
+    g_object_unref(s);
+    return modelUrlForName(name);
 }
 
 void WhisperAdapter::downloadModel(ProgressFn on_progress, DoneFn on_done) {

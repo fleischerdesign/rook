@@ -243,6 +243,116 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     whisper_list->add_css_class("boxed-list");
     whisper_list->set_selection_mode(Gtk::SelectionMode::NONE);
 
+    auto model_row = Adw::ComboRow::create();
+    model_row->set_title(_("Whisper Model"));
+    model_row->set_subtitle(_("Smaller = faster, larger = more accurate"));
+
+    const char* models_raw[] = {"tiny", "base", "small", "medium", "large-v3", nullptr};
+    auto model_model = Gtk::StringList::create(models_raw);
+    adw_combo_row_set_model(
+        reinterpret_cast<::AdwComboRow*>(static_cast<peel::Adw::ComboRow*>(model_row)),
+        G_LIST_MODEL(reinterpret_cast<::GtkStringList*>(
+            static_cast<Gtk::StringList*>(model_model))));
+
+    char* saved_model = g_settings_get_string(settings, "whisper-model");
+    int model_idx = 2;
+    if (saved_model && saved_model[0]) {
+        for (int i = 0; i < 5; ++i) {
+            if (std::string(models_raw[i]) == saved_model) { model_idx = i; break; }
+        }
+    }
+    g_free(saved_model);
+    model_row->set_selected(static_cast<unsigned>(model_idx));
+
+    auto* raw_model = reinterpret_cast<::AdwComboRow*>(
+        static_cast<peel::Adw::ComboRow*>(model_row));
+    g_signal_connect(raw_model, "notify::selected",
+        G_CALLBACK(+[](::AdwComboRow* row, GParamSpec*, gpointer data) {
+            auto* s = static_cast<GSettings*>(data);
+            guint sel = adw_combo_row_get_selected(row);
+            if (sel < 5) {
+                const char* nm = "small";
+                switch (sel) {
+                    case 0: nm = "tiny"; break;
+                    case 1: nm = "base"; break;
+                    case 2: nm = "small"; break;
+                    case 3: nm = "medium"; break;
+                    case 4: nm = "large-v3"; break;
+                }
+                g_settings_set_string(s, "whisper-model", nm);
+            }
+            g_settings_sync();
+        }), settings);
+    whisper_list->append(std::move(model_row).release_floating_ptr());
+
+    auto thread_row = Adw::SpinRow::create_with_range(1.0, 16.0, 1.0);
+    thread_row->set_title(_("CPU Threads"));
+    thread_row->set_subtitle(_("Threads for whisper inference (1–16)"));
+    thread_row->set_digits(0);
+    auto* raw_th = reinterpret_cast<::AdwSpinRow*>(
+        static_cast<peel::Adw::SpinRow*>(thread_row));
+    adw_spin_row_set_value(raw_th,
+        static_cast<double>(g_settings_get_int(settings, "whisper-threads")));
+    g_signal_connect(raw_th, "notify::value",
+        G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
+            auto* s = static_cast<GSettings*>(data);
+            g_settings_set_int(s, "whisper-threads",
+                static_cast<int>(adw_spin_row_get_value(row)));
+            g_settings_sync();
+        }), settings);
+    whisper_list->append(std::move(thread_row).release_floating_ptr());
+
+    auto beam_row = Adw::SpinRow::create_with_range(1.0, 5.0, 1.0);
+    beam_row->set_title(_("Beam Size"));
+    beam_row->set_subtitle(_("Beam search width. 1 = fastest, 5 = best accuracy"));
+    beam_row->set_digits(0);
+    auto* raw_beam = reinterpret_cast<::AdwSpinRow*>(
+        static_cast<peel::Adw::SpinRow*>(beam_row));
+    adw_spin_row_set_value(raw_beam,
+        static_cast<double>(g_settings_get_int(settings, "whisper-beam-size")));
+    g_signal_connect(raw_beam, "notify::value",
+        G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
+            auto* s = static_cast<GSettings*>(data);
+            g_settings_set_int(s, "whisper-beam-size",
+                static_cast<int>(adw_spin_row_get_value(row)));
+            g_settings_sync();
+        }), settings);
+    whisper_list->append(std::move(beam_row).release_floating_ptr());
+
+    auto bestof_row = Adw::SpinRow::create_with_range(1.0, 5.0, 1.0);
+    bestof_row->set_title(_("Best-Of Candidates"));
+    bestof_row->set_subtitle(_("Number of best candidates. 1 = fastest"));
+    bestof_row->set_digits(0);
+    auto* raw_bof = reinterpret_cast<::AdwSpinRow*>(
+        static_cast<peel::Adw::SpinRow*>(bestof_row));
+    adw_spin_row_set_value(raw_bof,
+        static_cast<double>(g_settings_get_int(settings, "whisper-best-of")));
+    g_signal_connect(raw_bof, "notify::value",
+        G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
+            auto* s = static_cast<GSettings*>(data);
+            g_settings_set_int(s, "whisper-best-of",
+                static_cast<int>(adw_spin_row_get_value(row)));
+            g_settings_sync();
+        }), settings);
+    whisper_list->append(std::move(bestof_row).release_floating_ptr());
+
+    auto ctx_row = Adw::SpinRow::create_with_range(0.0, 2048.0, 128.0);
+    ctx_row->set_title(_("Audio Context"));
+    ctx_row->set_subtitle(_("Encoding window size. 0 = auto, 512 = fast"));
+    ctx_row->set_digits(0);
+    auto* raw_ctx = reinterpret_cast<::AdwSpinRow*>(
+        static_cast<peel::Adw::SpinRow*>(ctx_row));
+    adw_spin_row_set_value(raw_ctx,
+        static_cast<double>(g_settings_get_int(settings, "whisper-audio-ctx")));
+    g_signal_connect(raw_ctx, "notify::value",
+        G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
+            auto* s = static_cast<GSettings*>(data);
+            g_settings_set_int(s, "whisper-audio-ctx",
+                static_cast<int>(adw_spin_row_get_value(row)));
+            g_settings_sync();
+        }), settings);
+    whisper_list->append(std::move(ctx_row).release_floating_ptr());
+
     auto nst_switch = Adw::SwitchRow::create();
     nst_switch->set_title(_("Suppress Noise Markers"));
     nst_switch->set_subtitle(_("Filter [Music], [Applause], [Laughter] from transcriptions"));

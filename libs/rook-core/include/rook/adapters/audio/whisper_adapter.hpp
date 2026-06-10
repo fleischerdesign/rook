@@ -27,6 +27,7 @@ public:
     void cancel() override;
     void setModel(std::string_view path) override;
     std::vector<std::string> availableModels() const override;
+    static std::string modelUrlForName(std::string_view name);
 
     std::string defaultModelPath() const;
     std::string defaultModelUrl() const;

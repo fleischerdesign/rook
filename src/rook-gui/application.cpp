@@ -218,6 +218,13 @@ inline void RookApplication::init(Class *)
     g_signal_connect(voice_settings, "changed::speaker-device",
         G_CALLBACK(+[](GSettings*, const gchar*, gpointer) {}), m_actor.get());
 
+    auto* whisper_ptr = dynamic_cast<rook::adapters::audio::WhisperAdapter*>(m_stt.get());
+    g_signal_connect(voice_settings, "changed::whisper-model",
+        G_CALLBACK(+[](GSettings*, const gchar*, gpointer data) {
+            auto* wa = static_cast<rook::adapters::audio::WhisperAdapter*>(data);
+            wa->setModel(wa->defaultModelPath());
+        }), whisper_ptr);
+
     auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);
     prefs_action->connect_activate(
         [this](Gio::SimpleAction *, GLib::Variant *) {
