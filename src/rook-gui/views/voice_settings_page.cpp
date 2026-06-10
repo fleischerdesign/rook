@@ -311,6 +311,31 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
 
     group.add(std::move(whisper_list).release_floating_ptr());
 
+    addSectionHeading(group, _("Audio Capture"), 16);
+
+    auto capture_list = Gtk::ListBox::create();
+    capture_list->add_css_class("boxed-list");
+    capture_list->set_selection_mode(Gtk::SelectionMode::NONE);
+
+    auto sil_row = Adw::SpinRow::create_with_range(0.0, 500.0, 10.0);
+    sil_row->set_title(_("Silence Threshold"));
+    sil_row->set_subtitle(_("Energy below this = silence. 0 = never skip, 80 = quiet room"));
+    sil_row->set_digits(0);
+    auto* raw_sil = reinterpret_cast<::AdwSpinRow*>(
+        static_cast<peel::Adw::SpinRow*>(sil_row));
+    adw_spin_row_set_value(raw_sil,
+        g_settings_get_double(settings, "voice-silence-threshold"));
+    g_signal_connect(raw_sil, "notify::value",
+        G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
+            auto* s = static_cast<GSettings*>(data);
+            g_settings_set_double(s, "voice-silence-threshold",
+                adw_spin_row_get_value(row));
+            g_settings_sync();
+        }), settings);
+    capture_list->append(std::move(sil_row).release_floating_ptr());
+
+    group.add(std::move(capture_list).release_floating_ptr());
+
     if (m_audio_device) {
         auto inputs = m_audio_device->enumerateInputs();
         auto outputs = m_audio_device->enumerateOutputs();

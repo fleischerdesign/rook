@@ -61,6 +61,11 @@
       <summary>No temperature fallback</summary>
       <description>Disable temperature fallback during decoding. Prevents whisper from generating text when uncertain.</description>
     </key>
+    <key name="voice-silence-threshold" type="d">
+      <default>80.0</default>
+      <summary>Silence energy threshold</summary>
+      <description>RMS energy below which audio is considered silence. Range 0–500. 0=never skip, 80=quiet room, 200=noisy environment.</description>
+    </key>
     <key name="language" type="s">
       <default>"de"</default>
       <summary>Interface language</summary>

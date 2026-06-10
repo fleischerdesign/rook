@@ -293,6 +293,22 @@ void AudioPipeline::processRecording(const int16_t* pcm, std::size_t count) {
 
         transition(ports::AudioState::Processing);
 
+        double sum_sq = 0.0;
+        for (auto s : audio) sum_sq += static_cast<double>(s) * static_cast<double>(s);
+        double rms = std::sqrt(sum_sq / static_cast<double>(audio.size()));
+
+        auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
+        double threshold = g_settings_get_double(gs, "voice-silence-threshold");
+        g_object_unref(gs);
+
+        if (threshold > 0.0 && rms < threshold) {
+            SPDLOG_INFO("AudioPipeline: skipped STT — silence (RMS={:.1f} < {:.1f})", rms, threshold);
+            auto cur_mode = m_mode.load(std::memory_order_acquire);
+            if (m_events.on_stt_result)
+                m_events.on_stt_result("", false, cur_mode);
+            return;
+        }
+
         int sr = 16000;
         auto cur_mode = m_mode.load(std::memory_order_acquire);
         m_stt.transcribe(audio.data(), audio.size(), sr,
