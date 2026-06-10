@@ -359,7 +359,7 @@ void AudioPipeline::startSpeaking(std::string text) {
         m_audio_device.writePlayback(pcm, sample_count);
         if (is_last) {
             SPDLOG_INFO("AudioPipeline: TTS finished");
-            m_audio_device.stopPlayback();
+            m_audio_device.finishPlayback();
             if (m_events.on_tts_done) {
                 m_events.on_tts_done();
             }

@@ -26,6 +26,7 @@ public:
 
     bool startPlayback(std::string_view device_id, int sample_rate) override;
     bool writePlayback(const float* pcm, std::size_t sample_count) override;
+    void finishPlayback();
     void stopPlayback() override;
     bool isPlaybackActive() const override;
 

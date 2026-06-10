@@ -32,6 +32,7 @@ public:
 
     virtual bool startPlayback(std::string_view device_id, int sample_rate) = 0;
     virtual bool writePlayback(const float* pcm, std::size_t sample_count) = 0;
+    virtual void finishPlayback() {}
     virtual void stopPlayback() = 0;
     virtual bool isPlaybackActive() const = 0;
 };

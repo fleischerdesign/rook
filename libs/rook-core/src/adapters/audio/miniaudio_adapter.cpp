@@ -79,6 +79,8 @@ struct MiniaudioAdapter::Impl {
     rook::core::SpScRingBuffer<float> playback_buffer{262144};
     int playback_sample_rate = 0;
 
+    std::atomic<bool> m_producer_done{false};
+
     static void onCapture(ma_device* device, void*, const void* input, ma_uint32 frame_count) {
         auto* self = static_cast<Impl*>(device->pUserData);
         if (self->capture_cb)
@@ -88,16 +90,23 @@ struct MiniaudioAdapter::Impl {
     static void onPlayback(ma_device* device, void* output, const void*, ma_uint32 frame_count) {
         auto* self = static_cast<Impl*>(device->pUserData);
         auto* out = static_cast<float*>(output);
+        auto available = self->playback_buffer.available();
+        if (available == 0 && self->m_producer_done.load(std::memory_order_acquire)) {
+            std::memset(out, 0, frame_count * sizeof(float));
+            ma_device_stop(device);
+            return;
+        }
         auto read = self->playback_buffer.read(out, frame_count);
         if (read < frame_count)
             std::memset(out + read, 0, (frame_count - read) * sizeof(float));
-    }
+    };
 };
 
 MiniaudioAdapter::MiniaudioAdapter()
     : m_impl(std::make_unique<Impl>())
 {
     auto config = ma_context_config_init();
+    config.pulse.pApplicationName = "Rook";
     config.alsa.useVerboseDeviceEnumeration = MA_TRUE;
 
     ma_result result = ma_context_init(k_backend_priority,
@@ -173,18 +182,24 @@ static bool init_device(ma_context& ctx, ma_device& dev, ma_device_type type,
                          ma_uint32 period_frames, ma_device_data_proc callback,
                          void* pUserData)
 {
+    constexpr ma_uint32 k_hw_rate = 48000;
+
     ma_device_config config = ma_device_config_init(type);
     if (capture) {
         config.capture.format   = format;
         config.capture.channels = 1;
+        config.pulse.pStreamNameCapture = "Rook Voice Capture";
     } else {
         config.playback.format   = format;
         config.playback.channels = 1;
+        config.pulse.pStreamNamePlayback = "Rook Voice Assistant";
     }
-    config.sampleRate          = sample_rate;
+    config.sampleRate          = k_hw_rate;
     config.periodSizeInFrames  = period_frames;
     config.dataCallback        = callback;
     config.pUserData           = pUserData;
+    config.resampling          = ma_resampler_config_init(
+        format, 1, k_hw_rate, sample_rate, ma_resample_algorithm_linear);
 
     ma_device_id did;
     bool has_explicit_device = false;
@@ -220,14 +235,18 @@ static bool init_device(ma_context& ctx, ma_device& dev, ma_device_type type,
     if (capture) {
         fb_config.capture.format   = format;
         fb_config.capture.channels = 1;
+        fb_config.pulse.pStreamNameCapture = "Rook Voice Capture";
     } else {
         fb_config.playback.format   = format;
         fb_config.playback.channels = 1;
+        fb_config.pulse.pStreamNamePlayback = "Rook Voice Assistant";
     }
-    fb_config.sampleRate         = sample_rate;
+    fb_config.sampleRate         = k_hw_rate;
     fb_config.periodSizeInFrames = period_frames;
     fb_config.dataCallback       = callback;
     fb_config.pUserData          = pUserData;
+    fb_config.resampling         = ma_resampler_config_init(
+        format, 1, k_hw_rate, sample_rate, ma_resample_algorithm_linear);
 
     if (ma_device_init(&ctx, &fb_config, &dev) != MA_SUCCESS) {
         SPDLOG_ERROR("miniaudio: fallback device init failed");
@@ -255,8 +274,8 @@ bool MiniaudioAdapter::startCapture(std::string_view device_id,
     if (ok) {
         m_impl->capture_cb = std::move(callback);
         m_impl->capture_open = true;
-        SPDLOG_INFO("miniaudio: capture started ({}Hz mono s16, device={})",
-                    16000, device_id.empty() ? "default" : device_id.substr(0, 16));
+        SPDLOG_INFO("miniaudio: capture started ({}Hz hw → {}Hz target mono s16, device={})",
+                    48000, 16000, device_id.empty() ? "default" : device_id.substr(0, 16));
         return true;
     }
 
@@ -284,6 +303,7 @@ bool MiniaudioAdapter::startPlayback(std::string_view device_id, int sample_rate
 
     m_impl->playback_buffer.clear();
     m_impl->playback_sample_rate = sample_rate;
+    m_impl->m_producer_done.store(false, std::memory_order_release);
 
     bool ok = init_device(m_impl->context, m_impl->playback_device,
                           ma_device_type_playback, device_id, false,
@@ -292,8 +312,8 @@ bool MiniaudioAdapter::startPlayback(std::string_view device_id, int sample_rate
 
     if (ok) {
         m_impl->playback_open = true;
-        SPDLOG_INFO("miniaudio: playback started ({}Hz mono f32, device={})",
-                    sample_rate, device_id.empty() ? "default" : device_id.substr(0, 16));
+        SPDLOG_INFO("miniaudio: playback started ({}Hz hw → {}Hz target mono f32, device={})",
+                    48000, sample_rate, device_id.empty() ? "default" : device_id.substr(0, 16));
         return true;
     }
 
@@ -315,11 +335,17 @@ bool MiniaudioAdapter::writePlayback(const float* pcm, std::size_t sample_count)
     return true;
 }
 
+void MiniaudioAdapter::finishPlayback() {
+    if (!m_impl->playback_open) return;
+    m_impl->m_producer_done.store(true, std::memory_order_release);
+}
+
 void MiniaudioAdapter::stopPlayback() {
     if (!m_impl->playback_open) return;
 
-    m_impl->playback_buffer.clear();
+    m_impl->m_producer_done.store(true, std::memory_order_release);
     ma_device_stop(&m_impl->playback_device);
+    m_impl->playback_buffer.clear();
     ma_device_uninit(&m_impl->playback_device);
     m_impl->playback_open = false;
     SPDLOG_DEBUG("miniaudio: playback stopped");
