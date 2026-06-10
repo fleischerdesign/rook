@@ -30967,7 +30967,6 @@ static ma_result ma_result_from_pulse(int result)
     }
 }
 
-#if 0
 static ma_pa_sample_format_t ma_format_to_pulse(ma_format format)
 {
     if (ma_is_little_endian()) {
@@ -30994,7 +30993,6 @@ static ma_pa_sample_format_t ma_format_to_pulse(ma_format format)
         default: return MA_PA_SAMPLE_INVALID;
     }
 }
-#endif
 
 static ma_format ma_format_from_pulse(ma_pa_sample_format_t format)
 {
@@ -32036,6 +32034,14 @@ static ma_result ma_device_init__pulse(ma_device* pDevice, const ma_device_confi
             ss.channels = pDescriptorCapture->channels;
         }
 
+        /* Use the requested format if one was specified. */
+        if (pDescriptorCapture->format != ma_format_unknown) {
+            ss.format = ma_format_to_pulse(pDescriptorCapture->format);
+            streamFlags = MA_PA_STREAM_START_CORKED | MA_PA_STREAM_FIX_FORMAT | MA_PA_STREAM_ADJUST_LATENCY;
+        } else {
+            streamFlags = MA_PA_STREAM_START_CORKED | MA_PA_STREAM_ADJUST_LATENCY;
+        }
+
         /* PulseAudio has a maximum channel count of 32. We'll get a crash if this is exceeded. */
         if (ss.channels > 32) {
             ss.channels = 32;
@@ -32048,7 +32054,7 @@ static ma_result ma_device_init__pulse(ma_device* pDevice, const ma_device_confi
         if (pDescriptorCapture->sampleRate != 0) {
             ss.rate = pDescriptorCapture->sampleRate;
         }
-        streamFlags = MA_PA_STREAM_START_CORKED | MA_PA_STREAM_ADJUST_LATENCY;
+        /* streamFlags set above in format section */
 
         if (ma_format_from_pulse(ss.format) == ma_format_unknown) {
             if (ma_is_little_endian()) {
@@ -32193,6 +32199,14 @@ static ma_result ma_device_init__pulse(ma_device* pDevice, const ma_device_confi
             ss.channels = pDescriptorPlayback->channels;
         }
 
+        /* Use the requested format if one was specified. */
+        if (pDescriptorPlayback->format != ma_format_unknown) {
+            ss.format = ma_format_to_pulse(pDescriptorPlayback->format);
+            streamFlags = MA_PA_STREAM_START_CORKED | MA_PA_STREAM_FIX_FORMAT | MA_PA_STREAM_ADJUST_LATENCY;
+        } else {
+            streamFlags = MA_PA_STREAM_START_CORKED | MA_PA_STREAM_ADJUST_LATENCY;
+        }
+
         /* PulseAudio has a maximum channel count of 32. We'll get a crash if this is exceeded. */
         if (ss.channels > 32) {
             ss.channels = 32;
@@ -32206,8 +32220,7 @@ static ma_result ma_device_init__pulse(ma_device* pDevice, const ma_device_confi
         if (pDescriptorPlayback->sampleRate != 0) {
             ss.rate = pDescriptorPlayback->sampleRate;
         }
-
-        streamFlags = MA_PA_STREAM_START_CORKED | MA_PA_STREAM_ADJUST_LATENCY;
+        /* streamFlags set above in format section */
         if (ma_format_from_pulse(ss.format) == ma_format_unknown) {
             if (ma_is_little_endian()) {
                 ss.format = MA_PA_SAMPLE_FLOAT32LE;
