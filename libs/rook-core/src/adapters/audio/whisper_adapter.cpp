@@ -165,10 +165,16 @@ void WhisperAdapter::transcribe(const int16_t* audio, std::size_t sample_count,
         bool no_fallback = g_settings_get_boolean(s, "whisper-no-fallback");
         double thold = g_settings_get_double(s, "whisper-no-speech-thold");
         double ethold = g_settings_get_double(s, "whisper-entropy-thold");
+
+        int threads = g_settings_get_int(s, "whisper-threads");
+        int beam = g_settings_get_int(s, "whisper-beam-size");
+        int best = g_settings_get_int(s, "whisper-best-of");
+        int actx = g_settings_get_int(s, "whisper-audio-ctx");
+        g_object_unref(s);
+
         char thold_buf[16], ethold_buf[16];
         std::snprintf(thold_buf, sizeof(thold_buf), "%.2f", thold);
         std::snprintf(ethold_buf, sizeof(ethold_buf), "%.2f", ethold);
-        g_object_unref(s);
 
         std::vector<const char*> argv = {
             "whisper-cli",
@@ -180,11 +186,6 @@ void WhisperAdapter::transcribe(const int16_t* audio, std::size_t sample_count,
             "--no-speech-thold", thold_buf,
             "--entropy-thold", ethold_buf,
         };
-
-        int threads = g_settings_get_int(s, "whisper-threads");
-        int beam = g_settings_get_int(s, "whisper-beam-size");
-        int best = g_settings_get_int(s, "whisper-best-of");
-        int actx = g_settings_get_int(s, "whisper-audio-ctx");
         char tbuf[8], bbuf[8], bofbuf[8], ctxbuf[8];
         std::snprintf(tbuf, sizeof(tbuf), "%d", threads);
         std::snprintf(bbuf, sizeof(bbuf), "%d", beam);
