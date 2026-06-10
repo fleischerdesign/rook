@@ -33,6 +33,8 @@ public:
 
     void populate(peel::Adw::PreferencesGroup &group);
 
+    void rebuildEngineStatus();
+
 private:
     VoiceSettingsPage() = default;
 
@@ -40,6 +42,7 @@ private:
     rook::ports::SpeechToTextPort* m_stt = nullptr;
     rook::ports::TextToSpeechPort* m_tts = nullptr;
     rook::ports::AudioDevicePort* m_audio_device = nullptr;
+    ::GtkListBox* m_engine_list_raw = nullptr;
     ChangeFn m_on_changed;
 
     void addEngineRow(peel::Gtk::ListBox &list,

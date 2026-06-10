@@ -139,6 +139,67 @@ void VoiceSettingsPage::addEngineRow(Gtk::ListBox &list,
     list.append(std::move(row).release_floating_ptr());
 }
 
+void VoiceSettingsPage::rebuildEngineStatus()
+{
+    if (!m_engine_list_raw) return;
+
+    GtkWidget* child;
+    while ((child = gtk_widget_get_first_child(GTK_WIDGET(m_engine_list_raw))))
+        gtk_list_box_remove(m_engine_list_raw, child);
+
+    auto& list = *reinterpret_cast<peel::Gtk::ListBox*>(m_engine_list_raw);
+
+    if (m_wakeword) {
+        auto ready = m_wakeword->isReady();
+        auto* ww = m_wakeword;
+        addEngineRow(list, m_wakeword->engineName(), ready,
+            ready ? _("Ready — wake word detection active")
+                  : (m_wakeword->needsKey()
+                        ? _("Access key required")
+                        : _("Engine not available — check installation")),
+            ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
+                  : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
+                      [ww](VoiceProgressFn p, VoiceDoneFn d) {
+                          auto* oww = dynamic_cast<rook::adapters::audio::OpenWakeWordAdapter*>(ww);
+                          if (oww) oww->downloadModel(p, d);
+                      }});
+    } else {
+        addEngineRow(list, _("Wake Word"), false, _("No engine loaded"), {});
+    }
+
+    if (m_stt) {
+        auto ready = m_stt->isReady();
+        auto* stt = m_stt;
+        addEngineRow(list, m_stt->engineName(), ready,
+            ready ? _("Ready — speech recognition active")
+                  : _("Engine not available — check installation"),
+            ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
+                  : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
+                      [stt](VoiceProgressFn p, VoiceDoneFn d) {
+                          auto* wa = dynamic_cast<rook::adapters::audio::WhisperAdapter*>(stt);
+                          if (wa) wa->downloadModel(p, d);
+                      }});
+    } else {
+        addEngineRow(list, _("Speech Recognition"), false, _("No engine loaded"), {});
+    }
+
+    if (m_tts) {
+        auto ready = m_tts->isReady();
+        auto* tts = m_tts;
+        addEngineRow(list, m_tts->engineName(), ready,
+            ready ? _("Ready — text-to-speech active")
+                  : _("Engine not available — check installation"),
+            ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
+                  : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
+                      [tts](VoiceProgressFn p, VoiceDoneFn d) {
+                          auto* pa = dynamic_cast<rook::adapters::audio::PiperAdapter*>(tts);
+                          if (pa) pa->downloadModel(p, d);
+                      }});
+    } else {
+        addEngineRow(list, _("Text-to-Speech"), false, _("No engine loaded"), {});
+    }
+}
+
 void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
 {
     auto heading = Gtk::Label::create(_("Voice"));
@@ -184,6 +245,8 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     auto engine_list = Gtk::ListBox::create();
     engine_list->add_css_class("boxed-list");
     engine_list->set_selection_mode(Gtk::SelectionMode::NONE);
+
+    m_engine_list_raw = GTK_LIST_BOX(reinterpret_cast<::GObject*>(static_cast<Gtk::ListBox*>(engine_list)));
 
     if (m_wakeword) {
         auto ready = m_wakeword->isReady();
@@ -268,7 +331,7 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
         static_cast<peel::Adw::ComboRow*>(model_row));
     g_signal_connect(raw_model, "notify::selected",
         G_CALLBACK(+[](::AdwComboRow* row, GParamSpec*, gpointer data) {
-            auto* s = static_cast<GSettings*>(data);
+            auto* self = static_cast<VoiceSettingsPage*>(data);
             guint sel = adw_combo_row_get_selected(row);
             if (sel < 5) {
                 const char* nm = "small";
@@ -279,10 +342,14 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
                     case 3: nm = "medium"; break;
                     case 4: nm = "large-v3"; break;
                 }
-                g_settings_set_string(s, "whisper-model", nm);
+                auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
+                g_settings_set_string(gs, "whisper-model", nm);
+                g_object_unref(gs);
             }
             g_settings_sync();
-        }), settings);
+            self->rebuildEngineStatus();
+            if (self->m_on_changed) self->m_on_changed();
+        }), this);
     whisper_list->append(std::move(model_row).release_floating_ptr());
 
     auto thread_row = Adw::SpinRow::create_with_range(1.0, 16.0, 1.0);
