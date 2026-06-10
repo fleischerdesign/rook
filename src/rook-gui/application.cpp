@@ -188,6 +188,21 @@ inline void RookApplication::init(Class *)
         SPDLOG_INFO("TTS engine ready: {}", m_tts->engineName());
 
     auto* voice_settings = g_settings_new("io.github.fleischerdesign.Rook");
+
+    {
+        char* vm = g_settings_get_string(voice_settings, "voice-model");
+        m_actor->setVoiceModel(vm && vm[0] ? vm : "default");
+        g_free(vm);
+    }
+
+    g_signal_connect(voice_settings, "changed::voice-model",
+        G_CALLBACK(+[](GSettings* s, const gchar*, gpointer data) {
+            auto* actor = static_cast<rook::core::DomainActor*>(data);
+            char* vm = g_settings_get_string(s, "voice-model");
+            actor->setVoiceModel(vm && vm[0] ? vm : "default");
+            g_free(vm);
+        }), m_actor.get());
+
     if (g_settings_get_boolean(voice_settings, "wake-word-enabled")) {
         m_actor->enableVoice();
         m_actor->unmuteVoice();

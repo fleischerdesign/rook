@@ -45,6 +45,8 @@
             gtest
             onnxruntime
             alsa-lib
+            libpulseaudio
+            pulseaudio
             piper-tts
             whisper-cpp
             ollama

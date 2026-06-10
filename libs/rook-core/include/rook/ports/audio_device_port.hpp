@@ -12,6 +12,7 @@ namespace rook::ports {
 struct DeviceInfo {
     std::string id;
     std::string name;
+    std::string backend;
     bool is_default = false;
 };
 

@@ -31,6 +31,11 @@
       <summary>Enable wake word</summary>
       <description>Whether to listen for the wake word.</description>
     </key>
+    <key name="voice-model" type="s">
+      <default>"default"</default>
+      <summary>Voice LLM model</summary>
+      <description>The LLM model to use for voice wake-word queries (provider_id:model_name format).</description>
+    </key>
     <key name="microphone-device" type="s">
       <default>""</default>
       <summary>Microphone device</summary>

@@ -49,7 +49,14 @@ librook_core_deps = [
   dependency('libcurl'),
   dependency('libsecret-1'),
   dependency('alsa'),
+  dependency('libpulse', required: false),
 ]
+
+libonnx_dep = dependency('libonnxruntime', required: false)
+if libonnx_dep.found()
+  librook_core_deps += libonnx_dep
+  add_project_arguments('-DROOK_HAS_ONNXRUNTIME', language: 'cpp')
+endif
 
 librook_core_inc_list = [
   include_directories('include'),

@@ -4,10 +4,13 @@
 #include <peel/GLib/functions.h>
 #include <memory>
 #include <functional>
+#include <vector>
+#include <string>
 #include "rook/ports/wakeword_port.hpp"
 #include "rook/ports/speech_to_text_port.hpp"
 #include "rook/ports/text_to_speech_port.hpp"
 #include "rook/ports/audio_device_port.hpp"
+#include "rook/ports/llm_port.hpp"
 
 namespace rook::adapters::audio {
 class WhisperAdapter;
@@ -29,6 +32,7 @@ public:
         rook::ports::SpeechToTextPort* stt = nullptr,
         rook::ports::TextToSpeechPort* tts = nullptr,
         rook::ports::AudioDevicePort* audio_device = nullptr,
+        rook::ports::LlmPort* llm = nullptr,
         ChangeFn on_changed = {});
 
     void populate(peel::Adw::PreferencesGroup &group);
@@ -43,6 +47,7 @@ private:
     rook::ports::SpeechToTextPort* m_stt = nullptr;
     rook::ports::TextToSpeechPort* m_tts = nullptr;
     rook::ports::AudioDevicePort* m_audio_device = nullptr;
+    rook::ports::LlmPort* m_llm = nullptr;
     peel::Gtk::ListBox* m_engine_list_raw = nullptr;
     ChangeFn m_on_changed;
 

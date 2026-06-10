@@ -61,7 +61,7 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
             [on_changed] { on_changed(); },
             on_before_uninstall);
 
-    dialog->m_impl->voice = VoiceSettingsPage::create(wakeword, stt, tts, audio_device,
+    dialog->m_impl->voice = VoiceSettingsPage::create(wakeword, stt, tts, audio_device, &llm,
                                                        [on_changed] { on_changed(); });
     dialog->m_impl->appearance = AppearancePage::create();
 

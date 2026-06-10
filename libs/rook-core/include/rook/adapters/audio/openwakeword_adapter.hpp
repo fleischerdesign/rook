@@ -5,6 +5,8 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace rook::adapters::audio {
 
@@ -26,6 +28,7 @@ public:
     void reset() override;
     void setSensitivity(float value) override;
 
+    std::string modelPath() const;
     std::string defaultModelPath() const;
     std::string defaultModelUrl() const;
     void downloadModel(ProgressFn on_progress, DoneFn on_done);

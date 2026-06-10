@@ -86,6 +86,7 @@ public:
     void unmuteVoice();
     bool isVoiceEnabled() const;
     bool isVoiceMuted() const;
+    void setVoiceModel(std::string model) { m_voice_model = std::move(model); }
 
 private:
     void run(std::stop_token token);
@@ -167,6 +168,7 @@ private:
     rook::adapters::hook::HookRegistry m_hooks;
     std::unique_ptr<domain::AudioPipeline> m_audio_pipeline;
     std::unordered_set<std::string> m_voice_triggered_chats;
+    std::string m_voice_model;
 };
 
 } // namespace rook::core

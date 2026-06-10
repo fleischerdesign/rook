@@ -130,6 +130,7 @@ struct ActorWakeDetected {
 
 struct ActorWakeQuery {
     std::string transcript;
+    std::string model;
     bool is_final = false;
 };
 

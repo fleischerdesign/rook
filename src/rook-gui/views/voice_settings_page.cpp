@@ -3,11 +3,13 @@
 #include <peel/Adw/Adw.h>
 #include <gtk/gtk.h>
 #include <gio/gio.h>
+#include <spdlog/spdlog.h>
 #include <string>
 
 #include "rook/adapters/audio/whisper_adapter.hpp"
 #include "rook/adapters/audio/piper_adapter.hpp"
 #include "rook/adapters/audio/openwakeword_adapter.hpp"
+#include "rook/adapters/model/model_cache.hpp"
 
 using namespace peel;
 
@@ -23,6 +25,7 @@ std::unique_ptr<VoiceSettingsPage> VoiceSettingsPage::create(
     rook::ports::SpeechToTextPort* stt,
     rook::ports::TextToSpeechPort* tts,
     rook::ports::AudioDevicePort* audio_device,
+    rook::ports::LlmPort* llm,
     ChangeFn on_changed)
 {
     auto page = std::unique_ptr<VoiceSettingsPage>(new VoiceSettingsPage());
@@ -30,6 +33,7 @@ std::unique_ptr<VoiceSettingsPage> VoiceSettingsPage::create(
     page->m_stt = stt;
     page->m_tts = tts;
     page->m_audio_device = audio_device;
+    page->m_llm = llm;
     page->m_on_changed = std::move(on_changed);
     return page;
 }
@@ -109,7 +113,9 @@ void VoiceSettingsPage::addEngineRow(Gtk::ListBox &list,
                 (*d)();
             }),
             new std::function<void()>([on_download = std::move(on_download),
-                                        raw_stack, raw_prog_bar, raw_prog_label]() mutable {
+                                        raw_stack, raw_prog_bar, raw_prog_label,
+                                        name = std::string(name)]() mutable {
+                SPDLOG_INFO("VoiceSettings: download button clicked for '{}'", name);
                 gtk_stack_set_visible_child_name(reinterpret_cast<::GtkStack*>(raw_stack),
                                                   "progress");
                 on_download(
@@ -166,8 +172,14 @@ void VoiceSettingsPage::rebuildEngineStatus()
             ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
                   : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
                       [ww](VoiceProgressFn p, VoiceDoneFn d) {
+                          SPDLOG_INFO("OpenWakeWord GUI: download button callback invoked (rebuild)");
                           auto* oww = dynamic_cast<rook::adapters::audio::OpenWakeWordAdapter*>(ww);
-                          if (oww) oww->downloadModel(p, d);
+                          if (oww) {
+                              SPDLOG_INFO("OpenWakeWord GUI: dynamic_cast succeeded, calling downloadModel");
+                              oww->downloadModel(p, d);
+                          } else {
+                              SPDLOG_ERROR("OpenWakeWord GUI: dynamic_cast FAILED");
+                          }
                       }});
     } else {
         addEngineRow(list, _("Wake Word"), false, _("No engine loaded"), {});
@@ -246,6 +258,77 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     wake_list->append(std::move(voice_switch).release_floating_ptr());
     group.add(std::move(wake_list).release_floating_ptr());
 
+    if (m_llm) {
+        addSectionHeading(group, _("Voice LLM Model"), 16);
+
+        auto model_list = Gtk::ListBox::create();
+        model_list->add_css_class("boxed-list");
+        model_list->set_selection_mode(Gtk::SelectionMode::NONE);
+
+        auto model_row = Adw::ComboRow::create();
+        model_row->set_title(_("Voice Model"));
+        model_row->set_subtitle(_("LLM model used for voice wake-word queries"));
+        model_row->set_activatable(true);
+
+        RefPtr<Gtk::StringList> model_strings = Gtk::StringList::create({nullptr});
+        std::vector<std::string> model_ids;
+
+        auto providers = m_llm->listProviders();
+        for (const auto &prov : providers) {
+            if (!prov.enabled) continue;
+
+            auto cached_models = rook::adapters::model::ModelCache::instance().getAllEnabled(
+                [&](std::string_view pid) { return pid == prov.id; });
+
+            if (!cached_models.empty()) {
+                for (const auto &model : cached_models) {
+                    auto id = prov.id + ":" + model.id;
+                    auto label = prov.display_name + " / " + model.display_name;
+                    model_ids.push_back(id);
+                    model_strings->append(label.c_str());
+                }
+            } else {
+                auto info = rook::ports::ProviderRegistry::instance().find(prov.type);
+                auto default_model = info ? info->default_model : prov.default_model;
+                auto id = prov.id + ":" + default_model;
+                auto label = prov.display_name + " / " + default_model;
+                model_ids.push_back(id);
+                model_strings->append(label.c_str());
+            }
+        }
+
+        model_row->set_model(model_strings);
+
+        std::string saved_model = "default";
+        auto* gs2 = g_settings_new("io.github.fleischerdesign.Rook");
+        char* saved = g_settings_get_string(gs2, "voice-model");
+        if (saved && saved[0]) saved_model = saved;
+        g_free(saved);
+
+        unsigned sel = 0;
+        for (unsigned i = 0; i < model_ids.size(); ++i) {
+            if (model_ids[i] == saved_model) { sel = i; break; }
+        }
+        model_row->set_selected(sel);
+
+        auto* raw_mr = reinterpret_cast<::AdwComboRow*>(
+            static_cast<peel::Adw::ComboRow*>(model_row));
+        g_signal_connect(raw_mr, "notify::selected",
+            G_CALLBACK(+[](::AdwComboRow* row, GParamSpec*, gpointer data) {
+                auto* ids = static_cast<std::vector<std::string>*>(data);
+                guint sel2 = adw_combo_row_get_selected(row);
+                if (sel2 < ids->size()) {
+                    auto* gs3 = g_settings_new("io.github.fleischerdesign.Rook");
+                    g_settings_set_string(gs3, "voice-model", (*ids)[sel2].c_str());
+                    g_object_unref(gs3);
+                    g_settings_sync();
+                }
+            }), &model_ids);
+
+        model_list->append(std::move(model_row).release_floating_ptr());
+        group.add(std::move(model_list).release_floating_ptr());
+    }
+
     addSectionHeading(group, _("Engine Status"), 16);
 
     auto engine_list = Gtk::ListBox::create();
@@ -266,8 +349,14 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
             ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
                   : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
                       [ww](VoiceProgressFn p, VoiceDoneFn d) {
+                          SPDLOG_INFO("OpenWakeWord GUI: download button callback invoked");
                           auto* oww = dynamic_cast<rook::adapters::audio::OpenWakeWordAdapter*>(ww);
-                          if (oww) oww->downloadModel(p, d);
+                          if (oww) {
+                              SPDLOG_INFO("OpenWakeWord GUI: dynamic_cast succeeded, calling downloadModel");
+                              oww->downloadModel(p, d);
+                          } else {
+                              SPDLOG_ERROR("OpenWakeWord GUI: dynamic_cast FAILED");
+                          }
                       }});
     } else {
         addEngineRow(*engine_list, _("Wake Word"), false, _("No engine loaded"), {});
@@ -539,6 +628,8 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
         for (std::size_t i = 0; i < inputs.size(); ++i) {
             auto label = inputs[i].name;
             if (label.empty()) label = _("Default");
+            if (!inputs[i].backend.empty())
+                label = label + " [" + inputs[i].backend + "]";
             mic_model->append(label.c_str());
             if (inputs[i].is_default) mic_default_idx = static_cast<int>(i);
         }
@@ -589,6 +680,8 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
         for (std::size_t i = 0; i < outputs.size(); ++i) {
             auto label = outputs[i].name;
             if (label.empty()) label = _("Default");
+            if (!outputs[i].backend.empty())
+                label = label + " [" + outputs[i].backend + "]";
             spk_model->append(label.c_str());
             if (outputs[i].is_default) spk_default_idx = static_cast<int>(i);
         }
