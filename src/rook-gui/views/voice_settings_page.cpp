@@ -95,8 +95,7 @@ void VoiceSettingsPage::addEngineRow(Gtk::ListBox &list,
 
         auto* btn_page = gtk_stack_get_child_by_name(
             reinterpret_cast<::GtkStack*>(raw_stack), "button");
-        auto* raw_btn = GTK_BUTTON(gtk_widget_get_first_child(
-            GTK_WIDGET(btn_page)));
+        auto* raw_btn = GTK_BUTTON(btn_page);
 
         auto* pb_page = gtk_stack_get_child_by_name(
             reinterpret_cast<::GtkStack*>(raw_stack), "progress");
