@@ -10,3 +10,4 @@
 *.dylib
 *.dll
 .pkgconfig/
+data/gschemas.compiled
