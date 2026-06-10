@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <semaphore>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -96,6 +97,7 @@ private:
 
     std::atomic<VoiceMode> m_mode{VoiceMode::Wakeword};
     std::atomic<bool> m_live_mode_active{false};
+    std::counting_semaphore<1024> m_data_sem{0};
 
     int m_silence_counter = 0;
     int m_recording_frames = 0;

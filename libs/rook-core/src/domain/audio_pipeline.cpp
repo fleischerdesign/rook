@@ -150,7 +150,10 @@ void AudioPipeline::startListening() {
     bool capture_ok = m_audio_device.startCapture(device_id,
         [this](const int16_t* pcm, std::size_t frame_count) {
             m_ring_buffer.write(pcm, frame_count);
+            m_data_sem.release();
         });
+
+    while (m_data_sem.try_acquire()) {}
 
     if (!capture_ok) {
         SPDLOG_ERROR("AudioPipeline: capture start failed (device='{}'), voice unavailable",
@@ -181,6 +184,7 @@ void AudioPipeline::startListening() {
 void AudioPipeline::stopListening() {
     m_voice_active.store(false, std::memory_order_release);
     m_worker_running.store(false, std::memory_order_release);
+    m_data_sem.release();
     if (m_worker.joinable()) {
         m_worker.join();
     }
@@ -197,7 +201,7 @@ void AudioPipeline::runWorker() {
         if (state == ports::AudioState::Inactive ||
             state == ports::AudioState::Processing) {
             m_ring_buffer.drain(512);
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
             continue;
         }
 
@@ -207,11 +211,9 @@ void AudioPipeline::runWorker() {
                 std::size_t pos = 0;
                 while (pos < frame_size && m_worker_running.load(std::memory_order_acquire)) {
                     auto n = m_ring_buffer.read(frame.data() + pos, frame_size - pos);
-                    if (n == 0) {
-                        std::this_thread::sleep_for(std::chrono::microseconds(500));
-                        continue;
-                    }
                     pos += n;
+                    if (pos >= frame_size) break;
+                    m_data_sem.try_acquire_for(std::chrono::milliseconds(50));
                 }
                 if (pos < frame_size) continue;
 
@@ -225,7 +227,7 @@ void AudioPipeline::runWorker() {
                 }
             } else {
                 m_ring_buffer.drain(512);
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
             }
             continue;
         }
@@ -233,11 +235,9 @@ void AudioPipeline::runWorker() {
         std::size_t pos = 0;
         while (pos < frame_size && m_worker_running.load(std::memory_order_acquire)) {
             auto n = m_ring_buffer.read(frame.data() + pos, frame_size - pos);
-            if (n == 0) {
-                std::this_thread::sleep_for(std::chrono::microseconds(500));
-                continue;
-            }
             pos += n;
+            if (pos >= frame_size) break;
+            m_data_sem.try_acquire_for(std::chrono::milliseconds(50));
         }
         if (pos < frame_size) continue;
 

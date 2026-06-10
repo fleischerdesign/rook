@@ -100,7 +100,7 @@ void downloadFile(std::string_view url, std::string_view dest_path,
         std::filesystem::rename(tmp, dest);
         SPDLOG_INFO("ModelDownloader: downloaded {} successfully", dest);
 
-        while (on_progress)
+        if (on_progress)
             on_progress(1.0f);
         on_done(true);
     }).detach();
