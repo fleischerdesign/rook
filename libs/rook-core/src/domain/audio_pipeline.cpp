@@ -224,11 +224,7 @@ void AudioPipeline::runWorker() {
                     sum += static_cast<double>(frame[i]) * static_cast<double>(frame[i]);
                 double rms = std::sqrt(sum / static_cast<double>(frame_size));
 
-                auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
-                int barge_threshold = g_settings_get_int(gs, "voice-barge-in-threshold");
-                g_object_unref(gs);
-
-                if (rms > static_cast<double>(barge_threshold)) {
+                if (rms > static_cast<double>(m_barge_in_threshold.load(std::memory_order_acquire))) {
                     onBargeInDetected();
                 }
             } else {
@@ -236,15 +232,16 @@ void AudioPipeline::runWorker() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
             }
 
-            if (!m_audio_device.isPlaybackActive() ||
-                m_audio_device.isPlaybackDrained()) {
+            if (!m_speaking_setup.load(std::memory_order_acquire) &&
+                (!m_audio_device.isPlaybackActive() ||
+                 m_audio_device.isPlaybackDrained())) {
                 if (mode == VoiceMode::LiveChat) {
                     m_recording_buffer.clear();
                     m_silence_counter = 0;
                     m_recording_frames = 0;
                     transition(ports::AudioState::Recording);
                 } else {
-                    startListening();
+                    transition(ports::AudioState::WaitingForWake);
                 }
             }
             continue;
@@ -361,9 +358,11 @@ void AudioPipeline::onResponseReady(std::string_view text) {
 }
 
 void AudioPipeline::startSpeaking(std::string text) {
+    m_speaking_setup.store(true, std::memory_order_release);
     transition(ports::AudioState::Speaking);
 
     if (text.empty()) {
+        m_speaking_setup.store(false, std::memory_order_release);
         auto mode = m_mode.load(std::memory_order_acquire);
         if (mode == VoiceMode::LiveChat) {
             m_recording_buffer.clear();
@@ -380,9 +379,26 @@ void AudioPipeline::startSpeaking(std::string text) {
     char* spk_device = g_settings_get_string(s, "speaker-device");
     std::string device_id(spk_device ? spk_device : "");
     g_free(spk_device);
+    int barge_threshold = g_settings_get_int(s, "voice-barge-in-threshold");
     g_object_unref(s);
 
-    m_audio_device.startPlayback(device_id, 22050);
+    m_barge_in_threshold.store(barge_threshold, std::memory_order_release);
+
+    if (!m_audio_device.startPlayback(device_id, 22050)) {
+        m_speaking_setup.store(false, std::memory_order_release);
+        auto mode = m_mode.load(std::memory_order_acquire);
+        if (mode == VoiceMode::LiveChat) {
+            m_recording_buffer.clear();
+            m_silence_counter = 0;
+            m_recording_frames = 0;
+            transition(ports::AudioState::Recording);
+        } else {
+            transition(ports::AudioState::WaitingForWake);
+        }
+        return;
+    }
+
+    m_speaking_setup.store(false, std::memory_order_release);
 
     m_tts.speak(text, [this](const float* pcm, std::size_t sample_count,
                               int sample_rate, bool is_last) {

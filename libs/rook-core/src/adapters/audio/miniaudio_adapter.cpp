@@ -94,6 +94,7 @@ struct MiniaudioAdapter::Impl {
     int playback_sample_rate = 0;
 
     std::atomic<bool> m_producer_done{false};
+    std::atomic<bool> playback_muted{false};
 
     static void onCapture(ma_device* device, void*, const void* input, ma_uint32 frame_count) {
         auto* self = static_cast<Impl*>(device->pUserData);
@@ -104,6 +105,10 @@ struct MiniaudioAdapter::Impl {
     static void onPlayback(ma_device* device, void* output, const void*, ma_uint32 frame_count) {
         auto* self = static_cast<Impl*>(device->pUserData);
         auto* out = static_cast<float*>(output);
+        if (self->playback_muted.load(std::memory_order_acquire)) {
+            std::memset(out, 0, frame_count * sizeof(float));
+            return;
+        }
         auto available = self->playback_buffer.available();
         if (available == 0 && self->m_producer_done.load(std::memory_order_acquire)) {
             std::memset(out, 0, frame_count * sizeof(float));
@@ -314,11 +319,13 @@ bool MiniaudioAdapter::startPlayback(std::string_view device_id, int sample_rate
     if (!m_impl->context_ok) return false;
 
     if (m_impl->playback_open) {
+        m_impl->playback_muted.store(false, std::memory_order_release);
         m_impl->playback_buffer.clear();
         m_impl->m_producer_done.store(false, std::memory_order_release);
         return true;
     }
 
+    m_impl->playback_muted.store(false, std::memory_order_release);
     m_impl->playback_buffer.clear();
     m_impl->playback_sample_rate = sample_rate;
     m_impl->m_producer_done.store(false, std::memory_order_release);
@@ -361,6 +368,7 @@ void MiniaudioAdapter::finishPlayback() {
 void MiniaudioAdapter::stopPlayback() {
     if (!m_impl->playback_open) return;
 
+    m_impl->playback_muted.store(true, std::memory_order_release);
     m_impl->m_producer_done.store(true, std::memory_order_release);
     ma_device_stop(&m_impl->playback_device);
     m_impl->playback_buffer.clear();

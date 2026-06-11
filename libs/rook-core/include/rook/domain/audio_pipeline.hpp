@@ -98,6 +98,8 @@ private:
 
     std::atomic<VoiceMode> m_mode{VoiceMode::Wakeword};
     std::atomic<bool> m_live_mode_active{false};
+    std::atomic<bool> m_speaking_setup{false};
+    std::atomic<int> m_barge_in_threshold{500};
     std::counting_semaphore<1024> m_data_sem{0};
 
     std::recursive_mutex m_capture_mutex;
