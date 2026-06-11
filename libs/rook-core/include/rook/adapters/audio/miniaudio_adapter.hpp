@@ -29,6 +29,7 @@ public:
     void finishPlayback();
     void stopPlayback() override;
     bool isPlaybackActive() const override;
+    bool isPlaybackDrained() const override;
 
 private:
     struct Impl;

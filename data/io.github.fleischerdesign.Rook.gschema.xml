@@ -24,7 +24,7 @@
     <key name="tts-voice" type="s">
       <default>"en_US-lessac-medium"</default>
       <summary>TTS voice</summary>
-      <description>Piper TTS voice model to use.</description>
+      <description>Sherpa-ONNX TTS voice model to use.</description>
     </key>
     <key name="wake-word-enabled" type="b">
       <default>true</default>
@@ -95,6 +95,11 @@
       <default>80.0</default>
       <summary>Silence energy threshold</summary>
       <description>RMS energy below which audio is considered silence. Range 0–500. 0=never skip, 80=quiet room, 200=noisy environment.</description>
+    </key>
+    <key name="voice-barge-in-threshold" type="i">
+      <default>500</default>
+      <summary>Barge-in energy threshold</summary>
+      <description>RMS energy above which speech is considered a barge-in interrupt. Range 50–5000. Lower = more sensitive, 500=normal speech.</description>
     </key>
     <key name="language" type="s">
       <default>"de"</default>

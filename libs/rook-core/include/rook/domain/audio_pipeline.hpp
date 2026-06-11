@@ -106,7 +106,6 @@ private:
     int m_recording_frames = 0;
 
     static constexpr int k_silence_threshold = 100;
-    static constexpr int k_barge_in_threshold = 2000;
     static constexpr int k_silence_max = 60;
     static constexpr int k_live_silence_max = 100;
     static constexpr int k_max_recording_frames = 750;

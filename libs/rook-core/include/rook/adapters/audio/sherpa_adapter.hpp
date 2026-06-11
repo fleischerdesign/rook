@@ -11,14 +11,14 @@ namespace rook::adapters::audio {
 using ProgressFn = std::function<void(float progress)>;
 using DoneFn = std::function<void(bool success)>;
 
-class PiperAdapter : public ports::TextToSpeechPort {
+class SherpaAdapter : public ports::TextToSpeechPort {
 public:
-    explicit PiperAdapter(std::string model_path = {},
-                          std::string voice_id = {});
-    ~PiperAdapter() override;
+    explicit SherpaAdapter(std::string model_path = {},
+                           std::string voice_id = {});
+    ~SherpaAdapter() override;
 
-    std::string id() const override { return "piper"; }
-    std::string engineName() const override { return "piper"; }
+    std::string id() const override { return "sherpa-onnx"; }
+    std::string engineName() const override { return "Sherpa-ONNX"; }
     bool isReady() const override;
 
     std::vector<ports::VoiceInfo> listVoices() const override;

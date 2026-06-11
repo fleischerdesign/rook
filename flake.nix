@@ -47,10 +47,31 @@
             alsa-lib
             libpulseaudio
             pulseaudio
-            piper-tts
             whisper-cpp
             ollama
             cmark-gfm
+          ] ++ [
+            (pkgs.stdenv.mkDerivation {
+              pname = "sherpa-onnx-bin";
+              version = "1.13.2";
+              src = pkgs.fetchurl {
+                url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.2/sherpa-onnx-v1.13.2-linux-x64-shared.tar.bz2";
+                hash = "sha256-HvZ0FTX3r01p45T9RAqAcQgDbSbtT1QmYBkQGdpcDao=";
+              };
+              espeak_data = pkgs.fetchurl {
+                url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/espeak-ng-data.tar.bz2";
+                hash = "sha256-QTXM+C4fQGE0kcCHTUlFrp6ceECTPY4lpvngA9nr9TM=";
+              };
+              nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+              buildInputs = [ pkgs.onnxruntime ];
+              installPhase = ''
+                mkdir -p $out/bin
+                cp bin/sherpa-onnx-offline-tts $out/bin/
+                chmod +x $out/bin/sherpa-onnx-offline-tts
+                mkdir -p $out/share/sherpa-onnx
+                tar xf $espeak_data -C $out/share/sherpa-onnx
+              '';
+            })
           ];
 
           env = {

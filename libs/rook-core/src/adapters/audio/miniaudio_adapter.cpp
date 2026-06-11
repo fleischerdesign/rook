@@ -107,7 +107,6 @@ struct MiniaudioAdapter::Impl {
         auto available = self->playback_buffer.available();
         if (available == 0 && self->m_producer_done.load(std::memory_order_acquire)) {
             std::memset(out, 0, frame_count * sizeof(float));
-            ma_device_stop(device);
             return;
         }
         auto read = self->playback_buffer.read(out, frame_count);
@@ -312,7 +311,13 @@ bool MiniaudioAdapter::isCaptureActive() const {
 }
 
 bool MiniaudioAdapter::startPlayback(std::string_view device_id, int sample_rate) {
-    if (!m_impl->context_ok || m_impl->playback_open) return false;
+    if (!m_impl->context_ok) return false;
+
+    if (m_impl->playback_open) {
+        m_impl->playback_buffer.clear();
+        m_impl->m_producer_done.store(false, std::memory_order_release);
+        return true;
+    }
 
     m_impl->playback_buffer.clear();
     m_impl->playback_sample_rate = sample_rate;
@@ -366,6 +371,12 @@ void MiniaudioAdapter::stopPlayback() {
 
 bool MiniaudioAdapter::isPlaybackActive() const {
     return m_impl->playback_open;
+}
+
+bool MiniaudioAdapter::isPlaybackDrained() const {
+    if (!m_impl->playback_open) return true;
+    return m_impl->m_producer_done.load(std::memory_order_acquire) &&
+           m_impl->playback_buffer.available() == 0;
 }
 
 } // namespace rook::adapters::audio

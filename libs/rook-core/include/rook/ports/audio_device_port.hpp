@@ -35,6 +35,7 @@ public:
     virtual void finishPlayback() {}
     virtual void stopPlayback() = 0;
     virtual bool isPlaybackActive() const = 0;
+    virtual bool isPlaybackDrained() const = 0;
 };
 
 } // namespace rook::ports

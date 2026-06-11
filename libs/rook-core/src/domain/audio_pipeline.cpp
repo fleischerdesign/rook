@@ -224,12 +224,28 @@ void AudioPipeline::runWorker() {
                     sum += static_cast<double>(frame[i]) * static_cast<double>(frame[i]);
                 double rms = std::sqrt(sum / static_cast<double>(frame_size));
 
-                if (rms > k_barge_in_threshold) {
+                auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
+                int barge_threshold = g_settings_get_int(gs, "voice-barge-in-threshold");
+                g_object_unref(gs);
+
+                if (rms > static_cast<double>(barge_threshold)) {
                     onBargeInDetected();
                 }
             } else {
                 m_ring_buffer.drain(512);
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
+
+            if (!m_audio_device.isPlaybackActive() ||
+                m_audio_device.isPlaybackDrained()) {
+                if (mode == VoiceMode::LiveChat) {
+                    m_recording_buffer.clear();
+                    m_silence_counter = 0;
+                    m_recording_frames = 0;
+                    transition(ports::AudioState::Recording);
+                } else {
+                    startListening();
+                }
             }
             continue;
         }
@@ -347,6 +363,19 @@ void AudioPipeline::onResponseReady(std::string_view text) {
 void AudioPipeline::startSpeaking(std::string text) {
     transition(ports::AudioState::Speaking);
 
+    if (text.empty()) {
+        auto mode = m_mode.load(std::memory_order_acquire);
+        if (mode == VoiceMode::LiveChat) {
+            m_recording_buffer.clear();
+            m_silence_counter = 0;
+            m_recording_frames = 0;
+            transition(ports::AudioState::Recording);
+        } else {
+            startListening();
+        }
+        return;
+    }
+
     auto* s = g_settings_new("io.github.fleischerdesign.Rook");
     char* spk_device = g_settings_get_string(s, "speaker-device");
     std::string device_id(spk_device ? spk_device : "");
@@ -364,19 +393,6 @@ void AudioPipeline::startSpeaking(std::string text) {
             m_audio_device.finishPlayback();
             if (m_events.on_tts_done) {
                 m_events.on_tts_done();
-            }
-            if (m_enabled.load(std::memory_order_acquire) &&
-                !m_muted.load(std::memory_order_acquire)) {
-
-                auto mode = m_mode.load(std::memory_order_acquire);
-                if (mode == VoiceMode::LiveChat) {
-                    m_recording_buffer.clear();
-                    m_silence_counter = 0;
-                    m_recording_frames = 0;
-                    transition(ports::AudioState::Recording);
-                } else {
-                    startListening();
-                }
             }
         }
     });

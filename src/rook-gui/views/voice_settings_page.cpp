@@ -7,7 +7,7 @@
 #include <string>
 
 #include "rook/adapters/audio/whisper_adapter.hpp"
-#include "rook/adapters/audio/piper_adapter.hpp"
+#include "rook/adapters/audio/sherpa_adapter.hpp"
 #include "rook/adapters/audio/openwakeword_adapter.hpp"
 #include "rook/adapters/model/model_cache.hpp"
 
@@ -210,8 +210,8 @@ void VoiceSettingsPage::rebuildEngineStatus()
             ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
                   : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
                       [tts](VoiceProgressFn p, VoiceDoneFn d) {
-                          auto* pa = dynamic_cast<rook::adapters::audio::PiperAdapter*>(tts);
-                          if (pa) pa->downloadModel(p, d);
+                          auto* sa = dynamic_cast<rook::adapters::audio::SherpaAdapter*>(tts);
+                          if (sa) sa->downloadModel(p, d);
                       }});
     } else {
         addEngineRow(list, _("Text-to-Speech"), false, _("No engine loaded"), {});
@@ -387,8 +387,8 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
             ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
                   : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
                       [tts](VoiceProgressFn p, VoiceDoneFn d) {
-                          auto* pa = dynamic_cast<rook::adapters::audio::PiperAdapter*>(tts);
-                          if (pa) pa->downloadModel(p, d);
+                          auto* sa = dynamic_cast<rook::adapters::audio::SherpaAdapter*>(tts);
+                          if (sa) sa->downloadModel(p, d);
                       }});
     } else {
         addEngineRow(*engine_list, _("Text-to-Speech"), false, _("No engine loaded"), {});
@@ -606,6 +606,23 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
             g_settings_sync();
         }), settings);
     capture_list->append(std::move(sil_row).release_floating_ptr());
+
+    auto barge_row = Adw::SpinRow::create_with_range(50.0, 5000.0, 50.0);
+    barge_row->set_title(_("Barge-in Threshold"));
+    barge_row->set_subtitle(_("Energy above this interrupts playback. 500 = normal, 200 = sensitive"));
+    barge_row->set_digits(0);
+    auto* raw_barge = reinterpret_cast<::AdwSpinRow*>(
+        static_cast<peel::Adw::SpinRow*>(barge_row));
+    adw_spin_row_set_value(raw_barge,
+        g_settings_get_int(settings, "voice-barge-in-threshold"));
+    g_signal_connect(raw_barge, "notify::value",
+        G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
+            auto* s = static_cast<GSettings*>(data);
+            g_settings_set_int(s, "voice-barge-in-threshold",
+                static_cast<int>(adw_spin_row_get_value(row)));
+            g_settings_sync();
+        }), settings);
+    capture_list->append(std::move(barge_row).release_floating_ptr());
 
     group.add(std::move(capture_list).release_floating_ptr());
 

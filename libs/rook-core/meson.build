@@ -38,7 +38,7 @@ librook_core_sources = files(
   'src/adapters/extension/extension_manager.cpp',
   'src/adapters/audio/miniaudio_adapter.cpp',
   'src/adapters/audio/whisper_adapter.cpp',
-  'src/adapters/audio/piper_adapter.cpp',
+  'src/adapters/audio/sherpa_adapter.cpp',
   'src/adapters/audio/openwakeword_adapter.cpp',
   'src/adapters/audio/model_downloader.cpp',
 )
