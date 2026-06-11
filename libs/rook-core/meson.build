@@ -37,9 +37,9 @@ librook_core_sources = files(
   'src/adapters/extension/extension_manifest.cpp',
   'src/adapters/extension/extension_manager.cpp',
   'src/adapters/audio/miniaudio_adapter.cpp',
-  'src/adapters/audio/whisper_adapter.cpp',
-  'src/adapters/audio/sherpa_adapter.cpp',
-  'src/adapters/audio/openwakeword_adapter.cpp',
+  'src/adapters/audio/sherpa_tts_adapter.cpp',
+  'src/adapters/audio/sherpa_asr_adapter.cpp',
+  'src/adapters/audio/sherpa_wakeword_adapter.cpp',
   'src/adapters/audio/model_downloader.cpp',
 )
 
@@ -56,6 +56,19 @@ libonnx_dep = dependency('libonnxruntime', required: false)
 if libonnx_dep.found()
   librook_core_deps += libonnx_dep
   add_project_arguments('-DROOK_HAS_ONNXRUNTIME', language: 'cpp')
+endif
+
+libsherpa_cxx = meson.get_compiler('cpp').find_library(
+  'sherpa-onnx-cxx-api',
+  required: false
+)
+libsherpa_c = meson.get_compiler('cpp').find_library(
+  'sherpa-onnx-c-api',
+  required: false
+)
+if libsherpa_cxx.found() and libsherpa_c.found()
+  librook_core_deps += [libsherpa_cxx, libsherpa_c]
+  add_project_arguments('-DROOK_HAS_SHERPA_NATIVE', language: 'cpp')
 endif
 
 librook_core_inc_list = [

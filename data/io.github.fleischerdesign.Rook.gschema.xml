@@ -46,50 +46,40 @@
       <summary>Speaker device</summary>
       <description>Audio output device. Empty for system default.</description>
     </key>
-    <key name="whisper-suppress-nst" type="b">
-      <default>true</default>
-      <summary>Suppress noise markers</summary>
-      <description>Filter non-speech tokens like [Music], [Applause], [Laughter] from transcription output.</description>
-    </key>
-    <key name="whisper-no-speech-thold" type="d">
-      <default>0.7</default>
-      <summary>No-speech threshold</summary>
-      <description>Silence detection threshold for whisper. Range 0.0–1.0. Higher = less false positives in silence.</description>
-    </key>
-    <key name="whisper-entropy-thold" type="d">
-      <default>2.80</default>
-      <summary>Entropy threshold</summary>
-      <description>Decoder entropy threshold for whisper. Range 0.0–6.0. Higher = discards more low-confidence output, reducing hallucinations.</description>
-    </key>
-    <key name="whisper-no-fallback" type="b">
-      <default>true</default>
-      <summary>No temperature fallback</summary>
-      <description>Disable temperature fallback during decoding. Prevents whisper from generating text when uncertain.</description>
-    </key>
-    <key name="whisper-threads" type="i">
+    <key name="asr-threads" type="i">
       <default>8</default>
       <summary>CPU threads</summary>
-      <description>Number of threads for whisper inference. Range 1–16. Higher = faster on multi-core CPUs.</description>
+      <description>Number of threads for speech recognition inference. Range 1–16. Higher = faster on multi-core CPUs.</description>
     </key>
-    <key name="whisper-beam-size" type="i">
-      <default>1</default>
-      <summary>Beam size</summary>
-      <description>Beam search width. Range 1–5. 1 = fastest, 5 = best accuracy.</description>
+    <key name="asr-model" type="s">
+      <default>"tiny"</default>
+      <summary>ASR model size</summary>
+      <description>Model size for speech recognition. tiny (fastest/75MB), base (142MB), small (466MB), medium (1.5GB), large-v3 (2.9GB).</description>
     </key>
-    <key name="whisper-best-of" type="i">
-      <default>1</default>
-      <summary>Best-of candidates</summary>
-      <description>Number of best candidates. Range 1–5. 1 = fastest, 5 = best accuracy.</description>
+    <key name="asr-backend" type="s">
+      <default>"whisper"</default>
+      <summary>ASR backend</summary>
+      <description>Speech recognition engine backend. whisper: fast, multilingual. transducer: Parakeet TDT, high accuracy, 25 European languages.</description>
     </key>
-    <key name="whisper-audio-ctx" type="i">
-      <default>512</default>
-      <summary>Audio context size</summary>
-      <description>Audio context window in tokens. Range 0–2048. 0 = auto, 512 = fast. Smaller = faster encode.</description>
+    <key name="asr-language" type="s">
+      <default>"de"</default>
+      <summary>ASR language</summary>
+      <description>Language for speech recognition. "auto" for automatic detection (whisper backend only). ISO 639-1 codes: de, en, fr, etc.</description>
     </key>
-    <key name="whisper-model" type="s">
-      <default>"small"</default>
-      <summary>Whisper model</summary>
-      <description>Model size for speech recognition. tiny (fastest/75MB), base (142MB), small (466MB, default), medium (1.5GB), large-v3 (2.9GB, best).</description>
+    <key name="tts-speed" type="d">
+      <default>1.0</default>
+      <summary>TTS speech speed</summary>
+      <description>Speech rate multiplier. 0.5 = half speed, 2.0 = double speed. Range 0.5–2.0.</description>
+    </key>
+    <key name="tts-noise-scale" type="d">
+      <default>0.667</default>
+      <summary>TTS voice variation</summary>
+      <description>Higher values produce more expressive speech, lower values are more monotone. Range 0.0–1.0.</description>
+    </key>
+    <key name="wakeword-sensitivity" type="d">
+      <default>0.5</default>
+      <summary>Wake word sensitivity</summary>
+      <description>Lower values make wake word detection more sensitive (easier to trigger). Range 0.0–1.0.</description>
     </key>
     <key name="voice-silence-threshold" type="d">
       <default>80.0</default>

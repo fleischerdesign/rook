@@ -12,12 +12,6 @@
 #include "rook/ports/audio_device_port.hpp"
 #include "rook/ports/llm_port.hpp"
 
-namespace rook::adapters::audio {
-class WhisperAdapter;
-class PiperAdapter;
-class OpenWakeWordAdapter;
-}
-
 namespace rook::gui {
 
 using VoiceProgressFn = std::function<void(float progress)>;

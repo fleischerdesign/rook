@@ -21,9 +21,9 @@
 #include "rook/adapters/hook/builtin_hooks.hpp"
 #include "rook/adapters/hook/core_api_provider.hpp"
 #include "rook/adapters/audio/miniaudio_adapter.hpp"
-#include "rook/adapters/audio/openwakeword_adapter.hpp"
-#include "rook/adapters/audio/whisper_adapter.hpp"
-#include "rook/adapters/audio/sherpa_adapter.hpp"
+#include "rook/adapters/audio/sherpa_wakeword_adapter.hpp"
+#include "rook/adapters/audio/sherpa_asr_adapter.hpp"
+#include "rook/adapters/audio/sherpa_tts_adapter.hpp"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <future>
@@ -175,9 +175,9 @@ inline void RookApplication::init(Class *)
     loadHookPlugins();
 
     m_audio_device = std::make_unique<rook::adapters::audio::MiniaudioAdapter>();
-    m_wakeword = std::make_unique<rook::adapters::audio::OpenWakeWordAdapter>();
-    m_stt = std::make_unique<rook::adapters::audio::WhisperAdapter>();
-    m_tts = std::make_unique<rook::adapters::audio::SherpaAdapter>();
+    m_wakeword = std::make_unique<rook::adapters::audio::SherpaWakewordAdapter>();
+    m_stt = std::make_unique<rook::adapters::audio::SherpaAsrAdapter>("");
+    m_tts = std::make_unique<rook::adapters::audio::SherpaTtsAdapter>("");
     m_actor->setupAudio(*m_wakeword, *m_stt, *m_tts, *m_audio_device);
 
     if (m_wakeword->isReady())
@@ -233,12 +233,30 @@ inline void RookApplication::init(Class *)
     g_signal_connect(voice_settings, "changed::speaker-device",
         G_CALLBACK(+[](GSettings*, const gchar*, gpointer) {}), m_actor.get());
 
-    auto* whisper_ptr = dynamic_cast<rook::adapters::audio::WhisperAdapter*>(m_stt.get());
-    g_signal_connect(voice_settings, "changed::whisper-model",
+    auto* asr_ptr = dynamic_cast<rook::adapters::audio::SherpaAsrAdapter*>(m_stt.get());
+    g_signal_connect(voice_settings, "changed::asr-backend",
         G_CALLBACK(+[](GSettings*, const gchar*, gpointer data) {
-            auto* wa = static_cast<rook::adapters::audio::WhisperAdapter*>(data);
-            wa->setModel(wa->defaultModelPath());
-        }), whisper_ptr);
+            auto* aa = static_cast<rook::adapters::audio::SherpaAsrAdapter*>(data);
+            auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
+            char* backend = g_settings_get_string(gs, "asr-backend");
+            aa->setBackend(backend);
+            g_free(backend);
+            g_object_unref(gs);
+        }), asr_ptr);
+    g_signal_connect(voice_settings, "changed::asr-model",
+        G_CALLBACK(+[](GSettings*, const gchar*, gpointer data) {
+            auto* aa = static_cast<rook::adapters::audio::SherpaAsrAdapter*>(data);
+            aa->setModel(aa->defaultModelPath());
+        }), asr_ptr);
+    g_signal_connect(voice_settings, "changed::asr-language",
+        G_CALLBACK(+[](GSettings*, const gchar*, gpointer data) {
+            auto* aa = static_cast<rook::adapters::audio::SherpaAsrAdapter*>(data);
+            auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
+            char* lang = g_settings_get_string(gs, "asr-language");
+            aa->setLanguage(lang);
+            g_free(lang);
+            g_object_unref(gs);
+        }), asr_ptr);
 
     auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);
     prefs_action->connect_activate(

@@ -12,6 +12,31 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+
+        sherpa-onnx = pkgs.stdenv.mkDerivation {
+          pname = "sherpa-onnx";
+          version = "1.13.2";
+          src = pkgs.fetchurl {
+            url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.2/sherpa-onnx-v1.13.2-linux-x64-shared.tar.bz2";
+            hash = "sha256-HvZ0FTX3r01p45T9RAqAcQgDbSbtT1QmYBkQGdpcDao=";
+          };
+          espeak_data = pkgs.fetchurl {
+            url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/espeak-ng-data.tar.bz2";
+            hash = "sha256-QTXM+C4fQGE0kcCHTUlFrp6ceECTPY4lpvngA9nr9TM=";
+          };
+          nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+          buildInputs = [ pkgs.onnxruntime ];
+          installPhase = ''
+            mkdir -p $out/lib $out/include/sherpa-onnx/c-api
+            cp lib/libsherpa-onnx-c-api.so $out/lib/
+            cp lib/libsherpa-onnx-cxx-api.so $out/lib/
+            cp lib/libonnxruntime.so $out/lib/
+            cp include/sherpa-onnx/c-api/c-api.h $out/include/sherpa-onnx/c-api/
+            cp include/sherpa-onnx/c-api/cxx-api.h $out/include/sherpa-onnx/c-api/
+            mkdir -p $out/share/sherpa-onnx
+            tar xf $espeak_data -C $out/share/sherpa-onnx
+          '';
+        };
       in
       {
         devShells.default = pkgs.mkShell {
@@ -23,7 +48,7 @@
             pkg-config
             gettext
             desktop-file-utils
-            gcc14
+            gcc15
             python3
             gobject-introspection
             clang-tools
@@ -47,31 +72,9 @@
             alsa-lib
             libpulseaudio
             pulseaudio
-            whisper-cpp
             ollama
             cmark-gfm
-          ] ++ [
-            (pkgs.stdenv.mkDerivation {
-              pname = "sherpa-onnx-bin";
-              version = "1.13.2";
-              src = pkgs.fetchurl {
-                url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.2/sherpa-onnx-v1.13.2-linux-x64-shared.tar.bz2";
-                hash = "sha256-HvZ0FTX3r01p45T9RAqAcQgDbSbtT1QmYBkQGdpcDao=";
-              };
-              espeak_data = pkgs.fetchurl {
-                url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/espeak-ng-data.tar.bz2";
-                hash = "sha256-QTXM+C4fQGE0kcCHTUlFrp6ceECTPY4lpvngA9nr9TM=";
-              };
-              nativeBuildInputs = [ pkgs.autoPatchelfHook ];
-              buildInputs = [ pkgs.onnxruntime ];
-              installPhase = ''
-                mkdir -p $out/bin
-                cp bin/sherpa-onnx-offline-tts $out/bin/
-                chmod +x $out/bin/sherpa-onnx-offline-tts
-                mkdir -p $out/share/sherpa-onnx
-                tar xf $espeak_data -C $out/share/sherpa-onnx
-              '';
-            })
+            sherpa-onnx
           ];
 
           env = {
