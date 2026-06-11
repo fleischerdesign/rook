@@ -19,7 +19,11 @@ namespace {
 std::string find_espeak_data() {
     auto try_dir = [](const std::filesystem::path& p) -> std::string {
         auto canonical = std::filesystem::weakly_canonical(p);
-        if (std::filesystem::exists(canonical)) return canonical;
+        if (!std::filesystem::exists(canonical)) return {};
+        if (std::filesystem::exists(canonical / "phontab"))
+            return canonical;
+        if (std::filesystem::exists(canonical / "espeak-ng-data" / "phontab"))
+            return canonical / "espeak-ng-data";
         return {};
     };
 

@@ -74,19 +74,31 @@ struct ResolvedPaths {
 ResolvedPaths discoverFiles(const std::string& dir) {
     ResolvedPaths p;
     if (!std::filesystem::exists(dir)) return p;
-    for (auto& e : std::filesystem::directory_iterator(dir)) {
-        auto n = e.path().filename().string();
-        if (n.find("encoder") != std::string::npos && n.ends_with(".onnx"))
-            p.encoder = e.path().string();
-        if (n.find("decoder") != std::string::npos && n.ends_with(".onnx"))
-            p.decoder = e.path().string();
-        if (n.find("joiner") != std::string::npos && n.ends_with(".onnx"))
-            p.joiner = e.path().string();
-        if (n.find("tokens") != std::string::npos && n.ends_with(".txt"))
-            p.tokens = e.path().string();
-        if (n.ends_with(".onnx") && p.model.empty())
-            p.model = e.path().string();
+
+    auto scan_dir = [&](const std::filesystem::path& d) {
+        for (auto& e : std::filesystem::directory_iterator(d)) {
+            auto n = e.path().filename().string();
+            if (n.find("encoder") != std::string::npos && n.ends_with(".onnx"))
+                p.encoder = e.path().string();
+            if (n.find("decoder") != std::string::npos && n.ends_with(".onnx"))
+                p.decoder = e.path().string();
+            if (n.find("joiner") != std::string::npos && n.ends_with(".onnx"))
+                p.joiner = e.path().string();
+            if (n.find("tokens") != std::string::npos && n.ends_with(".txt"))
+                p.tokens = e.path().string();
+            if (n.ends_with(".onnx") && p.model.empty())
+                p.model = e.path().string();
+        }
+    };
+
+    scan_dir(dir);
+
+    if (p.tokens.empty()) {
+        for (auto& e : std::filesystem::directory_iterator(dir)) {
+            if (e.is_directory()) scan_dir(e.path());
+        }
     }
+
     return p;
 }
 
@@ -387,7 +399,7 @@ void SherpaAsrAdapter::downloadModel(ProgressFn on_progress,
     }
 
     auto dir = m_impl->model_dir;
-    std::filesystem::create_directories(std::filesystem::path(dir).parent_path());
+    std::filesystem::create_directories(dir);
     std::string archive = dir + ".tar.bz2";
 
     downloadFile(entry->archive_url, archive,
@@ -396,8 +408,7 @@ void SherpaAsrAdapter::downloadModel(ProgressFn on_progress,
         },
         [this, dir, archive, on_done](bool ok) {
             if (!ok) { if (on_done) on_done(false); return; }
-            std::string cmd = "tar xf " + archive + " --strip-components=1 -C " +
-                std::filesystem::path(dir).parent_path().string();
+            std::string cmd = "tar xf " + archive + " --strip-components=1 -C " + dir;
             int ret = std::system(cmd.c_str());
             std::filesystem::remove(archive);
             if (ret == 0) m_impl->initRecognizer();
