@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <semaphore>
 #include <string>
 #include <string_view>
@@ -98,6 +99,8 @@ private:
     std::atomic<VoiceMode> m_mode{VoiceMode::Wakeword};
     std::atomic<bool> m_live_mode_active{false};
     std::counting_semaphore<1024> m_data_sem{0};
+
+    std::recursive_mutex m_capture_mutex;
 
     int m_silence_counter = 0;
     int m_recording_frames = 0;

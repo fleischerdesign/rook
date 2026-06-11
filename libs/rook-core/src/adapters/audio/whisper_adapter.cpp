@@ -142,6 +142,32 @@ void WhisperAdapter::transcribe(const int16_t* audio, std::size_t sample_count,
         return;
     }
 
+    const char* lang = ::getenv("LANG");
+    const char* slang = (lang && std::string_view(lang).starts_with("de")) ? "de" : "en";
+
+    auto* s = g_settings_new("io.github.fleischerdesign.Rook");
+    bool suppress = g_settings_get_boolean(s, "whisper-suppress-nst");
+    bool no_fallback = g_settings_get_boolean(s, "whisper-no-fallback");
+    double thold = g_settings_get_double(s, "whisper-no-speech-thold");
+    double ethold = g_settings_get_double(s, "whisper-entropy-thold");
+    int threads = g_settings_get_int(s, "whisper-threads");
+    int beam = g_settings_get_int(s, "whisper-beam-size");
+    int best = g_settings_get_int(s, "whisper-best-of");
+    int actx = g_settings_get_int(s, "whisper-audio-ctx");
+    g_object_unref(s);
+
+    char thold_buf[16], ethold_buf[16];
+    std::snprintf(thold_buf, sizeof(thold_buf), "%.2f", thold);
+    std::snprintf(ethold_buf, sizeof(ethold_buf), "%.2f", ethold);
+    char tbuf[8], bbuf[8], bofbuf[8], ctxbuf[8];
+    std::snprintf(tbuf, sizeof(tbuf), "%d", threads);
+    std::snprintf(bbuf, sizeof(bbuf), "%d", beam);
+    std::snprintf(bofbuf, sizeof(bofbuf), "%d", best);
+    std::snprintf(ctxbuf, sizeof(ctxbuf), "%d", actx);
+
+    std::string model_path = m_impl->model_path;
+    std::string binary_path = m_impl->binary_path;
+
     pid_t pid = ::fork();
     if (pid < 0) {
         SPDLOG_ERROR("WhisperAdapter: fork failed");
@@ -157,28 +183,9 @@ void WhisperAdapter::transcribe(const int16_t* audio, std::size_t sample_count,
         ::dup2(pipefd[1], STDOUT_FILENO);
         ::close(pipefd[1]);
 
-        const char* lang = ::getenv("LANG");
-        const char* slang = (lang && std::string_view(lang).starts_with("de")) ? "de" : "en";
-
-        auto* s = g_settings_new("io.github.fleischerdesign.Rook");
-        bool suppress = g_settings_get_boolean(s, "whisper-suppress-nst");
-        bool no_fallback = g_settings_get_boolean(s, "whisper-no-fallback");
-        double thold = g_settings_get_double(s, "whisper-no-speech-thold");
-        double ethold = g_settings_get_double(s, "whisper-entropy-thold");
-
-        int threads = g_settings_get_int(s, "whisper-threads");
-        int beam = g_settings_get_int(s, "whisper-beam-size");
-        int best = g_settings_get_int(s, "whisper-best-of");
-        int actx = g_settings_get_int(s, "whisper-audio-ctx");
-        g_object_unref(s);
-
-        char thold_buf[16], ethold_buf[16];
-        std::snprintf(thold_buf, sizeof(thold_buf), "%.2f", thold);
-        std::snprintf(ethold_buf, sizeof(ethold_buf), "%.2f", ethold);
-
         std::vector<const char*> argv = {
             "whisper-cli",
-            "-m", m_impl->model_path.c_str(),
+            "-m", model_path.c_str(),
             "-f", tmpname,
             "-l", slang,
             "--output-txt",
@@ -186,11 +193,6 @@ void WhisperAdapter::transcribe(const int16_t* audio, std::size_t sample_count,
             "--no-speech-thold", thold_buf,
             "--entropy-thold", ethold_buf,
         };
-        char tbuf[8], bbuf[8], bofbuf[8], ctxbuf[8];
-        std::snprintf(tbuf, sizeof(tbuf), "%d", threads);
-        std::snprintf(bbuf, sizeof(bbuf), "%d", beam);
-        std::snprintf(bofbuf, sizeof(bofbuf), "%d", best);
-        std::snprintf(ctxbuf, sizeof(ctxbuf), "%d", actx);
 
         argv.push_back("--threads"); argv.push_back(tbuf);
         argv.push_back("--beam-size"); argv.push_back(bbuf);
@@ -203,7 +205,7 @@ void WhisperAdapter::transcribe(const int16_t* audio, std::size_t sample_count,
             argv.push_back("--no-fallback");
         argv.push_back(nullptr);
 
-        ::execvp(m_impl->binary_path.c_str(),
+        ::execvp(binary_path.c_str(),
                  const_cast<char* const*>(argv.data()));
         _exit(127);
     }

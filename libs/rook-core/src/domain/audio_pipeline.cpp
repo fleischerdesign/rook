@@ -137,6 +137,7 @@ void AudioPipeline::unmute() {
 }
 
 void AudioPipeline::startListening() {
+    std::lock_guard<std::recursive_mutex> lock(m_capture_mutex);
     stopListening();
     m_ring_buffer.clear();
     m_voice_active.store(true, std::memory_order_release);
@@ -182,6 +183,7 @@ void AudioPipeline::startListening() {
 }
 
 void AudioPipeline::stopListening() {
+    std::lock_guard<std::recursive_mutex> lock(m_capture_mutex);
     m_voice_active.store(false, std::memory_order_release);
     m_worker_running.store(false, std::memory_order_release);
     m_data_sem.release();
