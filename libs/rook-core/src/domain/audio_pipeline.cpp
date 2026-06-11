@@ -415,8 +415,8 @@ void AudioPipeline::startSpeaking(std::string text) {
 }
 
 void AudioPipeline::stopSpeaking() {
-    m_tts.stop();
     m_audio_device.stopPlayback();
+    m_tts.stop();
 }
 
 void AudioPipeline::transition(ports::AudioState to) {

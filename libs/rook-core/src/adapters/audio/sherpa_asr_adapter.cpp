@@ -245,6 +245,9 @@ void SherpaAsrAdapter::transcribe(
         return;
     }
 
+    if (m_impl->transcribe_thread.joinable())
+        m_impl->transcribe_thread.join();
+
     m_impl->cancel_requested.store(false, std::memory_order_release);
 
     std::vector<float> f32(sample_count);

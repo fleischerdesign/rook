@@ -349,6 +349,8 @@ bool MiniaudioAdapter::startPlayback(std::string_view device_id, int sample_rate
 bool MiniaudioAdapter::writePlayback(const float* pcm, std::size_t sample_count) {
     if (!m_impl->playback_open) return false;
     while (sample_count > 0) {
+        if (m_impl->playback_muted.load(std::memory_order_acquire))
+            return false;
         auto written = m_impl->playback_buffer.write(pcm, sample_count);
         if (written == 0) {
             std::this_thread::yield();
