@@ -132,6 +132,7 @@ void AudioPipeline::onBargeInDetected() {
 void AudioPipeline::mute() {
     if (m_muted.exchange(true, std::memory_order_acq_rel)) return;
 
+    stopSpeaking();
     stopListening();
     m_audio_device.stopCapture();
     m_live_mode_active.store(false, std::memory_order_release);
