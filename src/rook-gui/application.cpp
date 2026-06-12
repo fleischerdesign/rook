@@ -308,8 +308,10 @@ inline void RookApplication::vfunc_activate()
     }
 
     if (!m_css_loaded) {
-        auto* provider = gtk_css_provider_new();
-        gtk_css_provider_load_from_string(provider,
+        auto provider = Gtk::CssProvider::create();
+        auto* raw_provider = reinterpret_cast<::GtkCssProvider*>(
+            static_cast<peel::Gtk::CssProvider*>(provider));
+        gtk_css_provider_load_from_string(raw_provider,
             ".code-block frame {"
             "  background-color: alpha(currentColor, 0.06);"
             "  border-radius: 6px;"
@@ -333,9 +335,8 @@ inline void RookApplication::vfunc_activate()
             "}");
         gtk_style_context_add_provider_for_display(
             gdk_display_get_default(),
-            GTK_STYLE_PROVIDER(provider),
+            GTK_STYLE_PROVIDER(raw_provider),
             GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-        g_object_unref(provider);
         m_css_loaded = true;
     }
 

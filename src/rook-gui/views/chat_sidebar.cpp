@@ -266,13 +266,15 @@ Gtk::ListBoxRow* ChatSidebar::buildChatRow(std::string_view id,
             delete static_cast<std::pair<ChatSidebar*, std::string>*>(p);
         });
 
-    auto ctrl = gtk_gesture_click_new();
-    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(ctrl),
+    auto ctrl = Gtk::GestureClick::create();
+    auto* raw_ctrl = reinterpret_cast<::GtkGestureClick*>(
+        static_cast<peel::Gtk::GestureClick*>(ctrl));
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(raw_ctrl),
                                    GDK_BUTTON_SECONDARY);
-    g_signal_connect(ctrl, "pressed",
+    g_signal_connect(raw_ctrl, "pressed",
                      G_CALLBACK(onContextGesture), row_ptr);
     gtk_widget_add_controller(GTK_WIDGET(row_ptr),
-                               GTK_EVENT_CONTROLLER(ctrl));
+                               GTK_EVENT_CONTROLLER(raw_ctrl));
 
     return std::move(row).release_floating_ptr();
 }

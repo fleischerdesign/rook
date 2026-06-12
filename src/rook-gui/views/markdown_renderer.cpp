@@ -3,7 +3,10 @@
 #include <cmark-gfm-core-extensions.h>
 #include <cmark-gfm-extension_api.h>
 #include <spdlog/spdlog.h>
+#include <peel/Gtk/Gtk.h>
 #include <cstdlib>
+
+using namespace peel;
 
 namespace rook::gui {
 
@@ -115,76 +118,91 @@ GtkWidget* MarkdownRenderer::renderBlock(cmark_node* node)
 
     switch (type) {
     case CMARK_NODE_PARAGRAPH: {
-        auto* label = gtk_label_new(nullptr);
-        gtk_label_set_wrap(GTK_LABEL(label), TRUE);
-        gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+        auto label = Gtk::Label::create(nullptr);
+        auto* l = reinterpret_cast<::GtkLabel*>(
+            static_cast<peel::Gtk::Label*>(label));
+        gtk_label_set_wrap(l, TRUE);
+        gtk_label_set_xalign(l, 0.0f);
         auto markup = renderInlinePango(node);
-        gtk_label_set_markup(GTK_LABEL(label), markup.c_str());
-        gtk_widget_set_margin_top(GTK_WIDGET(label), 2);
-        gtk_widget_set_margin_bottom(GTK_WIDGET(label), 2);
-        return GTK_WIDGET(label);
+        gtk_label_set_markup(l, markup.c_str());
+        gtk_widget_set_margin_top(GTK_WIDGET(l), 2);
+        gtk_widget_set_margin_bottom(GTK_WIDGET(l), 2);
+        return GTK_WIDGET(l);
     }
 
     case CMARK_NODE_HEADING: {
-        auto* label = gtk_label_new(nullptr);
-        gtk_label_set_wrap(GTK_LABEL(label), TRUE);
-        gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+        auto label = Gtk::Label::create(nullptr);
+        auto* l = reinterpret_cast<::GtkLabel*>(
+            static_cast<peel::Gtk::Label*>(label));
+        gtk_label_set_wrap(l, TRUE);
+        gtk_label_set_xalign(l, 0.0f);
         int level = cmark_node_get_heading_level(node);
         std::string markup = "<span size=\"";
         markup += headingSize(level);
         markup += "\" weight=\"bold\">";
         markup += renderInlinePango(node);
         markup += "</span>";
-        gtk_label_set_markup(GTK_LABEL(label), markup.c_str());
-        gtk_widget_set_margin_top(GTK_WIDGET(label), 6);
-        gtk_widget_set_margin_bottom(GTK_WIDGET(label), 2);
-        return GTK_WIDGET(label);
+        gtk_label_set_markup(l, markup.c_str());
+        gtk_widget_set_margin_top(GTK_WIDGET(l), 6);
+        gtk_widget_set_margin_bottom(GTK_WIDGET(l), 2);
+        return GTK_WIDGET(l);
     }
 
     case CMARK_NODE_CODE_BLOCK: {
         const char* literal = cmark_node_get_literal(node);
         std::string code = literal ? std::string(literal) : "";
 
-        auto* buf = gtk_text_buffer_new(nullptr);
-        gtk_text_buffer_set_text(buf, code.c_str(), code.size());
+        auto buf = Gtk::TextBuffer::create(nullptr);
+        auto* raw_buf = reinterpret_cast<::GtkTextBuffer*>(
+            static_cast<peel::Gtk::TextBuffer*>(buf));
+        gtk_text_buffer_set_text(raw_buf, code.c_str(), code.size());
 
-        auto* tv = gtk_text_view_new_with_buffer(buf);
-        gtk_text_view_set_editable(GTK_TEXT_VIEW(tv), FALSE);
-        gtk_text_view_set_monospace(GTK_TEXT_VIEW(tv), TRUE);
-        gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(tv), GTK_WRAP_WORD);
-        gtk_widget_set_margin_start(GTK_WIDGET(tv), kCodeBlockMargin);
-        gtk_widget_set_margin_end(GTK_WIDGET(tv), kCodeBlockMargin);
-        gtk_widget_set_margin_top(GTK_WIDGET(tv), kCodeBlockMargin);
-        gtk_widget_set_margin_bottom(GTK_WIDGET(tv), kCodeBlockMargin);
+        auto tv = Gtk::TextView::create_with_buffer(
+            static_cast<peel::Gtk::TextBuffer*>(buf));
+        auto* raw_tv = reinterpret_cast<::GtkTextView*>(
+            static_cast<peel::Gtk::TextView*>(tv));
+        gtk_text_view_set_editable(raw_tv, FALSE);
+        gtk_text_view_set_monospace(raw_tv, TRUE);
+        gtk_text_view_set_wrap_mode(raw_tv, GTK_WRAP_WORD);
+        gtk_widget_set_margin_start(GTK_WIDGET(raw_tv), kCodeBlockMargin);
+        gtk_widget_set_margin_end(GTK_WIDGET(raw_tv), kCodeBlockMargin);
+        gtk_widget_set_margin_top(GTK_WIDGET(raw_tv), kCodeBlockMargin);
+        gtk_widget_set_margin_bottom(GTK_WIDGET(raw_tv), kCodeBlockMargin);
 
-        auto* frame = gtk_frame_new(nullptr);
-        gtk_frame_set_child(GTK_FRAME(frame), GTK_WIDGET(tv));
-        gtk_widget_add_css_class(GTK_WIDGET(frame), "code-block");
-        gtk_widget_set_margin_top(GTK_WIDGET(frame), 4);
-        gtk_widget_set_margin_bottom(GTK_WIDGET(frame), 4);
-        gtk_widget_set_hexpand(GTK_WIDGET(frame), TRUE);
+        auto frame = Gtk::Frame::create(nullptr);
+        auto* raw_frame = reinterpret_cast<::GtkFrame*>(
+            static_cast<peel::Gtk::Frame*>(frame));
+        gtk_frame_set_child(raw_frame, GTK_WIDGET(raw_tv));
+        gtk_widget_add_css_class(GTK_WIDGET(raw_frame), "code-block");
+        gtk_widget_set_margin_top(GTK_WIDGET(raw_frame), 4);
+        gtk_widget_set_margin_bottom(GTK_WIDGET(raw_frame), 4);
+        gtk_widget_set_hexpand(GTK_WIDGET(raw_frame), TRUE);
 
-        return GTK_WIDGET(frame);
+        return GTK_WIDGET(raw_frame);
     }
 
     case CMARK_NODE_BLOCK_QUOTE: {
-        auto* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-        gtk_widget_add_css_class(GTK_WIDGET(box), "blockquote");
-        gtk_widget_set_margin_start(GTK_WIDGET(box), 6);
-        gtk_widget_set_hexpand(GTK_WIDGET(box), TRUE);
+        auto box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 0);
+        auto* b = reinterpret_cast<::GtkBox*>(
+            static_cast<peel::Gtk::Box*>(box));
+        gtk_widget_add_css_class(GTK_WIDGET(b), "blockquote");
+        gtk_widget_set_margin_start(GTK_WIDGET(b), 6);
+        gtk_widget_set_hexpand(GTK_WIDGET(b), TRUE);
 
         for (cmark_node* child = cmark_node_first_child(node);
              child; child = cmark_node_next(child)) {
             auto* widget = renderBlock(child);
             if (widget)
-                gtk_box_append(GTK_BOX(box), widget);
+                gtk_box_append(b, widget);
         }
-        return GTK_WIDGET(box);
+        return GTK_WIDGET(b);
     }
 
     case CMARK_NODE_LIST: {
-        auto* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-        gtk_widget_set_margin_start(GTK_WIDGET(box), 12);
+        auto box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 0);
+        auto* b = reinterpret_cast<::GtkBox*>(
+            static_cast<peel::Gtk::Box*>(box));
+        gtk_widget_set_margin_start(GTK_WIDGET(b), 12);
 
         cmark_list_type list_type = cmark_node_get_list_type(node);
         int n = static_cast<int>(cmark_node_get_list_start(node));
@@ -192,8 +210,10 @@ GtkWidget* MarkdownRenderer::renderBlock(cmark_node* node)
         for (cmark_node* item = cmark_node_first_child(node);
              item; item = cmark_node_next(item)) {
 
-            auto* row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
-            gtk_widget_set_hexpand(GTK_WIDGET(row), TRUE);
+            auto row = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 4);
+            auto* r = reinterpret_cast<::GtkBox*>(
+                static_cast<peel::Gtk::Box*>(row));
+            gtk_widget_set_hexpand(GTK_WIDGET(r), TRUE);
 
             char prefix[16];
             if (list_type == CMARK_ORDERED_LIST)
@@ -201,23 +221,25 @@ GtkWidget* MarkdownRenderer::renderBlock(cmark_node* node)
             else
                 std::snprintf(prefix, sizeof(prefix), "\u2022");
 
-            auto* bullet = gtk_label_new(prefix);
-            gtk_widget_set_valign(GTK_WIDGET(bullet), GTK_ALIGN_START);
-            gtk_widget_set_margin_top(GTK_WIDGET(bullet), 1);
-            gtk_box_append(GTK_BOX(row), GTK_WIDGET(bullet));
+            auto bullet = Gtk::Label::create(prefix);
+            auto* bl = reinterpret_cast<::GtkLabel*>(
+                static_cast<peel::Gtk::Label*>(bullet));
+            gtk_widget_set_valign(GTK_WIDGET(bl), GTK_ALIGN_START);
+            gtk_widget_set_margin_top(GTK_WIDGET(bl), 1);
+            gtk_box_append(r, GTK_WIDGET(bl));
 
             for (cmark_node* item_child = cmark_node_first_child(item);
                  item_child; item_child = cmark_node_next(item_child)) {
                 auto* widget = renderBlock(item_child);
                 if (widget) {
                     gtk_widget_set_hexpand(widget, TRUE);
-                    gtk_box_append(GTK_BOX(row), widget);
+                    gtk_box_append(r, widget);
                 }
             }
 
-            gtk_box_append(GTK_BOX(box), GTK_WIDGET(row));
+            gtk_box_append(b, GTK_WIDGET(r));
         }
-        return GTK_WIDGET(box);
+        return GTK_WIDGET(b);
     }
 
     case CMARK_NODE_TABLE: {
@@ -225,12 +247,14 @@ GtkWidget* MarkdownRenderer::renderBlock(cmark_node* node)
         if (ncols == 0) ncols = 1;
         auto* alignments = cmark_gfm_extensions_get_table_alignments(node);
 
-        auto* grid = gtk_grid_new();
-        gtk_grid_set_column_spacing(GTK_GRID(grid), 12);
-        gtk_grid_set_row_spacing(GTK_GRID(grid), 2);
-        gtk_widget_set_margin_top(GTK_WIDGET(grid), 4);
-        gtk_widget_set_margin_bottom(GTK_WIDGET(grid), 4);
-        gtk_widget_set_hexpand(GTK_WIDGET(grid), TRUE);
+        auto grid = Gtk::Grid::create();
+        auto* g = reinterpret_cast<::GtkGrid*>(
+            static_cast<peel::Gtk::Grid*>(grid));
+        gtk_grid_set_column_spacing(g, 12);
+        gtk_grid_set_row_spacing(g, 2);
+        gtk_widget_set_margin_top(GTK_WIDGET(g), 4);
+        gtk_widget_set_margin_bottom(GTK_WIDGET(g), 4);
+        gtk_widget_set_hexpand(GTK_WIDGET(g), TRUE);
 
         int row_idx = 0;
         for (cmark_node* trow = cmark_node_first_child(node);
@@ -252,11 +276,13 @@ GtkWidget* MarkdownRenderer::renderBlock(cmark_node* node)
                 markup += renderInlinePango(cell);
                 markup += "</span>";
 
-                auto* label = gtk_label_new(nullptr);
-                gtk_label_set_wrap(GTK_LABEL(label), TRUE);
-                gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
-                gtk_label_set_markup(GTK_LABEL(label), markup.c_str());
-                gtk_widget_set_hexpand(GTK_WIDGET(label), TRUE);
+                auto label = Gtk::Label::create(nullptr);
+                auto* l = reinterpret_cast<::GtkLabel*>(
+                    static_cast<peel::Gtk::Label*>(label));
+                gtk_label_set_wrap(l, TRUE);
+                gtk_label_set_xalign(l, 0.0f);
+                gtk_label_set_markup(l, markup.c_str());
+                gtk_widget_set_hexpand(GTK_WIDGET(l), TRUE);
 
                 float xalign = 0.0f;
                 if (alignments && col_idx < static_cast<int>(ncols)) {
@@ -266,61 +292,69 @@ GtkWidget* MarkdownRenderer::renderBlock(cmark_node* node)
                     default: xalign = 0.0f; break;
                     }
                 }
-                gtk_label_set_xalign(GTK_LABEL(label), xalign);
+                gtk_label_set_xalign(l, xalign);
 
-                gtk_grid_attach(GTK_GRID(grid),
-                    GTK_WIDGET(label), col_idx, row_idx, 1, 1);
+                gtk_grid_attach(g, GTK_WIDGET(l), col_idx, row_idx, 1, 1);
                 col_idx++;
             }
             row_idx++;
         }
-        return GTK_WIDGET(grid);
+        return GTK_WIDGET(g);
     }
 
     case CMARK_NODE_TASK_LIST_ITEM: {
         bool checked = cmark_gfm_extensions_get_tasklist_item_checked(node);
 
-        auto* row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
-        gtk_widget_set_hexpand(GTK_WIDGET(row), TRUE);
+        auto row = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 4);
+        auto* r = reinterpret_cast<::GtkBox*>(
+            static_cast<peel::Gtk::Box*>(row));
+        gtk_widget_set_hexpand(GTK_WIDGET(r), TRUE);
 
-        auto* cb = gtk_check_button_new();
-        gtk_check_button_set_active(GTK_CHECK_BUTTON(cb), checked);
-        gtk_widget_set_valign(GTK_WIDGET(cb), GTK_ALIGN_START);
-        gtk_widget_set_sensitive(GTK_WIDGET(cb), FALSE);
-        gtk_widget_set_margin_top(GTK_WIDGET(cb), 1);
-        gtk_box_append(GTK_BOX(row), GTK_WIDGET(cb));
+        auto cb = Gtk::CheckButton::create();
+        auto* raw_cb = reinterpret_cast<::GtkCheckButton*>(
+            static_cast<peel::Gtk::CheckButton*>(cb));
+        gtk_check_button_set_active(raw_cb, checked);
+        gtk_widget_set_valign(GTK_WIDGET(raw_cb), GTK_ALIGN_START);
+        gtk_widget_set_sensitive(GTK_WIDGET(raw_cb), FALSE);
+        gtk_widget_set_margin_top(GTK_WIDGET(raw_cb), 1);
+        gtk_box_append(r, GTK_WIDGET(raw_cb));
 
         for (cmark_node* item_child = cmark_node_first_child(node);
              item_child; item_child = cmark_node_next(item_child)) {
             auto* widget = renderBlock(item_child);
             if (widget) {
                 gtk_widget_set_hexpand(widget, TRUE);
-                gtk_box_append(GTK_BOX(row), widget);
+                gtk_box_append(r, widget);
             }
         }
 
-        gtk_widget_set_margin_start(GTK_WIDGET(row), 12);
-        return GTK_WIDGET(row);
+        gtk_widget_set_margin_start(GTK_WIDGET(r), 12);
+        return GTK_WIDGET(r);
+        break;
     }
 
     case CMARK_NODE_THEMATIC_BREAK: {
-        auto* sep = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
-        gtk_widget_set_margin_top(GTK_WIDGET(sep), 8);
-        gtk_widget_set_margin_bottom(GTK_WIDGET(sep), 8);
-        return GTK_WIDGET(sep);
+        auto sep = Gtk::Separator::create(Gtk::Orientation::HORIZONTAL);
+        auto* s = reinterpret_cast<::GtkSeparator*>(
+            static_cast<peel::Gtk::Separator*>(sep));
+        gtk_widget_set_margin_top(GTK_WIDGET(s), 8);
+        gtk_widget_set_margin_bottom(GTK_WIDGET(s), 8);
+        return GTK_WIDGET(s);
     }
 
     case CMARK_NODE_DOCUMENT: {
-        auto* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-        gtk_widget_set_hexpand(GTK_WIDGET(box), TRUE);
+        auto box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 0);
+        auto* b = reinterpret_cast<::GtkBox*>(
+            static_cast<peel::Gtk::Box*>(box));
+        gtk_widget_set_hexpand(GTK_WIDGET(b), TRUE);
 
         for (cmark_node* child = cmark_node_first_child(node);
              child; child = cmark_node_next(child)) {
             auto* widget = renderBlock(child);
             if (widget)
-                gtk_box_append(GTK_BOX(box), widget);
+                gtk_box_append(b, widget);
         }
-        return GTK_WIDGET(box);
+        return GTK_WIDGET(b);
     }
 
     default:
@@ -330,8 +364,12 @@ GtkWidget* MarkdownRenderer::renderBlock(cmark_node* node)
 
 GtkWidget* MarkdownRenderer::render(const std::string& markdown)
 {
-    if (markdown.empty())
-        return gtk_label_new("");
+    if (markdown.empty()) {
+        auto label = Gtk::Label::create("");
+        return reinterpret_cast<::GtkWidget*>(
+            static_cast<peel::Gtk::Widget*>(
+                std::move(label).release_floating_ptr()));
+    }
 
     cmark_node* doc = nullptr;
 
@@ -355,18 +393,22 @@ GtkWidget* MarkdownRenderer::render(const std::string& markdown)
     cmark_parser_free(parser);
 
     if (!doc) {
-        auto* label = gtk_label_new(markdown.c_str());
-        gtk_label_set_wrap(GTK_LABEL(label), TRUE);
-        return GTK_WIDGET(label);
+        auto label = Gtk::Label::create(markdown.c_str());
+        auto* l = reinterpret_cast<::GtkLabel*>(
+            static_cast<peel::Gtk::Label*>(label));
+        gtk_label_set_wrap(l, TRUE);
+        return GTK_WIDGET(l);
     }
 
     auto* widget = renderBlock(doc);
     cmark_node_free(doc);
 
     if (!widget) {
-        auto* label = gtk_label_new(markdown.c_str());
-        gtk_label_set_wrap(GTK_LABEL(label), TRUE);
-        return GTK_WIDGET(label);
+        auto label = Gtk::Label::create(markdown.c_str());
+        auto* l = reinterpret_cast<::GtkLabel*>(
+            static_cast<peel::Gtk::Label*>(label));
+        gtk_label_set_wrap(l, TRUE);
+        return GTK_WIDGET(l);
     }
 
     return widget;

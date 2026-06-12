@@ -8,6 +8,7 @@
 #include "rook/core/actor_messages.hpp"
 #include "rook/ports/extension_port.hpp"
 #include "rook/adapters/model/model_cache.hpp"
+#include <peel/GLib/functions.h>
 #include <spdlog/spdlog.h>
 #include <gtk/gtk.h>
 
@@ -183,12 +184,16 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
         entry->connect_activate([v](Gtk::Entry *) { v->onMessageEntryActivated(nullptr); });
         entry->connect_changed([v](Gtk::Editable *) { v->onChatEntryChanged(); });
 
-        auto* key_ctrl = gtk_event_controller_key_new();
+        auto key_ctrl = Gtk::EventControllerKey::create();
+        auto* raw_kc = reinterpret_cast<::GtkEventControllerKey*>(
+            static_cast<peel::Gtk::EventControllerKey*>(key_ctrl));
         gtk_event_controller_key_set_im_context(
-            GTK_EVENT_CONTROLLER_KEY(key_ctrl), FALSE);
-        gtk_widget_add_controller(GTK_WIDGET(entry),
-            GTK_EVENT_CONTROLLER(key_ctrl));
-        g_signal_connect(key_ctrl, "key-pressed",
+            GTK_EVENT_CONTROLLER_KEY(raw_kc), FALSE);
+        gtk_widget_add_controller(
+            reinterpret_cast<::GtkWidget*>(
+                static_cast<peel::Gtk::Widget*>(entry)),
+            GTK_EVENT_CONTROLLER(raw_kc));
+        g_signal_connect(raw_kc, "key-pressed",
             G_CALLBACK(+[](GtkEventControllerKey*, guint keyval, guint,
                             GdkModifierType, gpointer data) -> gboolean {
                 auto self = static_cast<ChatView*>(data);
@@ -282,12 +287,16 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
         entry->connect_activate([v](Gtk::Entry *) { v->onMessageEntryActivated(nullptr); });
         entry->connect_changed([v](Gtk::Editable *) { v->onChatEntryChanged(); });
 
-        auto* key_ctrl2 = gtk_event_controller_key_new();
+        auto key_ctrl2 = Gtk::EventControllerKey::create();
+        auto* raw_kc2 = reinterpret_cast<::GtkEventControllerKey*>(
+            static_cast<peel::Gtk::EventControllerKey*>(key_ctrl2));
         gtk_event_controller_key_set_im_context(
-            GTK_EVENT_CONTROLLER_KEY(key_ctrl2), FALSE);
-        gtk_widget_add_controller(GTK_WIDGET(entry),
-            GTK_EVENT_CONTROLLER(key_ctrl2));
-        g_signal_connect(key_ctrl2, "key-pressed",
+            GTK_EVENT_CONTROLLER_KEY(raw_kc2), FALSE);
+        gtk_widget_add_controller(
+            reinterpret_cast<::GtkWidget*>(
+                static_cast<peel::Gtk::Widget*>(entry)),
+            GTK_EVENT_CONTROLLER(raw_kc2));
+        g_signal_connect(raw_kc2, "key-pressed",
             G_CALLBACK(+[](GtkEventControllerKey*, guint keyval, guint,
                             GdkModifierType, gpointer data) -> gboolean {
                 auto self = static_cast<ChatView*>(data);
@@ -922,15 +931,17 @@ void ChatView::onChatEntryChanged()
         });
 
         auto* row_ptr = row.operator Adw::ActionRow*();
-        auto* gesture = gtk_gesture_click_new();
-        gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), 1);
-        g_signal_connect(gesture, "released",
+        auto gesture = Gtk::GestureClick::create();
+        auto* raw_gesture = reinterpret_cast<::GtkGestureClick*>(
+            static_cast<peel::Gtk::GestureClick*>(gesture));
+        gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(raw_gesture), 1);
+        g_signal_connect(raw_gesture, "released",
             G_CALLBACK(+[](GtkGestureClick*, int, double, double,
                            gpointer ptr) {
                 adw_action_row_activate(ADW_ACTION_ROW(ptr));
             }), row_ptr);
         gtk_widget_add_controller(
-            GTK_WIDGET(row_ptr), GTK_EVENT_CONTROLLER(gesture));
+            GTK_WIDGET(row_ptr), GTK_EVENT_CONTROLLER(raw_gesture));
 
         m_command_listbox->append(std::move(row).release_floating_ptr());
     }
@@ -987,22 +998,21 @@ void ChatView::onPermissionRequest(
 
     m_banner_slot->append(std::move(banner).release_floating_ptr());
 
-    m_banner_timeout_id = g_timeout_add_seconds(30,
-        [](gpointer data) -> gboolean {
-            auto *self = static_cast<ChatView*>(data);
-            if (self->m_active_banner) {
-                auto uid = self->m_active_banner->requestUuid();
-                if (self->m_actor)
-                    self->m_actor->post(
+    m_banner_timeout_id = GLib::timeout_add_seconds(30,
+        [this]() -> bool {
+            if (m_active_banner) {
+                auto uid = m_active_banner->requestUuid();
+                if (m_actor)
+                    m_actor->post(
                         rook::domain::ActorPermissionTimeout{.request_uuid = uid});
                 gtk_widget_unparent(
                     GTK_WIDGET(reinterpret_cast<::GObject*>(
-                        self->m_active_banner)));
-                self->m_active_banner = nullptr;
+                        m_active_banner)));
+                m_active_banner = nullptr;
             }
-            self->m_banner_timeout_id = 0;
-            return G_SOURCE_REMOVE;
-        }, this);
+            m_banner_timeout_id = 0;
+            return false;
+        });
 }
 
 void ChatView::onPermissionTimeout(

@@ -82,7 +82,9 @@ FloatPtr<MessageWidget> MessageWidget::create(const std::string &role,
         widget->set_margin_start(50);
         widget->set_margin_end(12);
 
-        auto* inner = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0));
+        auto inner_box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 0);
+        auto* inner = reinterpret_cast<::GtkBox*>(
+            static_cast<peel::Gtk::Box*>(inner_box));
         widget->m_content_box = inner;
         gtk_widget_set_margin_start(GTK_WIDGET(inner), 10);
         gtk_widget_set_margin_end(GTK_WIDGET(inner), 10);
