@@ -124,6 +124,9 @@ struct SherpaWakewordAdapter::Impl {
         cfg.num_trailing_blanks = 1;
         cfg.keywords_score = 1.5f;
         cfg.keywords_threshold = 0.25f;
+        cfg.keywords_buf = k_kws_keyword_tokens;
+        cfg.keywords_buf_size =
+            static_cast<int32_t>(std::strlen(k_kws_keyword_tokens));
 
         kws = SherpaOnnxCreateKeywordSpotter(&cfg);
         if (!kws) {
