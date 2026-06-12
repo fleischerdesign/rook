@@ -74,10 +74,7 @@ void VoiceSettingsPage::addEngineRow(Gtk::ListBox &list,
     row->set_subtitle(std::string(status_msg).c_str());
     row->set_activatable(false);
 
-    if (ready) {
-        auto icon = Gtk::Image::create_from_icon_name("emblem-ok-symbolic");
-        row->add_suffix(std::move(icon).release_floating_ptr());
-    } else if (on_download) {
+    if (on_download) {
         auto suffix_stack = Gtk::Stack::create();
 
         auto download_btn = Gtk::Button::create_with_label(_("Download Model"));
@@ -147,6 +144,9 @@ void VoiceSettingsPage::addEngineRow(Gtk::ListBox &list,
             }),
             +[](void* p, GClosure*) { delete static_cast<std::function<void()>*>(p); },
             GConnectFlags(0));
+    } else if (ready) {
+        auto icon = Gtk::Image::create_from_icon_name("emblem-ok-symbolic");
+        row->add_suffix(std::move(icon).release_floating_ptr());
     } else {
         auto icon = Gtk::Image::create_from_icon_name("dialog-warning-symbolic");
         row->add_suffix(std::move(icon).release_floating_ptr());
