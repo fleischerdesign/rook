@@ -897,10 +897,9 @@ void DomainActor::setupAudio(ports::WakewordPort& wakeword,
                 });
             } else {
                 SPDLOG_INFO("Voice: wakeword query '{}'", trimmed);
-                auto model = m_voice_model.empty() ? std::string("default") : std::string(m_voice_model);
                 m_inbox->push(domain::ActorWakeQuery{
                     .transcript = std::move(trimmed),
-                    .model = std::move(model),
+                    .model = m_voice_model,
                     .is_final = is_final,
                 });
             }
@@ -984,7 +983,7 @@ void DomainActor::handleWakeQuery(const domain::ActorWakeQuery& msg) {
         .model = msg.model,
     });
 
-    auto model = msg.model.empty() ? std::string("default") : msg.model;
+    auto model = msg.model;
     auto temp_conv = m_conv->openEphemeral(m_llm ? model : "");
     if (!temp_conv.has_value()) return;
     auto chat_id = temp_conv->id;

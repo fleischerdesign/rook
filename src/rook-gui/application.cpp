@@ -191,7 +191,7 @@ inline void RookApplication::init(Class *)
 
     {
         char* vm = g_settings_get_string(voice_settings, "voice-model");
-        m_actor->setVoiceModel(vm && vm[0] ? vm : "default");
+        m_actor->setVoiceModel(vm && vm[0] ? vm : "");
         g_free(vm);
     }
 
@@ -199,7 +199,7 @@ inline void RookApplication::init(Class *)
         G_CALLBACK(+[](GSettings* s, const gchar*, gpointer data) {
             auto* actor = static_cast<rook::core::DomainActor*>(data);
             char* vm = g_settings_get_string(s, "voice-model");
-            actor->setVoiceModel(vm && vm[0] ? vm : "default");
+            actor->setVoiceModel(vm && vm[0] ? vm : "");
             g_free(vm);
         }), m_actor.get());
 
