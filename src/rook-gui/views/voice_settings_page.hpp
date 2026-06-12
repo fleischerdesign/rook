@@ -43,6 +43,7 @@ private:
     rook::ports::AudioDevicePort* m_audio_device = nullptr;
     rook::ports::LlmPort* m_llm = nullptr;
     peel::Gtk::ListBox* m_engine_list_raw = nullptr;
+    std::vector<std::string> m_voice_model_ids;
     ChangeFn m_on_changed;
 
     void addEngineRow(peel::Gtk::ListBox &list,

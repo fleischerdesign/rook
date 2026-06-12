@@ -303,7 +303,8 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
         model_row->set_activatable(true);
 
         RefPtr<Gtk::StringList> model_strings = Gtk::StringList::create({});
-        std::vector<std::string> model_ids;
+        auto& model_ids = m_voice_model_ids;
+        model_ids.clear();
 
         auto providers = m_llm->listProviders();
         for (const auto &prov : providers) {
