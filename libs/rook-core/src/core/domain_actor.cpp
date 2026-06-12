@@ -340,17 +340,17 @@ void DomainActor::handleLlmDone(const domain::ActorLlmDone& msg) {
         auto* last = m_conv->lastResponse(msg.chat_id);
         bool ephemeral = m_conv->open(msg.chat_id).ephemeral;
 
-        if (m_audio_pipeline && last) {
-            auto it = m_voice_triggered_chats.find(msg.chat_id);
-            if (it != m_voice_triggered_chats.end()) {
-                emitUiEvent(domain::TtsStarted{*last});
-                m_audio_pipeline->onResponseReady(*last);
-                m_voice_triggered_chats.erase(it);
+        auto vc_it = m_voice_triggered_chats.find(msg.chat_id);
+        if (vc_it != m_voice_triggered_chats.end()) {
+            std::string response_text = last ? *last : std::string();
+            emitUiEvent(domain::TtsStarted{response_text});
+            if (m_audio_pipeline)
+                m_audio_pipeline->onResponseReady(response_text);
+            m_voice_triggered_chats.erase(vc_it);
 
-                if (ephemeral) {
-                    m_conv->remove(msg.chat_id);
-                    return;
-                }
+            if (ephemeral) {
+                m_conv->remove(msg.chat_id);
+                return;
             }
         }
 
