@@ -165,7 +165,7 @@ std::string SherpaWakewordAdapter::defaultModelPath() {
 
 std::string SherpaWakewordAdapter::defaultModelUrl() {
     return "https://github.com/k2-fsa/sherpa-onnx/releases/download/"
-           "asr-models/sherpa-onnx-silero-vad-v5.0.0.tar.bz2";
+           "asr-models/silero_vad.onnx";
 }
 
 void SherpaWakewordAdapter::downloadModel(ProgressFn on_progress,
@@ -175,26 +175,15 @@ void SherpaWakewordAdapter::downloadModel(ProgressFn on_progress,
     auto path = defaultModelPath();
     auto dir = std::filesystem::path(path).parent_path();
     std::filesystem::create_directories(dir);
-    std::string archive = dir.string() + "/silero_vad.tar.bz2";
 
-    downloadFile(url, archive,
-        [on_progress](float p) {
-            if (on_progress) on_progress(p * 0.8f);
-        },
-        [this, dir, archive, path, on_done](bool ok) {
+    downloadFile(url, path, on_progress,
+        [this, path, on_done](bool ok) {
             if (!ok) { if (on_done) on_done(false); return; }
-            std::string cmd = "tar xf " + archive
-                              + " --strip-components=1 -C "
-                              + dir.string();
-            int ret = std::system(cmd.c_str());
-            std::filesystem::remove(archive);
-            if (ret == 0 && std::filesystem::exists(path)) {
-                m_impl->reloadVad();
-                if (m_impl->vad_loaded)
-                    SPDLOG_INFO("SherpaWakewordAdapter: VAD loaded "
-                                "after download");
-            }
-            if (on_done) on_done(ret == 0);
+            m_impl->reloadVad();
+            if (m_impl->vad_loaded)
+                SPDLOG_INFO("SherpaWakewordAdapter: VAD loaded "
+                            "after download");
+            if (on_done) on_done(m_impl->vad_loaded);
         });
 }
 
