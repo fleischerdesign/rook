@@ -834,8 +834,7 @@ void ChatView::onChatEntryChanged()
     auto text = std::string(entry->get_text());
     if (!text.starts_with("/")) {
         if (m_command_popover) {
-            gtk_popover_popdown(GTK_POPOVER(
-                m_command_popover.operator Gtk::Popover*()));
+            m_command_popover->popdown();
             m_command_popover = {};
             m_command_listbox = nullptr;
         }
@@ -858,8 +857,7 @@ void ChatView::onChatEntryChanged()
 
     if (matches.empty()) {
         if (m_command_popover) {
-            gtk_popover_popdown(GTK_POPOVER(
-                m_command_popover.operator Gtk::Popover*()));
+            m_command_popover->popdown();
             m_command_popover = {};
             m_command_listbox = nullptr;
         }

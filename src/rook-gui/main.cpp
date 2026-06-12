@@ -1,7 +1,6 @@
 #include "application.hpp"
 #include <glib/gi18n.h>
 #include <peel/Gio/Gio.h>
-#include <gio/gio.h>
 #include <clocale>
 
 using namespace peel;

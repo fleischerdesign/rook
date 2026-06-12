@@ -6,7 +6,6 @@
 #include "skills_page.hpp"
 #include "extension_settings_page.hpp"
 #include <glib/gi18n.h>
-#include <adwaita.h>
 
 using namespace peel;
 

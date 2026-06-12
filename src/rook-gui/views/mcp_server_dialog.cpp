@@ -4,7 +4,6 @@
 #include "rook/adapters/mcp/http_sse_transport.hpp"
 #include "rook/adapters/mcp/mcp_client.hpp"
 #include <peel/GLib/functions.h>
-#include <gtk/gtk.h>
 #include <spdlog/spdlog.h>
 #include <future>
 #include <chrono>

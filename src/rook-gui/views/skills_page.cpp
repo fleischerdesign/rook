@@ -4,7 +4,6 @@
 #include "rook/ports/extension_port.hpp"
 #include "rook/adapters/extension/extension_manager.hpp"
 #include <peel/Adw/Adw.h>
-#include <gtk/gtk.h>
 
 using namespace peel;
 

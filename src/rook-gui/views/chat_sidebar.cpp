@@ -6,6 +6,7 @@
 #include <peel/Adw/Adw.h>
 #include <peel/Gtk/Orientable.h>
 #include <peel/Graphene/Rect.h>
+#include <peel/Gdk/Rectangle.h>
 
 using namespace peel;
 
@@ -291,15 +292,13 @@ void ChatSidebar::showContextMenu(Gtk::Widget *,
 
     Graphene::Rect bounds;
     bool ok = m_list->compute_bounds(m_list, &bounds);
-    GdkRectangle rect = {
+    Gdk::Rectangle rect = {
         ok ? static_cast<int>(bounds.origin.x) : 0,
         ok ? static_cast<int>(bounds.origin.y) : 0,
         ok ? static_cast<int>(bounds.size.width) : 1,
         ok ? static_cast<int>(bounds.size.height) : 1,
     };
-    gtk_popover_set_pointing_to(
-        GTK_POPOVER(reinterpret_cast<::GtkPopover*>(
-            static_cast<peel::Gtk::Popover*>(popover))), &rect);
+    popover->set_pointing_to(&rect);
     auto *pop_ptr = static_cast<Gtk::Popover*>(popover);
 
     auto box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 0);

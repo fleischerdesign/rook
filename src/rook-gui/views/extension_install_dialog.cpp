@@ -1,6 +1,5 @@
 #include <glib/gi18n.h>
 #include "extension_install_dialog.hpp"
-#include <gtk/gtk.h>
 
 using namespace peel;
 

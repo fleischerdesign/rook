@@ -2,7 +2,6 @@
 #include "llm_settings_page.hpp"
 #include "provider_dialog.hpp"
 #include <peel/Adw/Adw.h>
-#include <gtk/gtk.h>
 
 using namespace peel;
 

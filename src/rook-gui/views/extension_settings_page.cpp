@@ -3,7 +3,6 @@
 #include "extension_install_dialog.hpp"
 #include "rook/adapters/extension/extension_manager.hpp"
 #include <peel/Adw/Adw.h>
-#include <gtk/gtk.h>
 #include <spdlog/spdlog.h>
 
 using namespace peel;

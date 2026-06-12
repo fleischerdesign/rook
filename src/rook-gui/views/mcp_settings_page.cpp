@@ -2,7 +2,6 @@
 #include "mcp_settings_page.hpp"
 #include "mcp_server_dialog.hpp"
 #include <peel/Adw/Adw.h>
-#include <gtk/gtk.h>
 #include <spdlog/spdlog.h>
 
 using namespace peel;
