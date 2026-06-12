@@ -1,6 +1,6 @@
 #pragma once
 
-#include <gtk/gtk.h>
+#include <peel/Gtk/Gtk.h>
 #include <string>
 #include <vector>
 
@@ -15,10 +15,10 @@ struct PangoAttr {
 
 class MarkdownRenderer {
 public:
-    static GtkWidget* render(const std::string& markdown);
+    static peel::FloatPtr<peel::Gtk::Widget> render(const std::string& markdown);
 
 private:
-    static GtkWidget* renderBlock(cmark_node* node);
+    static peel::FloatPtr<peel::Gtk::Widget> renderBlock(cmark_node* node);
     static std::string renderInlinePango(cmark_node* node,
         const std::vector<PangoAttr>& attrs = {});
 

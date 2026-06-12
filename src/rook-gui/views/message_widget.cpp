@@ -1,7 +1,7 @@
 #include <glib/gi18n.h>
+#include <gtk/gtk.h>
 #include "message_widget.hpp"
 #include "markdown_renderer.hpp"
-#include <gtk/gtk.h>
 
 using namespace peel;
 
@@ -36,15 +36,13 @@ inline void MessageWidget::init(Class *)
 
 void MessageWidget::rebuildContent()
 {
-    while (auto* child = gtk_widget_get_first_child(
-               GTK_WIDGET(m_content_box))) {
-        gtk_box_remove(m_content_box, child);
-    }
+    while (auto* child = m_content_box->get_first_child())
+        m_content_box->remove(child);
 
-    auto* rendered = MarkdownRenderer::render(m_raw_content);
-    gtk_box_append(m_content_box, GTK_WIDGET(rendered));
+    auto rendered = MarkdownRenderer::render(m_raw_content);
+    m_content_box->append(std::move(rendered));
 
-    gtk_widget_queue_resize(GTK_WIDGET(this));
+    queue_resize();
 }
 
 FloatPtr<MessageWidget> MessageWidget::create(const std::string &role,
@@ -66,15 +64,13 @@ FloatPtr<MessageWidget> MessageWidget::create(const std::string &role,
         rlabel->add_css_class("dim-label");
         rlabel->set_use_markup(true);
 
-        Gtk::Label *rlabel_ptr = rlabel;
-        Gtk::Expander *expander_ptr = expander;
+        widget->m_reasoning_expander = expander;
+        widget->m_reasoning_label = rlabel;
         expander->set_child(std::move(rlabel).release_floating_ptr());
-        widget->m_reasoning_expander = expander_ptr;
-        widget->m_reasoning_label = rlabel_ptr;
         widget->append(std::move(expander));
     }
 
-    auto* rendered = MarkdownRenderer::render(content);
+    auto rendered = MarkdownRenderer::render(content);
 
     if (role == "user") {
         widget->set_halign(Gtk::Align::END);
@@ -83,18 +79,18 @@ FloatPtr<MessageWidget> MessageWidget::create(const std::string &role,
         widget->set_margin_end(12);
 
         auto inner_box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 0);
-        auto* inner = reinterpret_cast<::GtkBox*>(
-            static_cast<peel::Gtk::Box*>(inner_box));
-        widget->m_content_box = inner;
-        gtk_widget_set_margin_start(GTK_WIDGET(inner), 10);
-        gtk_widget_set_margin_end(GTK_WIDGET(inner), 10);
-        gtk_widget_set_margin_top(GTK_WIDGET(inner), 6);
-        gtk_widget_set_margin_bottom(GTK_WIDGET(inner), 6);
-        gtk_box_append(inner, GTK_WIDGET(rendered));
+        Gtk::Box* inner_ptr = inner_box;
+        widget->m_content_box = inner_ptr;
+        inner_box->set_margin_start(10);
+        inner_box->set_margin_end(10);
+        inner_box->set_margin_top(6);
+        inner_box->set_margin_bottom(6);
+        inner_box->append(std::move(rendered));
 
         auto card = Gtk::Box::create(Gtk::Orientation::VERTICAL, 0);
         card->add_css_class("card");
-        card->append(reinterpret_cast<peel::Gtk::Widget*>(inner));
+        card->append(
+            static_cast<peel::Gtk::Widget*>(inner_ptr));
         widget->append(std::move(card));
     } else {
         widget->set_halign(Gtk::Align::FILL);
@@ -102,9 +98,9 @@ FloatPtr<MessageWidget> MessageWidget::create(const std::string &role,
         widget->set_margin_start(12);
         widget->set_margin_end(12);
 
-        auto* raw = widget.operator MessageWidget*();
-        widget->m_content_box = reinterpret_cast<::GtkBox*>(raw);
-        widget->append(reinterpret_cast<peel::Gtk::Widget*>(rendered));
+        widget->m_content_box = static_cast<peel::Gtk::Box*>(
+            widget.operator->());
+        widget->append(std::move(rendered));
     }
 
     return widget;
@@ -118,27 +114,10 @@ void MessageWidget::appendChunk(std::string_view chunk)
 
 void MessageWidget::appendReasoningChunk(std::string_view chunk)
 {
-    if (!m_reasoning_expander) {
-        auto expander = Gtk::Expander::create(_("Thinking..."));
-        expander->set_expanded(false);
-
-        auto rlabel = Gtk::Label::create("");
-        rlabel->set_wrap(true);
-        rlabel->set_xalign(0.0f);
-        rlabel->set_max_width_chars(80);
-        rlabel->add_css_class("dim-label");
-        rlabel->set_use_markup(true);
-
-        Gtk::Label *rlabel_ptr = rlabel;
-        expander->set_child(std::move(rlabel).release_floating_ptr());
-        m_reasoning_expander = expander;
-        m_reasoning_label = rlabel_ptr;
-        prepend(std::move(expander));
+    if (m_reasoning_expander) {
+        m_reasoning_expander->set_expanded(true);
+        m_reasoning_label->set_text(escapeText(chunk).c_str());
     }
-
-    auto current = std::string(m_reasoning_label->get_text());
-    current += escapeText(chunk);
-    m_reasoning_label->set_markup(current.c_str());
 }
 
 } // namespace rook::gui

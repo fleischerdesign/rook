@@ -12,7 +12,7 @@ class MessageWidget final : public peel::Gtk::Box
 
     std::string m_role;
     std::string m_raw_content;
-    ::GtkBox *m_content_box = nullptr;
+    peel::Gtk::Box *m_content_box = nullptr;
     peel::Gtk::Expander *m_reasoning_expander = nullptr;
     peel::Gtk::Label *m_reasoning_label = nullptr;
 

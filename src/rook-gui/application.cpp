@@ -188,89 +188,75 @@ inline void RookApplication::init(Class *)
         SPDLOG_INFO("TTS engine ready: {}", m_tts->engineName());
 
     auto voice_settings = Gio::Settings::create("io.github.fleischerdesign.Rook");
-    auto* vs = reinterpret_cast<::GSettings*>(
-        static_cast<peel::Gio::Settings*>(voice_settings));
 
     {
         auto vm = voice_settings->get_string("voice-model");
         m_actor->setVoiceModel(vm ? vm.c_str() : "");
     }
 
-    g_signal_connect(vs, "changed::voice-model",
-        G_CALLBACK(+[](::GSettings* s, const gchar*, gpointer data) {
-            auto* actor = static_cast<rook::core::DomainActor*>(data);
-            auto* ps = reinterpret_cast<peel::Gio::Settings*>(s);
-            auto vm = ps->get_string("voice-model");
-            actor->setVoiceModel(vm ? vm.c_str() : "");
-        }), m_actor.get());
+    voice_settings->connect_changed("voice-model",
+        [this, voice_settings](Gio::Settings *, const char *) {
+            auto vm = voice_settings->get_string("voice-model");
+            m_actor->setVoiceModel(vm ? vm.c_str() : "");
+        });
 
     if (voice_settings->get_boolean("wake-word-enabled")) {
         m_actor->enableVoice();
         m_actor->unmuteVoice();
     }
 
-    g_signal_connect(vs, "changed::wake-word-enabled",
-        G_CALLBACK(+[](::GSettings* s, const gchar*, gpointer data) {
-            auto* actor = static_cast<rook::core::DomainActor*>(data);
-            auto* ps = reinterpret_cast<peel::Gio::Settings*>(s);
-            if (ps->get_boolean("wake-word-enabled")) {
-                actor->enableVoice();
-                actor->unmuteVoice();
+    voice_settings->connect_changed("wake-word-enabled",
+        [this, voice_settings](Gio::Settings *, const char *) {
+            if (voice_settings->get_boolean("wake-word-enabled")) {
+                m_actor->enableVoice();
+                m_actor->unmuteVoice();
             } else {
-                actor->disableVoice();
+                m_actor->disableVoice();
             }
-        }), m_actor.get());
+        });
 
-    g_signal_connect(vs, "changed::wakeword-sensitivity",
-        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer data) {
-            auto* ww = static_cast<rook::ports::WakewordPort*>(data);
-            auto gs = Gio::Settings::create("io.github.fleischerdesign.Rook");
-            ww->setSensitivity(static_cast<float>(
-                gs->get_double("wakeword-sensitivity")));
-        }), m_wakeword.get());
+    voice_settings->connect_changed("wakeword-sensitivity",
+        [this, voice_settings](Gio::Settings *, const char *) {
+            m_wakeword->setSensitivity(static_cast<float>(
+                voice_settings->get_double("wakeword-sensitivity")));
+        });
 
-    g_signal_connect(vs, "changed::mic-gain",
-        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer data) {
-            auto* ad = static_cast<rook::ports::AudioDevicePort*>(data);
-            auto gs = Gio::Settings::create("io.github.fleischerdesign.Rook");
-            ad->setCaptureVolume(static_cast<float>(
-                gs->get_double("mic-gain")));
-        }), m_audio_device.get());
+    voice_settings->connect_changed("mic-gain",
+        [this, voice_settings](Gio::Settings *, const char *) {
+            m_audio_device->setCaptureVolume(static_cast<float>(
+                voice_settings->get_double("mic-gain")));
+        });
 
-    g_signal_connect(vs, "changed::microphone-device",
-        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer data) {
-            auto* actor = static_cast<rook::core::DomainActor*>(data);
-            if (actor->isVoiceEnabled()) {
-                bool was_unmuted = !actor->isVoiceMuted();
-                actor->disableVoice();
-                actor->enableVoice();
-                if (was_unmuted) actor->unmuteVoice();
+    voice_settings->connect_changed("microphone-device",
+        [this](Gio::Settings *, const char *) {
+            if (m_actor->isVoiceEnabled()) {
+                bool was_unmuted = !m_actor->isVoiceMuted();
+                m_actor->disableVoice();
+                m_actor->enableVoice();
+                if (was_unmuted) m_actor->unmuteVoice();
             }
-        }), m_actor.get());
+        });
 
-    g_signal_connect(vs, "changed::speaker-device",
-        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer) {}), m_actor.get());
+    voice_settings->connect_changed("speaker-device",
+        [](Gio::Settings *, const char *) {});
 
     auto* asr_ptr = dynamic_cast<rook::adapters::audio::SherpaAsrAdapter*>(m_stt.get());
-    g_signal_connect(vs, "changed::asr-backend",
-        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer data) {
-            auto* aa = static_cast<rook::adapters::audio::SherpaAsrAdapter*>(data);
+    voice_settings->connect_changed("asr-backend",
+        [asr_ptr](Gio::Settings *, const char *) {
             auto gs = Gio::Settings::create("io.github.fleischerdesign.Rook");
             auto backend = gs->get_string("asr-backend");
-            aa->setBackend(std::string(backend.c_str()));
-        }), asr_ptr);
-    g_signal_connect(vs, "changed::asr-model",
-        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer data) {
-            auto* aa = static_cast<rook::adapters::audio::SherpaAsrAdapter*>(data);
-            aa->setModel(aa->defaultModelPath());
-        }), asr_ptr);
-    g_signal_connect(vs, "changed::asr-language",
-        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer data) {
-            auto* aa = static_cast<rook::adapters::audio::SherpaAsrAdapter*>(data);
+            asr_ptr->setBackend(std::string(backend.c_str()));
+        });
+    voice_settings->connect_changed("asr-model",
+        [asr_ptr](Gio::Settings *, const char *) {
+            asr_ptr->setModel(asr_ptr->defaultModelPath());
+        });
+    voice_settings->connect_changed("asr-language",
+        [asr_ptr](Gio::Settings *, const char *) {
             auto gs = Gio::Settings::create("io.github.fleischerdesign.Rook");
             auto lang = gs->get_string("asr-language");
-            aa->setLanguage(std::string(lang.c_str()));
-        }), asr_ptr);
+            asr_ptr->setLanguage(std::string(lang.c_str()));
+        });
 
     auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);
     prefs_action->connect_activate(
@@ -303,15 +289,13 @@ inline void RookApplication::vfunc_activate()
     parent_vfunc_activate<RookApplication>();
 
     if (m_window) {
-        gtk_window_present(GTK_WINDOW(reinterpret_cast<::GObject*>(m_window)));
+        m_window->present();
         return;
     }
 
     if (!m_css_loaded) {
         auto provider = Gtk::CssProvider::create();
-        auto* raw_provider = reinterpret_cast<::GtkCssProvider*>(
-            static_cast<peel::Gtk::CssProvider*>(provider));
-        gtk_css_provider_load_from_string(raw_provider,
+        provider->load_from_string(
             ".code-block frame {"
             "  background-color: alpha(currentColor, 0.06);"
             "  border-radius: 6px;"
@@ -333,6 +317,8 @@ inline void RookApplication::vfunc_activate()
             "  background: transparent;"
             "  box-shadow: none;"
             "}");
+        auto* raw_provider = reinterpret_cast<::GtkCssProvider*>(
+            static_cast<peel::Gtk::CssProvider*>(provider));
         gtk_style_context_add_provider_for_display(
             gdk_display_get_default(),
             GTK_STYLE_PROVIDER(raw_provider),
@@ -358,17 +344,16 @@ inline void RookApplication::vfunc_activate()
 
         m_tray_icon->onActivate([this]() {
             if (m_window)
-                gtk_window_present(GTK_WINDOW(
-                    reinterpret_cast<::GObject*>(m_window)));
+                m_window->present();
         });
 
         m_tray_icon->show();
 
-        g_signal_connect(reinterpret_cast<::GObject*>(window), "close-request",
-            G_CALLBACK(+[](GtkWindow*, gpointer data) -> gboolean {
-                gtk_widget_set_visible(GTK_WIDGET(data), FALSE);
-                return TRUE;
-            }), window);
+        window->connect_close_request(
+            +[](Gtk::Window *gw) -> bool {
+                gw->set_visible(false);
+                return true;
+            });
     }
 
     if (m_first_run) {

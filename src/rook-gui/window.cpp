@@ -82,11 +82,12 @@ RookWindow *RookWindow::create(Gtk::Application *app,
     win->m_header->pack_end(std::move(menu_button));
 
     {
-        auto* icon = gtk_image_new_from_icon_name("microphone-disabled-symbolic");
-        gtk_widget_set_tooltip_text(GTK_WIDGET(icon), _("Voice inactive"));
-        adw_header_bar_pack_end(reinterpret_cast<::AdwHeaderBar*>(
-            static_cast<peel::Adw::HeaderBar*>(win->m_header)), icon);
-        win->m_voice_icon = icon;
+        auto icon = Gtk::Image::create_from_icon_name("microphone-disabled-symbolic");
+        Gtk::Image* icon_ptr = icon;
+        icon->set_tooltip_text(_("Voice inactive"));
+        win->m_header->pack_end(std::move(icon));
+        win->m_voice_icon = reinterpret_cast<::GtkWidget*>(
+            static_cast<peel::Gtk::Widget*>(icon_ptr));
     }
 
     win->m_voice_indicator_handler = bus.subscribe<domain::AudioStateChanged>(

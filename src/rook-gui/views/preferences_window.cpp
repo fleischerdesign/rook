@@ -42,8 +42,7 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
     auto dialog = Object::create<PreferencesWindow>();
     dialog->set_title(_("Preferences"));
 
-    adw_dialog_set_content_width(
-        ADW_DIALOG(reinterpret_cast<::AdwDialog*>(static_cast<peel::Adw::PreferencesDialog*>(dialog))), 720);
+    dialog->set_content_width(720);
 
     dialog->m_impl = std::make_unique<Impl>();
 

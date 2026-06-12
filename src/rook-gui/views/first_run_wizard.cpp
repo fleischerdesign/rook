@@ -110,22 +110,15 @@ inline void FirstRunWizard::init(Class *)
         voice_switch->set_subtitle(_("Microphone access required"));
 
         auto settings = Gio::Settings::create("io.github.fleischerdesign.Rook");
-        auto* raw_settings = reinterpret_cast<::GSettings*>(
-            static_cast<peel::Gio::Settings*>(settings));
+        Adw::SwitchRow* sw_ptr = voice_switch;
         bool enabled = settings->get_boolean("wake-word-enabled");
-        adw_switch_row_set_active(
-            reinterpret_cast<::AdwSwitchRow*>(static_cast<peel::Adw::SwitchRow*>(voice_switch)),
-            enabled);
+        voice_switch->set_active(enabled);
 
-        g_signal_connect(
-            reinterpret_cast<::AdwSwitchRow*>(static_cast<peel::Adw::SwitchRow*>(voice_switch)),
-            "notify::active",
-            G_CALLBACK(+[](::AdwSwitchRow* sw, GParamSpec*, gpointer data) {
-                auto* s = reinterpret_cast<peel::Gio::Settings*>(data);
-                s->set_boolean("wake-word-enabled",
-                    adw_switch_row_get_active(sw));
-                s->sync();
-            }), raw_settings);
+        voice_switch->connect_notify(Adw::SwitchRow::prop_active(),
+            [settings, sw_ptr](GObject::Object *, GObject::ParamSpec *) {
+                settings->set_boolean("wake-word-enabled", sw_ptr->get_active());
+                settings->sync();
+            });
 
         box->append(std::move(voice_switch).release_floating_ptr());
     }
