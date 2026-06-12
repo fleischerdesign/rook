@@ -190,8 +190,7 @@ void ChatSidebar::onSearchChanged()
             }
         }
 
-        gtk_widget_set_visible(
-            GTK_WIDGET(reinterpret_cast<::GObject*>(row)), match);
+        row->set_visible(match);
         if (match) any_visible = true;
     }
 
@@ -386,8 +385,7 @@ void ChatSidebar::startRename(std::string_view chat_id)
         entry_w->set_text(current.c_str());
         entry_w->set_position(-1);
         stack->set_visible_child_name("edit");
-        gtk_widget_grab_focus(
-            GTK_WIDGET(reinterpret_cast<::GObject*>(entry_w)));
+        entry_w->grab_focus();
         return;
     }
     m_rename_row = nullptr;

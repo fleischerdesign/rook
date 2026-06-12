@@ -140,9 +140,10 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
                         auto* msg = MessageWidget::create("user", content)
                             .release_floating_ptr();
                         v->m_message_list->append(msg);
-                        auto* row = GTK_LIST_BOX_ROW(
-                            gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(msg)));
-                        if (row) gtk_list_box_row_set_activatable(row, FALSE);
+                        if (auto* parent = msg->get_parent()) {
+                            if (auto* row = parent->template cast<Gtk::ListBoxRow>())
+                                row->set_activatable(false);
+                        }
                     }
                 });
             }
@@ -193,27 +194,24 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
             reinterpret_cast<::GtkWidget*>(
                 static_cast<peel::Gtk::Widget*>(entry)),
             GTK_EVENT_CONTROLLER(raw_kc));
-        g_signal_connect(raw_kc, "key-pressed",
-            G_CALLBACK(+[](GtkEventControllerKey*, guint keyval, guint,
-                            GdkModifierType, gpointer data) -> gboolean {
-                auto self = static_cast<ChatView*>(data);
-                if (!self->m_command_listbox) return GDK_EVENT_PROPAGATE;
+        key_ctrl->connect_key_pressed(
+            [v](Gtk::EventControllerKey *, unsigned keyval, unsigned,
+                Gdk::ModifierType) -> bool {
+                if (!v->m_command_listbox) return GDK_EVENT_PROPAGATE;
 
                 if (keyval == GDK_KEY_Down || keyval == GDK_KEY_Up) {
-                    auto* listbox = reinterpret_cast<::GtkListBox*>(
-                        self->m_command_listbox);
-                    auto* sel = gtk_list_box_get_selected_row(listbox);
-                    int idx = sel ? gtk_list_box_row_get_index(sel) : -1;
+                    auto* listbox = v->m_command_listbox;
+                    auto* sel = listbox->get_selected_row();
+                    int idx = sel ? sel->get_index() : -1;
                     idx += (keyval == GDK_KEY_Down) ? 1 : -1;
-                    auto* row = gtk_list_box_get_row_at_index(listbox, idx);
-                    if (row) gtk_list_box_select_row(listbox, row);
+                    auto* row = listbox->get_row_at_index(idx);
+                    if (row) listbox->select_row(row);
                     return GDK_EVENT_STOP;
                 }
 
                 if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) {
-                    auto* listbox = reinterpret_cast<::GtkListBox*>(
-                        self->m_command_listbox);
-                    auto* sel = gtk_list_box_get_selected_row(listbox);
+                    auto* listbox = v->m_command_listbox;
+                    auto* sel = listbox->get_selected_row();
                     if (sel) {
                         if (ADW_IS_ACTION_ROW(sel))
                             adw_action_row_activate(ADW_ACTION_ROW(sel));
@@ -222,7 +220,7 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
                 }
 
                 return GDK_EVENT_PROPAGATE;
-            }), v);
+            });
 
         v->m_welcome_entry = entry;
         welcome_bar->append(std::move(entry));
@@ -296,27 +294,24 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
             reinterpret_cast<::GtkWidget*>(
                 static_cast<peel::Gtk::Widget*>(entry)),
             GTK_EVENT_CONTROLLER(raw_kc2));
-        g_signal_connect(raw_kc2, "key-pressed",
-            G_CALLBACK(+[](GtkEventControllerKey*, guint keyval, guint,
-                            GdkModifierType, gpointer data) -> gboolean {
-                auto self = static_cast<ChatView*>(data);
-                if (!self->m_command_listbox) return GDK_EVENT_PROPAGATE;
+        key_ctrl2->connect_key_pressed(
+            [v](Gtk::EventControllerKey *, unsigned keyval, unsigned,
+                Gdk::ModifierType) -> bool {
+                if (!v->m_command_listbox) return GDK_EVENT_PROPAGATE;
 
                 if (keyval == GDK_KEY_Down || keyval == GDK_KEY_Up) {
-                    auto* listbox = reinterpret_cast<::GtkListBox*>(
-                        self->m_command_listbox);
-                    auto* sel = gtk_list_box_get_selected_row(listbox);
-                    int idx = sel ? gtk_list_box_row_get_index(sel) : -1;
+                    auto* listbox = v->m_command_listbox;
+                    auto* sel = listbox->get_selected_row();
+                    int idx = sel ? sel->get_index() : -1;
                     idx += (keyval == GDK_KEY_Down) ? 1 : -1;
-                    auto* row = gtk_list_box_get_row_at_index(listbox, idx);
-                    if (row) gtk_list_box_select_row(listbox, row);
+                    auto* row = listbox->get_row_at_index(idx);
+                    if (row) listbox->select_row(row);
                     return GDK_EVENT_STOP;
                 }
 
                 if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) {
-                    auto* listbox = reinterpret_cast<::GtkListBox*>(
-                        self->m_command_listbox);
-                    auto* sel = gtk_list_box_get_selected_row(listbox);
+                    auto* listbox = v->m_command_listbox;
+                    auto* sel = listbox->get_selected_row();
                     if (sel) {
                         if (ADW_IS_ACTION_ROW(sel))
                             adw_action_row_activate(ADW_ACTION_ROW(sel));
@@ -325,7 +320,7 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
                 }
 
                 return GDK_EVENT_PROPAGATE;
-            }), v);
+            });
 
         v->m_chat_entry = entry;
         chat_bar->append(std::move(entry));
@@ -476,9 +471,10 @@ void ChatView::doSend(std::string_view chat_id)
 
     auto *user_msg = MessageWidget::create("user", text).release_floating_ptr();
     m_message_list->append(user_msg);
-    auto *row = GTK_LIST_BOX_ROW(
-        gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(user_msg)));
-    if (row) gtk_list_box_row_set_activatable(row, FALSE);
+    if (auto* parent = user_msg->get_parent()) {
+        if (auto *row = parent->template cast<Gtk::ListBoxRow>())
+            row->set_activatable(false);
+    }
 
     std::string model_id;
     auto idx = m_chat_model->get_selected();
@@ -495,10 +491,8 @@ void ChatView::doSend(std::string_view chat_id)
 void ChatView::onMessageEntryActivated(Gtk::Entry *)
 {
     if (m_command_popover && m_command_listbox && m_extensions
-        && gtk_widget_is_visible(GTK_WIDGET(
-            m_command_popover.operator Gtk::Popover*()))) {
-        auto* listbox = reinterpret_cast<::GtkListBox*>(m_command_listbox);
-        auto* sel = gtk_list_box_get_selected_row(listbox);
+        && m_command_popover->is_visible()) {
+        auto* sel = m_command_listbox->get_selected_row();
         if (sel) {
             if (ADW_IS_ACTION_ROW(sel))
                 adw_action_row_activate(ADW_ACTION_ROW(sel));
@@ -519,9 +513,10 @@ void ChatView::onStreamChunk(const rook::domain::LlmStreamChunk &event)
             auto msg = MessageWidget::create("assistant", "");
             m_pending_assistant = std::move(msg).release_floating_ptr();
             m_message_list->append(m_pending_assistant);
-            auto *row = GTK_LIST_BOX_ROW(
-                gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(m_pending_assistant)));
-            if (row) gtk_list_box_row_set_activatable(row, FALSE);
+            if (auto* parent = m_pending_assistant->get_parent()) {
+                if (auto *row = parent->template cast<Gtk::ListBoxRow>())
+                    row->set_activatable(false);
+            }
         }
 
         if (!content.empty()) {
@@ -551,11 +546,12 @@ void ChatView::onToolCallRequested(const rook::domain::ToolCallRequested &event)
     GLib::idle_add_once([this, name = event.tool_name,
                          call_id = event.call_id]() mutable {
         auto row = ToolCallRow::createPending(name, call_id);
-        auto *ptr = std::move(row).release_floating_ptr();
+        auto* ptr = std::move(row).release_floating_ptr();
         m_message_list->append(ptr);
-        auto *list_row = GTK_LIST_BOX_ROW(
-            gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(ptr)));
-        if (list_row) gtk_list_box_row_set_activatable(list_row, FALSE);
+        if (auto* parent = ptr->get_parent()) {
+            if (auto *list_row = parent->template cast<Gtk::ListBoxRow>())
+                list_row->set_activatable(false);
+        }
         m_pending_tool_rows[call_id] = ptr;
     });
 }
@@ -629,9 +625,10 @@ void ChatView::switchToChat(std::string_view chat_id)
 
         auto *user_msg = MessageWidget::create("user", text).release_floating_ptr();
         m_message_list->append(user_msg);
-        auto *row = GTK_LIST_BOX_ROW(
-            gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(user_msg)));
-        if (row) gtk_list_box_row_set_activatable(row, FALSE);
+        if (auto* parent = user_msg->get_parent()) {
+            if (auto *row = parent->template cast<Gtk::ListBoxRow>())
+                row->set_activatable(false);
+        }
 
         std::string model_id;
         auto idx = m_chat_model->get_selected();
@@ -666,18 +663,20 @@ void ChatView::loadMessages(std::string_view chat_id)
                 msg.tool_name.empty() ? msg.tool_call_id : msg.tool_name,
                 "", msg.content, false).release_floating_ptr();
             m_message_list->append(row);
-            auto *list_row = GTK_LIST_BOX_ROW(
-                gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(row)));
-            if (list_row) gtk_list_box_row_set_activatable(list_row, FALSE);
+            if (auto* parent = row->get_parent()) {
+                if (auto *list_row = parent->template cast<Gtk::ListBoxRow>())
+                    list_row->set_activatable(false);
+            }
             continue;
         }
         auto *widget = MessageWidget::create(
             msg.role, msg.content, "")
             .release_floating_ptr();
         m_message_list->append(widget);
-        auto *row = GTK_LIST_BOX_ROW(
-            gtk_widget_get_parent(reinterpret_cast<::GtkWidget*>(widget)));
-        if (row) gtk_list_box_row_set_activatable(row, FALSE);
+        if (auto* parent = widget->get_parent()) {
+            if (auto *row = parent->template cast<Gtk::ListBoxRow>())
+                row->set_activatable(false);
+        }
     }
 
     if (!it->model.empty()) {
@@ -881,8 +880,7 @@ void ChatView::onChatEntryChanged()
     }
 
     if (m_command_popover) {
-        gtk_popover_popdown(GTK_POPOVER(
-            m_command_popover.operator Gtk::Popover*()));
+        m_command_popover->popdown();
         m_command_popover = {};
         m_command_listbox = nullptr;
     }
@@ -891,10 +889,8 @@ void ChatView::onChatEntryChanged()
     gtk_widget_set_parent(
         GTK_WIDGET(m_command_popover.operator Gtk::Popover*()),
         GTK_WIDGET(entry));
-    gtk_popover_set_autohide(
-        GTK_POPOVER(m_command_popover.operator Gtk::Popover*()), FALSE);
-    gtk_popover_set_has_arrow(
-        GTK_POPOVER(m_command_popover.operator Gtk::Popover*()), FALSE);
+    m_command_popover->set_autohide(false);
+    m_command_popover->set_has_arrow(false);
 
     auto content = Gtk::Box::create(Gtk::Orientation::VERTICAL, 2);
     content->set_margin_start(4);
@@ -924,10 +920,8 @@ void ChatView::onChatEntryChanged()
             if (!entry) return;
             entry->set_text(cmd_text.c_str());
             entry->set_position(-1);
-            if (raw_v->m_command_popover) {
-                gtk_popover_popdown(GTK_POPOVER(
-                    raw_v->m_command_popover.operator Gtk::Popover*()));
-            }
+            if (raw_v->m_command_popover)
+                raw_v->m_command_popover->popdown();
         });
 
         auto* row_ptr = row.operator Adw::ActionRow*();
@@ -935,31 +929,27 @@ void ChatView::onChatEntryChanged()
         auto* raw_gesture = reinterpret_cast<::GtkGestureClick*>(
             static_cast<peel::Gtk::GestureClick*>(gesture));
         gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(raw_gesture), 1);
-        g_signal_connect(raw_gesture, "released",
-            G_CALLBACK(+[](GtkGestureClick*, int, double, double,
-                           gpointer ptr) {
-                adw_action_row_activate(ADW_ACTION_ROW(ptr));
-            }), row_ptr);
+        gesture->connect_released(
+            [row_ptr](Gtk::GestureClick *, int, double, double) {
+                adw_action_row_activate(ADW_ACTION_ROW(row_ptr));
+            });
         gtk_widget_add_controller(
             GTK_WIDGET(row_ptr), GTK_EVENT_CONTROLLER(raw_gesture));
 
         m_command_listbox->append(std::move(row).release_floating_ptr());
     }
 
-    gtk_popover_set_position(
-        GTK_POPOVER(m_command_popover.operator Gtk::Popover*()),
-        entry == m_chat_entry ? GTK_POS_TOP : GTK_POS_BOTTOM);
+    m_command_popover->set_position(
+        entry == m_chat_entry ? Gtk::PositionType::TOP : Gtk::PositionType::BOTTOM);
 
-    gtk_popover_popup(GTK_POPOVER(
-        m_command_popover.operator Gtk::Popover*()));
+    m_command_popover->popup();
 }
 
 void ChatView::onPermissionRequest(
     const rook::domain::ToolCallPermissionRequest& event)
 {
     if (m_active_banner) {
-        gtk_widget_unparent(
-            GTK_WIDGET(reinterpret_cast<::GObject*>(m_active_banner)));
+        m_active_banner->unparent();
         m_active_banner = nullptr;
     }
     if (m_banner_timeout_id) {
@@ -1019,8 +1009,7 @@ void ChatView::onPermissionTimeout(
     const rook::domain::ToolCallTimedOut& /*event*/)
 {
     if (m_active_banner) {
-        gtk_widget_unparent(
-            GTK_WIDGET(reinterpret_cast<::GObject*>(m_active_banner)));
+        m_active_banner->unparent();
         m_active_banner = nullptr;
     }
     if (m_banner_timeout_id) {

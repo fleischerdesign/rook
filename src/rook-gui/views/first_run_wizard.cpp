@@ -3,8 +3,6 @@
 #include "rook/ports/llm_port.hpp"
 #include <peel/Adw/Adw.h>
 #include <peel/Gio/Gio.h>
-#include <gio/gio.h>
-#include <adwaita.h>
 
 using namespace peel;
 
