@@ -227,16 +227,16 @@ void AudioPipeline::runWorker() {
 
         if (state == ports::AudioState::Speaking) {
             auto mode = m_mode.load(std::memory_order_acquire);
-            if (mode == VoiceMode::LiveChat) {
-                std::size_t pos = 0;
-                while (pos < frame_size && m_worker_running.load(std::memory_order_acquire)) {
-                    auto n = m_ring_buffer.read(frame.data() + pos, frame_size - pos);
-                    pos += n;
-                    if (pos >= frame_size) break;
-                    m_data_sem.try_acquire_for(std::chrono::milliseconds(50));
-                }
-                if (pos < frame_size) continue;
 
+            std::size_t pos = 0;
+            while (pos < frame_size && m_worker_running.load(std::memory_order_acquire)) {
+                auto n = m_ring_buffer.read(frame.data() + pos, frame_size - pos);
+                pos += n;
+                if (pos >= frame_size) break;
+                m_data_sem.try_acquire_for(std::chrono::milliseconds(50));
+            }
+
+            if (pos >= frame_size) {
                 double sum = 0.0;
                 for (std::size_t i = 0; i < frame_size; ++i)
                     sum += static_cast<double>(frame[i]) * static_cast<double>(frame[i]);
@@ -245,9 +245,6 @@ void AudioPipeline::runWorker() {
                 if (rms > static_cast<double>(m_barge_in_threshold.load(std::memory_order_acquire))) {
                     onBargeInDetected();
                 }
-            } else {
-                m_ring_buffer.drain(512);
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
             }
 
             if (!m_speaking_setup.load(std::memory_order_acquire) &&
