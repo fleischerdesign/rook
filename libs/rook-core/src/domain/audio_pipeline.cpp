@@ -119,14 +119,20 @@ void AudioPipeline::stopLiveMode() {
 void AudioPipeline::onBargeInDetected() {
     auto state = m_state.load(std::memory_order_acquire);
     if (state != ports::AudioState::Speaking) return;
-    if (m_mode.load(std::memory_order_acquire) != VoiceMode::LiveChat) return;
 
-    SPDLOG_INFO("AudioPipeline: barge-in detected");
+    auto mode = m_mode.load(std::memory_order_acquire);
+    SPDLOG_INFO("AudioPipeline: barge-in detected (mode={})",
+                mode == VoiceMode::LiveChat ? "live" : "wakeword");
     stopSpeaking();
     m_recording_buffer.clear();
     m_silence_counter = 0;
     m_recording_frames = 0;
-    transition(ports::AudioState::Recording);
+
+    if (mode == VoiceMode::LiveChat) {
+        transition(ports::AudioState::Recording);
+    } else {
+        transition(ports::AudioState::WaitingForWake);
+    }
 }
 
 void AudioPipeline::mute() {

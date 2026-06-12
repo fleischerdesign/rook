@@ -16,6 +16,44 @@ namespace rook::adapters::audio {
 
 namespace {
 
+static bool is_emoji(uint32_t cp) {
+    return (cp >= 0x1F600 && cp <= 0x1F64F)
+        || (cp >= 0x1F300 && cp <= 0x1F5FF)
+        || (cp >= 0x1F680 && cp <= 0x1F6FF)
+        || (cp >= 0x1F1E0 && cp <= 0x1F1FF)
+        || (cp >= 0x2600 && cp <= 0x27BF)
+        || (cp >= 0x1F900 && cp <= 0x1F9FF)
+        || (cp >= 0x1FA00 && cp <= 0x1FA6F)
+        || (cp >= 0x1FA70 && cp <= 0x1FAFF)
+        || cp == 0xFE0F || cp == 0x200D || cp == 0x20E3;
+}
+
+static std::string strip_emojis(std::string_view input) {
+    std::string out;
+    out.reserve(input.size());
+    for (std::size_t i = 0; i < input.size();) {
+        unsigned char c = static_cast<unsigned char>(input[i]);
+        uint32_t cp;
+        int len;
+        if ((c & 0x80u) == 0) {
+            cp = c; len = 1;
+        } else if ((c & 0xE0u) == 0xC0) {
+            cp = c & 0x1F; len = 2;
+        } else if ((c & 0xF0u) == 0xE0) {
+            cp = c & 0x0F; len = 3;
+        } else {
+            cp = c & 0x07; len = 4;
+        }
+        if (i + static_cast<std::size_t>(len) > input.size()) break;
+        for (int j = 1; j < len; ++j)
+            cp = (cp << 6) | (static_cast<unsigned char>(input[i + j]) & 0x3F);
+        if (!is_emoji(cp))
+            out.append(input.data() + i, static_cast<std::size_t>(len));
+        i += static_cast<std::size_t>(len);
+    }
+    return out;
+}
+
 std::string find_espeak_data() {
     auto try_dir = [](const std::filesystem::path& p) -> std::string {
         auto canonical = std::filesystem::weakly_canonical(p);
@@ -139,6 +177,7 @@ void SherpaTtsAdapter::speak(std::string_view text,
     m_impl->cancel_requested.store(false, std::memory_order_release);
     m_impl->user_chunk_cb = std::move(on_chunk);
 
+    std::string clean_text = strip_emojis(text);
     const auto* tts = m_impl->tts;
 
     auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
@@ -148,7 +187,7 @@ void SherpaTtsAdapter::speak(std::string_view text,
     g_object_unref(gs);
 
     m_impl->speech_thread = std::thread([this,
-                                          text = std::string(text),
+                                          text = std::move(clean_text),
                                           tts, speed, noise_scale]() {
         SherpaOnnxGenerationConfig gen_cfg;
         std::memset(&gen_cfg, 0, sizeof(gen_cfg));
