@@ -4,6 +4,7 @@
 #include <gtk/gtk.h>
 #include <gio/gio.h>
 #include <spdlog/spdlog.h>
+#include <filesystem>
 #include <string>
 
 #include "rook/adapters/audio/sherpa_asr_adapter.hpp"
@@ -166,25 +167,18 @@ void VoiceSettingsPage::rebuildEngineStatus()
     auto& list = *m_engine_list_raw;
 
     if (m_wakeword) {
-        auto ready = m_wakeword->isReady();
+        bool has_vad = std::filesystem::exists(
+            SherpaWakewordAdapter::defaultModelPath());
         auto* ww = m_wakeword;
-        addEngineRow(list, m_wakeword->engineName(), ready,
-            ready ? _("Ready — wake word detection active")
-                  : (m_wakeword->needsKey()
-                        ? _("Access key required")
-                        : _("Engine not available — check installation")),
-            ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
-                  : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
-                      [ww](VoiceProgressFn p, VoiceDoneFn d) {
-                          SPDLOG_INFO("SherpaWakeword GUI: download button callback invoked (rebuild)");
-                          auto* oww = dynamic_cast<rook::adapters::audio::SherpaWakewordAdapter*>(ww);
-                          if (oww) {
-                              SPDLOG_INFO("SherpaWakeword GUI: dynamic_cast succeeded, calling downloadModel");
-                              oww->downloadModel(p, d);
-                          } else {
-                              SPDLOG_ERROR("SherpaWakeword GUI: dynamic_cast FAILED");
-                          }
-                      }});
+        addEngineRow(list, m_wakeword->engineName(), true,
+            has_vad ? _("Ready — neural VAD active")
+                    : _("Ready — energy-based fallback"),
+            has_vad ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
+                    : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
+                          [ww](VoiceProgressFn p, VoiceDoneFn d) {
+                              auto* oww = dynamic_cast<SherpaWakewordAdapter*>(ww);
+                              if (oww) oww->downloadModel(p, d);
+                          }});
     } else {
         addEngineRow(list, _("Wake Word"), false, _("No engine loaded"), {});
     }
@@ -361,25 +355,18 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     g_object_ref(reinterpret_cast<::GObject*>(m_engine_list_raw));
 
     if (m_wakeword) {
-        auto ready = m_wakeword->isReady();
+        bool has_vad = std::filesystem::exists(
+            SherpaWakewordAdapter::defaultModelPath());
         auto* ww = m_wakeword;
-        addEngineRow(*engine_list, m_wakeword->engineName(), ready,
-            ready ? _("Ready — wake word detection active")
-                  : (m_wakeword->needsKey()
-                        ? _("Access key required")
-                        : _("Engine not available — check installation")),
-            ready ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
-                  : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
-                      [ww](VoiceProgressFn p, VoiceDoneFn d) {
-                          SPDLOG_INFO("SherpaWakeword GUI: download button callback invoked");
-                          auto* oww = dynamic_cast<rook::adapters::audio::SherpaWakewordAdapter*>(ww);
-                          if (oww) {
-                              SPDLOG_INFO("SherpaWakeword GUI: dynamic_cast succeeded, calling downloadModel");
-                              oww->downloadModel(p, d);
-                          } else {
-                              SPDLOG_ERROR("SherpaWakeword GUI: dynamic_cast FAILED");
-                          }
-                      }});
+        addEngineRow(*engine_list, m_wakeword->engineName(), true,
+            has_vad ? _("Ready — neural VAD active")
+                    : _("Ready — energy-based fallback"),
+            has_vad ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
+                    : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
+                          [ww](VoiceProgressFn p, VoiceDoneFn d) {
+                              auto* oww = dynamic_cast<SherpaWakewordAdapter*>(ww);
+                              if (oww) oww->downloadModel(p, d);
+                          }});
     } else {
         addEngineRow(*engine_list, _("Wake Word"), false, _("No engine loaded"), {});
     }
