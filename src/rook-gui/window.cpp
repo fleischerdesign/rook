@@ -86,13 +86,12 @@ RookWindow *RookWindow::create(Gtk::Application *app,
         Gtk::Image* icon_ptr = icon;
         icon->set_tooltip_text(_("Voice inactive"));
         win->m_header->pack_end(std::move(icon));
-        win->m_voice_icon = reinterpret_cast<::GtkWidget*>(
-            static_cast<peel::Gtk::Widget*>(icon_ptr));
+        win->m_voice_icon = icon_ptr;
     }
 
     win->m_voice_indicator_handler = bus.subscribe<domain::AudioStateChanged>(
         [win](const domain::AudioStateChanged& ev) {
-            auto* img = static_cast<::GtkImage*>(win->m_voice_icon);
+            auto* img = win->m_voice_icon;
             if (!img) return;
             const char* icon = nullptr;
             const char* tip = nullptr;
@@ -109,8 +108,8 @@ RookWindow *RookWindow::create(Gtk::Application *app,
                 icon = "audio-speakers-symbolic"; tip = "Speaking"; break;
             }
             if (icon) {
-                gtk_image_set_from_icon_name(img, icon);
-                gtk_widget_set_tooltip_text(GTK_WIDGET(img), tip);
+                img->set_from_icon_name(icon);
+                img->set_tooltip_text(tip);
             }
         });
 

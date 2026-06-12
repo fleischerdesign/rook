@@ -1,5 +1,5 @@
 #include <glib/gi18n.h>
-#include <gtk/gtk.h>
+#include <peel/Gtk/Orientable.h>
 #include "message_widget.hpp"
 #include "markdown_renderer.hpp"
 
@@ -26,9 +26,7 @@ inline void MessageWidget::init(Class *)
 {
     new (&m_role) std::string();
     new (&m_raw_content) std::string();
-    gtk_orientable_set_orientation(
-        GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
-        GTK_ORIENTATION_VERTICAL);
+    reinterpret_cast<Gtk::Orientable*>(this)->set_orientation(Gtk::Orientation::VERTICAL);
     set_spacing(2);
     set_margin_top(6);
     set_margin_bottom(6);

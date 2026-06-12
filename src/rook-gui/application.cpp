@@ -317,11 +317,9 @@ inline void RookApplication::vfunc_activate()
             "  background: transparent;"
             "  box-shadow: none;"
             "}");
-        auto* raw_provider = reinterpret_cast<::GtkCssProvider*>(
-            static_cast<peel::Gtk::CssProvider*>(provider));
-        gtk_style_context_add_provider_for_display(
-            gdk_display_get_default(),
-            GTK_STYLE_PROVIDER(raw_provider),
+        Gtk::StyleContext::add_provider_for_display(
+            Gdk::Display::get_default(),
+            static_cast<Gtk::StyleProvider*>(provider),
             GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
         m_css_loaded = true;
     }

@@ -4,6 +4,8 @@
 #include "rook/core/actor_messages.hpp"
 #include <spdlog/spdlog.h>
 #include <peel/Adw/Adw.h>
+#include <peel/Gtk/Orientable.h>
+#include <peel/Graphene/Rect.h>
 
 using namespace peel;
 
@@ -19,9 +21,7 @@ inline void ChatSidebar::Class::init()
 inline void ChatSidebar::init(Class *)
 {
     new (&m_snapshot) rook::domain::SnapshotReady();
-    gtk_orientable_set_orientation(
-        GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
-        GTK_ORIENTATION_VERTICAL);
+    reinterpret_cast<Gtk::Orientable*>(this)->set_orientation(Gtk::Orientation::VERTICAL);
     set_size_request(220, -1);
 
     auto search = Gtk::SearchEntry::create();
@@ -129,10 +129,7 @@ FloatPtr<ChatSidebar> ChatSidebar::create(rook::domain::EventBus &bus,
 
 static Gtk::Stack* stackForRow(Gtk::ListBoxRow *row)
 {
-    auto *raw = g_object_get_data(
-        reinterpret_cast<::GObject*>(row), "chat-stack");
-    return raw ? static_cast<Gtk::Stack*>(
-        reinterpret_cast<peel::Gtk::Stack*>(raw)) : nullptr;
+    return static_cast<Gtk::Stack*>(row->get_data("chat-stack"));
 }
 
 static std::string rowTitle(Gtk::ListBoxRow *row)
@@ -221,76 +218,61 @@ Gtk::ListBoxRow* ChatSidebar::buildChatRow(std::string_view id,
     outer->append(std::move(pin_icon));
 
     auto stack = Gtk::Stack::create();
-    auto *s_raw = GTK_STACK(reinterpret_cast<::GObject*>(
-        static_cast<Gtk::Stack*>(stack)));
+    Gtk::Stack* stack_ptr = stack;
 
-    auto *lbl_ptr = std::move(Gtk::Label::create(display.c_str())).release_floating_ptr();
-    lbl_ptr->set_xalign(0.0f);
-    lbl_ptr->set_margin_start(2);
-    lbl_ptr->set_margin_end(6);
-    lbl_ptr->set_margin_top(6);
-    lbl_ptr->set_margin_bottom(6);
-    lbl_ptr->set_max_width_chars(20);
-    lbl_ptr->set_ellipsize(
+    auto lbl = Gtk::Label::create(display.c_str());
+    lbl->set_xalign(0.0f);
+    lbl->set_margin_start(2);
+    lbl->set_margin_end(6);
+    lbl->set_margin_top(6);
+    lbl->set_margin_bottom(6);
+    lbl->set_max_width_chars(20);
+    lbl->set_ellipsize(
         static_cast<Pango::EllipsizeMode>(PANGO_ELLIPSIZE_END));
-    gtk_stack_add_named(s_raw,
-        GTK_WIDGET(reinterpret_cast<::GObject*>(lbl_ptr)), "label_");
+    stack->add_named(std::move(lbl), "label_");
 
-    auto *ent_ptr = std::move(Gtk::Entry::create()).release_floating_ptr();
-    ent_ptr->set_text(display.c_str());
-    ent_ptr->set_margin_start(2);
-    ent_ptr->set_margin_end(6);
-    ent_ptr->set_margin_top(4);
-    ent_ptr->set_margin_bottom(4);
-    ent_ptr->set_hexpand(true);
-    ent_ptr->connect_activate([this, cid](Gtk::Entry *e) {
+    auto ent = Gtk::Entry::create();
+    ent->set_text(display.c_str());
+    ent->set_margin_start(2);
+    ent->set_margin_end(6);
+    ent->set_margin_top(4);
+    ent->set_margin_bottom(4);
+    ent->set_hexpand(true);
+    ent->connect_activate([this, cid](Gtk::Entry *e) {
         auto t = e->get_text();
         confirmRename(cid, t ? std::string(t) : std::string{});
     });
-    gtk_stack_add_named(s_raw,
-        GTK_WIDGET(reinterpret_cast<::GObject*>(ent_ptr)), "edit");
+    stack->add_named(std::move(ent), "edit");
 
     stack->set_visible_child_name("label_");
     outer->append(std::move(stack));
     row->set_child(std::move(outer).release_floating_ptr());
 
     auto *row_ptr = static_cast<Gtk::ListBoxRow*>(row);
-    g_object_set_data(reinterpret_cast<::GObject*>(row_ptr),
-                      "chat-stack", s_raw);
+    row_ptr->set_data("chat-stack", stack_ptr);
 
     auto *ctx = new std::pair<ChatSidebar*, std::string>(this, cid);
-    g_object_set_data_full(reinterpret_cast<::GObject*>(row_ptr),
-        "sidebar-ctx", ctx,
+    row_ptr->set_data("sidebar-ctx", ctx,
         [](void *p) {
             delete static_cast<std::pair<ChatSidebar*, std::string>*>(p);
         });
 
     auto ctrl = Gtk::GestureClick::create();
-    auto* raw_ctrl = reinterpret_cast<::GtkGestureClick*>(
-        static_cast<peel::Gtk::GestureClick*>(ctrl));
-    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(raw_ctrl),
-                                   GDK_BUTTON_SECONDARY);
-    g_signal_connect(raw_ctrl, "pressed",
-                     G_CALLBACK(onContextGesture), row_ptr);
-    gtk_widget_add_controller(GTK_WIDGET(row_ptr),
-                               GTK_EVENT_CONTROLLER(raw_ctrl));
+    ctrl->set_button(GDK_BUTTON_SECONDARY);
+    ctrl->connect_pressed([this, row_ptr](Gtk::GestureClick *, int, double, double) {
+        auto *pair = static_cast<std::pair<ChatSidebar*, std::string>*>(
+            row_ptr->get_data("sidebar-ctx"));
+        if (pair) pair->first->showContextMenu(row_ptr, pair->second);
+    });
+    row_ptr->add_controller(ctrl);
 
     return std::move(row).release_floating_ptr();
 }
 
 // --- Context menu ---
 
-void ChatSidebar::onContextGesture(GtkGestureClick *, int /*n_press*/,
-                                     double /*x*/, double /*y*/, gpointer data)
-{
-    auto *row = GTK_LIST_BOX_ROW(data);
-    auto *pair = static_cast<std::pair<ChatSidebar*, std::string>*>(
-        g_object_get_data(reinterpret_cast<::GObject*>(row), "sidebar-ctx"));
-    if (pair) pair->first->showContextMenu(
-        GTK_WIDGET(reinterpret_cast<::GObject*>(row)), pair->second);
-}
 
-void ChatSidebar::showContextMenu(::GtkWidget *parent,
+void ChatSidebar::showContextMenu(Gtk::Widget *,
                                    std::string_view chat_id)
 {
     auto it = std::find_if(m_snapshot.conversations.begin(),
@@ -301,23 +283,23 @@ void ChatSidebar::showContextMenu(::GtkWidget *parent,
 
     auto popover = Gtk::Popover::create();
     popover->set_has_arrow(false);
-    auto *popover_raw = GTK_WIDGET(reinterpret_cast<::GObject*>(
-        static_cast<Gtk::Popover*>(popover)));
 
-    gtk_widget_set_parent(popover_raw,
+    gtk_widget_set_parent(
+        GTK_WIDGET(reinterpret_cast<::GObject*>(
+            static_cast<Gtk::Popover*>(popover))),
         GTK_WIDGET(reinterpret_cast<::GObject*>(m_list)));
 
-    graphene_rect_t bounds;
-    graphene_rect_init(&bounds, 0.f, 0.f, 0.f, 0.f);
-    bool ok = gtk_widget_compute_bounds(parent,
-        GTK_WIDGET(reinterpret_cast<::GObject*>(m_list)), &bounds);
+    Graphene::Rect bounds;
+    bool ok = m_list->compute_bounds(m_list, &bounds);
     GdkRectangle rect = {
         ok ? static_cast<int>(bounds.origin.x) : 0,
         ok ? static_cast<int>(bounds.origin.y) : 0,
         ok ? static_cast<int>(bounds.size.width) : 1,
         ok ? static_cast<int>(bounds.size.height) : 1,
     };
-    gtk_popover_set_pointing_to(GTK_POPOVER(popover_raw), &rect);
+    gtk_popover_set_pointing_to(
+        GTK_POPOVER(reinterpret_cast<::GtkPopover*>(
+            static_cast<peel::Gtk::Popover*>(popover))), &rect);
     auto *pop_ptr = static_cast<Gtk::Popover*>(popover);
 
     auto box = Gtk::Box::create(Gtk::Orientation::VERTICAL, 0);

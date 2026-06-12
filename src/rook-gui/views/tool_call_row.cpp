@@ -1,6 +1,6 @@
 #include <glib/gi18n.h>
 #include "tool_call_row.hpp"
-#include <gtk/gtk.h>
+#include <peel/Gtk/Orientable.h>
 
 using namespace peel;
 
@@ -17,9 +17,7 @@ inline void ToolCallRow::init(Class *)
 {
     new (&m_call_id) std::string();
     new (&m_tool_name) std::string();
-    gtk_orientable_set_orientation(
-        GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
-        GTK_ORIENTATION_VERTICAL);
+    reinterpret_cast<Gtk::Orientable*>(this)->set_orientation(Gtk::Orientation::VERTICAL);
     set_spacing(2);
     set_margin_start(12);
     set_margin_end(12);

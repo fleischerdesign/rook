@@ -50,7 +50,7 @@ class RookWindow final : public peel::Adw::ApplicationWindow
     rook::ports::TextToSpeechPort* m_tts = nullptr;
     rook::ports::AudioDevicePort* m_audio_device = nullptr;
     rook::domain::EventBus::HandlerId m_voice_indicator_handler;
-    void* m_voice_icon = nullptr;
+    peel::Gtk::Image* m_voice_icon = nullptr;
 
     inline void init(Class *);
 

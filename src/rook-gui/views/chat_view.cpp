@@ -9,6 +9,7 @@
 #include "rook/ports/extension_port.hpp"
 #include "rook/adapters/model/model_cache.hpp"
 #include <peel/GLib/functions.h>
+#include <peel/Gtk/Orientable.h>
 #include <spdlog/spdlog.h>
 #include <gtk/gtk.h>
 
@@ -25,9 +26,7 @@ inline void ChatView::Class::init()
 
 inline void ChatView::init(Class *)
 {
-    gtk_orientable_set_orientation(
-        GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
-        GTK_ORIENTATION_VERTICAL);
+    reinterpret_cast<Gtk::Orientable*>(this)->set_orientation(Gtk::Orientation::VERTICAL);
     new (&m_chat_id) std::string();
     new (&m_pending_input) std::string();
     new (&m_snapshot) rook::domain::SnapshotReady();
@@ -186,14 +185,8 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
         entry->connect_changed([v](Gtk::Editable *) { v->onChatEntryChanged(); });
 
         auto key_ctrl = Gtk::EventControllerKey::create();
-        auto* raw_kc = reinterpret_cast<::GtkEventControllerKey*>(
-            static_cast<peel::Gtk::EventControllerKey*>(key_ctrl));
-        gtk_event_controller_key_set_im_context(
-            GTK_EVENT_CONTROLLER_KEY(raw_kc), FALSE);
-        gtk_widget_add_controller(
-            reinterpret_cast<::GtkWidget*>(
-                static_cast<peel::Gtk::Widget*>(entry)),
-            GTK_EVENT_CONTROLLER(raw_kc));
+        key_ctrl->set_im_context(nullptr);
+        entry->add_controller(key_ctrl);
         key_ctrl->connect_key_pressed(
             [v](Gtk::EventControllerKey *, unsigned keyval, unsigned,
                 Gdk::ModifierType) -> bool {
@@ -286,14 +279,8 @@ FloatPtr<ChatView> ChatView::create(rook::core::DomainActor *actor,
         entry->connect_changed([v](Gtk::Editable *) { v->onChatEntryChanged(); });
 
         auto key_ctrl2 = Gtk::EventControllerKey::create();
-        auto* raw_kc2 = reinterpret_cast<::GtkEventControllerKey*>(
-            static_cast<peel::Gtk::EventControllerKey*>(key_ctrl2));
-        gtk_event_controller_key_set_im_context(
-            GTK_EVENT_CONTROLLER_KEY(raw_kc2), FALSE);
-        gtk_widget_add_controller(
-            reinterpret_cast<::GtkWidget*>(
-                static_cast<peel::Gtk::Widget*>(entry)),
-            GTK_EVENT_CONTROLLER(raw_kc2));
+        key_ctrl2->set_im_context(nullptr);
+        entry->add_controller(key_ctrl2);
         key_ctrl2->connect_key_pressed(
             [v](Gtk::EventControllerKey *, unsigned keyval, unsigned,
                 Gdk::ModifierType) -> bool {
@@ -926,15 +913,12 @@ void ChatView::onChatEntryChanged()
 
         auto* row_ptr = row.operator Adw::ActionRow*();
         auto gesture = Gtk::GestureClick::create();
-        auto* raw_gesture = reinterpret_cast<::GtkGestureClick*>(
-            static_cast<peel::Gtk::GestureClick*>(gesture));
-        gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(raw_gesture), 1);
+        gesture->set_button(1);
         gesture->connect_released(
             [row_ptr](Gtk::GestureClick *, int, double, double) {
                 adw_action_row_activate(ADW_ACTION_ROW(row_ptr));
             });
-        gtk_widget_add_controller(
-            GTK_WIDGET(row_ptr), GTK_EVENT_CONTROLLER(raw_gesture));
+        row_ptr->add_controller(gesture);
 
         m_command_listbox->append(std::move(row).release_floating_ptr());
     }
@@ -975,9 +959,7 @@ void ChatView::onPermissionRequest(
             }
 
             if (m_active_banner) {
-                gtk_widget_unparent(
-                    GTK_WIDGET(reinterpret_cast<::GObject*>(
-                        m_active_banner)));
+                m_active_banner->unparent();
                 m_active_banner = nullptr;
             }
             if (m_banner_timeout_id) {
@@ -995,9 +977,7 @@ void ChatView::onPermissionRequest(
                 if (m_actor)
                     m_actor->post(
                         rook::domain::ActorPermissionTimeout{.request_uuid = uid});
-                gtk_widget_unparent(
-                    GTK_WIDGET(reinterpret_cast<::GObject*>(
-                        m_active_banner)));
+                m_active_banner->unparent();
                 m_active_banner = nullptr;
             }
             m_banner_timeout_id = 0;

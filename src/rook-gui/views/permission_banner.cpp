@@ -1,4 +1,5 @@
 #include <glib/gi18n.h>
+#include <peel/Gtk/Orientable.h>
 #include "permission_banner.hpp"
 #include <sstream>
 
@@ -12,9 +13,7 @@ inline void PermissionBanner::Class::init() {}
 
 inline void PermissionBanner::init(Class *)
 {
-    gtk_orientable_set_orientation(
-        GTK_ORIENTABLE(reinterpret_cast<::GtkBox*>(this)),
-        GTK_ORIENTATION_VERTICAL);
+    reinterpret_cast<Gtk::Orientable*>(this)->set_orientation(Gtk::Orientation::VERTICAL);
     set_spacing(6);
     set_margin_start(12);
     set_margin_end(12);

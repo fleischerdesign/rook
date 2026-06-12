@@ -50,15 +50,12 @@ class ChatSidebar final : public peel::Gtk::Box
     void rebuildList();
     peel::Gtk::ListBoxRow* buildChatRow(std::string_view id, std::string title,
                                          bool pinned);
-    void showContextMenu(::GtkWidget *parent, std::string_view chat_id);
+    void showContextMenu(peel::Gtk::Widget *parent, std::string_view chat_id);
 
     void startRename(std::string_view chat_id);
     void confirmRename(std::string_view chat_id, std::string_view new_title);
     void cancelRename();
     void confirmDelete(std::string_view chat_id);
-
-    static void onContextGesture(GtkGestureClick *, int n_press,
-                                  double x, double y, gpointer data);
 
 public:
     static peel::FloatPtr<ChatSidebar> create(rook::domain::EventBus &bus,

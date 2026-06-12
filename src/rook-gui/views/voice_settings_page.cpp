@@ -98,48 +98,40 @@ void VoiceSettingsPage::addEngineRow(Gtk::ListBox &list,
         Gtk::Stack* stack_ptr = suffix_stack;
         row->add_suffix(std::move(suffix_stack).release_floating_ptr());
 
-        auto* raw_stack = reinterpret_cast<::GtkStack*>(
-            static_cast<peel::Gtk::Widget*>(stack_ptr));
-        auto* btn_page = gtk_stack_get_child_by_name(raw_stack, "button");
-        auto* raw_btn = GTK_BUTTON(btn_page);
+        auto* btn_page = stack_ptr->get_child_by_name("button");
+        auto* btn = static_cast<Gtk::Button*>(btn_page);
 
-        auto* pb_page = gtk_stack_get_child_by_name(raw_stack, "progress");
-        auto* pb_child = gtk_widget_get_first_child(GTK_WIDGET(pb_page));
-        auto* raw_prog_bar = GTK_PROGRESS_BAR(pb_child);
-        auto* raw_prog_label = GTK_LABEL(gtk_widget_get_next_sibling(pb_child));
+        auto* pb_page = stack_ptr->get_child_by_name("progress");
+        auto* pb_child = pb_page->get_first_child();
+        auto* bar = static_cast<Gtk::ProgressBar*>(pb_child);
+        auto* label = static_cast<Gtk::Label*>(pb_child->get_next_sibling());
 
-        g_signal_connect_data(raw_btn, "clicked",
-            G_CALLBACK(+[](GtkButton*, gpointer data) {
-                auto* d = static_cast<std::function<void()>*>(data);
-                (*d)();
-            }),
-            new std::function<void()>([on_download = std::move(on_download),
-                                        raw_stack, raw_prog_bar, raw_prog_label,
-                                        name = std::string(name)]() mutable {
+        btn->connect_clicked(
+            [on_download = std::move(on_download),
+             stack_ptr, bar, label,
+             name = std::string(name)](Gtk::Button *) mutable {
                 SPDLOG_INFO("VoiceSettings: download button clicked for '{}'", name);
-                gtk_stack_set_visible_child_name(raw_stack, "progress");
+                stack_ptr->set_visible_child_name("progress");
                 on_download(
-                    [raw_prog_bar, raw_prog_label](float p) {
-                        GLib::idle_add_once([raw_prog_bar, raw_prog_label, p]() {
-                            gtk_progress_bar_set_fraction(raw_prog_bar, p);
+                    [bar, label](float p) {
+                        GLib::idle_add_once([bar, label, p]() {
+                            bar->set_fraction(p);
                             auto s = std::to_string(static_cast<int>(p * 100)) + "%";
-                            gtk_label_set_text(raw_prog_label, s.c_str());
+                            label->set_text(s.c_str());
                         });
                     },
-                    [raw_stack](bool ok) {
+                    [stack_ptr](bool ok) {
                         if (ok) {
-                            GLib::idle_add_once([raw_stack]() {
-                                gtk_stack_set_visible_child_name(raw_stack, "done");
+                            GLib::idle_add_once([stack_ptr]() {
+                                stack_ptr->set_visible_child_name("done");
                             });
                         } else {
-                            GLib::idle_add_once([raw_stack]() {
-                                gtk_stack_set_visible_child_name(raw_stack, "button");
+                            GLib::idle_add_once([stack_ptr]() {
+                                stack_ptr->set_visible_child_name("button");
                             });
                         }
                     });
-            }),
-            +[](void* p, GClosure*) { delete static_cast<std::function<void()>*>(p); },
-            GConnectFlags(0));
+            });
     } else if (ready) {
         auto icon = Gtk::Image::create_from_icon_name("emblem-ok-symbolic");
         row->add_suffix(std::move(icon).release_floating_ptr());
