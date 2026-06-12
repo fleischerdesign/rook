@@ -34,6 +34,15 @@ public:
 
     virtual void setModel(std::string_view path) = 0;
     virtual std::vector<std::string> availableModels() const = 0;
+
+    virtual bool supportsStreaming() const { return false; }
+    virtual void beginStream() {}
+    virtual void acceptWaveform(const int16_t*, int, int) {}
+    virtual bool isStreamReady() { return false; }
+    virtual void decodeStream() {}
+    virtual std::string getPartialResult() { return ""; }
+    virtual bool isStreamEndpoint() { return false; }
+    virtual void endStream() {}
 };
 
 } // namespace rook::ports

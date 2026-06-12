@@ -5,7 +5,9 @@
 
 #include <spdlog/spdlog.h>
 #include <algorithm>
+#include <condition_variable>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -95,6 +97,8 @@ struct MiniaudioAdapter::Impl {
 
     std::atomic<bool> m_producer_done{false};
     std::atomic<bool> playback_muted{false};
+    std::mutex playback_cv_mtx;
+    std::condition_variable playback_cv;
 
     static void onCapture(ma_device* device, void*, const void* input, ma_uint32 frame_count) {
         auto* self = static_cast<Impl*>(device->pUserData);
@@ -117,6 +121,7 @@ struct MiniaudioAdapter::Impl {
         auto read = self->playback_buffer.read(out, frame_count);
         if (read < frame_count)
             std::memset(out + read, 0, (frame_count - read) * sizeof(float));
+        self->playback_cv.notify_one();
     };
 };
 
@@ -353,7 +358,8 @@ bool MiniaudioAdapter::writePlayback(const float* pcm, std::size_t sample_count)
             return false;
         auto written = m_impl->playback_buffer.write(pcm, sample_count);
         if (written == 0) {
-            std::this_thread::yield();
+            std::unique_lock<std::mutex> lock(m_impl->playback_cv_mtx);
+            m_impl->playback_cv.wait_for(lock, std::chrono::milliseconds(50));
             continue;
         }
         pcm += written;

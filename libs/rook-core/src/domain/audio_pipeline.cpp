@@ -89,6 +89,17 @@ void AudioPipeline::stopLiveMode() {
         SPDLOG_INFO("AudioPipeline: live-chat recording stopped, transcribing {} samples", audio.size());
 
         auto cur_mode = VoiceMode::LiveChat;
+
+        if (m_stt.supportsStreaming()) {
+            auto result = m_stt.getPartialResult();
+            m_stt.endStream();
+            if (m_events.on_stt_result)
+                m_events.on_stt_result(
+                    result.empty() ? std::string() : std::move(result),
+                    true, cur_mode);
+            return;
+        }
+
         m_stt.transcribe(audio.data(), audio.size(), 16000,
             [this, cur_mode](ports::SttResult result) {
                 if (m_events.on_stt_result)
@@ -286,6 +297,19 @@ void AudioPipeline::processRecording(const int16_t* pcm, std::size_t count) {
     m_recording_buffer.insert(m_recording_buffer.end(), pcm, pcm + count);
     m_recording_frames++;
 
+    if (m_stt.supportsStreaming()) {
+        m_stt.acceptWaveform(pcm, static_cast<int>(count), 16000);
+        while (m_stt.isStreamReady()) {
+            m_stt.decodeStream();
+            auto partial = m_stt.getPartialResult();
+            if (!partial.empty() && partial != m_last_partial) {
+                m_last_partial = std::move(partial);
+                if (m_events.on_partial_stt)
+                    m_events.on_partial_stt(m_last_partial);
+            }
+        }
+    }
+
     double sum = 0.0;
     for (std::size_t i = 0; i < count; ++i)
         sum += static_cast<double>(pcm[i]) * static_cast<double>(pcm[i]);
@@ -307,6 +331,17 @@ void AudioPipeline::processRecording(const int16_t* pcm, std::size_t count) {
         m_recording_buffer.clear();
 
         transition(ports::AudioState::Processing);
+
+        if (m_stt.supportsStreaming()) {
+            auto final_text = m_stt.getPartialResult();
+            m_stt.endStream();
+            auto cur_mode = m_mode.load(std::memory_order_acquire);
+            if (final_text.empty() && m_events.on_stt_result)
+                m_events.on_stt_result("", false, cur_mode);
+            else if (!final_text.empty() && m_events.on_stt_result)
+                m_events.on_stt_result(std::move(final_text), true, cur_mode);
+            return;
+        }
 
         double sum_sq = 0.0;
         for (auto s : audio) sum_sq += static_cast<double>(s) * static_cast<double>(s);
@@ -427,6 +462,12 @@ void AudioPipeline::transition(ports::AudioState to) {
 
     if (m_events.on_state_change)
         m_events.on_state_change(from, to);
+
+    if (to == ports::AudioState::Recording) {
+        m_last_partial.clear();
+        if (m_stt.supportsStreaming())
+            m_stt.beginStream();
+    }
 }
 
 } // namespace rook::domain

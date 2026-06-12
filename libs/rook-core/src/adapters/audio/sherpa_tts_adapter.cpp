@@ -62,6 +62,21 @@ struct SherpaTtsAdapter::Impl {
 
     std::atomic<bool> cancel_requested{false};
     std::thread speech_thread;
+
+    using ChunkFn = std::function<void(const float*, std::size_t, int, bool)>;
+    ChunkFn user_chunk_cb;
+
+    static int32_t onTtsChunk(const float* samples, int32_t n, float,
+                              void* arg)
+    {
+        auto* self = static_cast<Impl*>(arg);
+        if (self->cancel_requested.load(std::memory_order_acquire))
+            return 0;
+        if (self->user_chunk_cb)
+            self->user_chunk_cb(samples, static_cast<std::size_t>(n),
+                                22050, false);
+        return 1;
+    }
 };
 
 SherpaTtsAdapter::SherpaTtsAdapter(std::string model_path)
@@ -122,8 +137,8 @@ void SherpaTtsAdapter::speak(std::string_view text,
     }
 
     m_impl->cancel_requested.store(false, std::memory_order_release);
+    m_impl->user_chunk_cb = std::move(on_chunk);
 
-    std::string text_copy(text);
     const auto* tts = m_impl->tts;
 
     auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
@@ -132,9 +147,9 @@ void SherpaTtsAdapter::speak(std::string_view text,
         g_settings_get_double(gs, "tts-noise-scale"));
     g_object_unref(gs);
 
-    m_impl->speech_thread = std::thread([this, text_copy, tts, speed,
-                                          noise_scale,
-                                          cb = std::move(on_chunk)]() {
+    m_impl->speech_thread = std::thread([this,
+                                          text = std::string(text),
+                                          tts, speed, noise_scale]() {
         SherpaOnnxGenerationConfig gen_cfg;
         std::memset(&gen_cfg, 0, sizeof(gen_cfg));
         gen_cfg.sid = 0;
@@ -142,33 +157,20 @@ void SherpaTtsAdapter::speak(std::string_view text,
         gen_cfg.silence_scale = 0.2f;
 
         const SherpaOnnxGeneratedAudio* audio =
-            SherpaOnnxOfflineTtsGenerateWithConfig(tts, text_copy.c_str(),
-                                                    &gen_cfg, nullptr, nullptr);
+            SherpaOnnxOfflineTtsGenerateWithConfig(tts, text.c_str(),
+                                                    &gen_cfg,
+                                                    Impl::onTtsChunk,
+                                                    m_impl.get());
 
-        if (m_impl->cancel_requested.load(std::memory_order_acquire)) {
-            if (audio) SherpaOnnxDestroyOfflineTtsGeneratedAudio(audio);
+        if (audio) SherpaOnnxDestroyOfflineTtsGeneratedAudio(audio);
+
+        if (m_impl->cancel_requested.load(std::memory_order_acquire))
             return;
-        }
 
-        if (!audio || audio->n == 0) {
-            SPDLOG_ERROR("SherpaTtsAdapter: generation produced no audio");
+        if (m_impl->user_chunk_cb) {
             float dummy = 0.0f;
-            cb(&dummy, 0, 22050, true);
-            if (audio) SherpaOnnxDestroyOfflineTtsGeneratedAudio(audio);
-            return;
+            m_impl->user_chunk_cb(&dummy, 0, 22050, true);
         }
-
-        cb(audio->samples, audio->n, audio->sample_rate, false);
-
-        if (m_impl->cancel_requested.load(std::memory_order_acquire)) {
-            SherpaOnnxDestroyOfflineTtsGeneratedAudio(audio);
-            return;
-        }
-
-        float dummy = 0.0f;
-        cb(&dummy, 0, 22050, true);
-
-        SherpaOnnxDestroyOfflineTtsGeneratedAudio(audio);
     });
 }
 

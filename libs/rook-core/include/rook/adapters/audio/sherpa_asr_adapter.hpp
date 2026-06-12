@@ -33,6 +33,15 @@ public:
 
     void cancel() override;
 
+    bool supportsStreaming() const override;
+    void beginStream() override;
+    void acceptWaveform(const int16_t*, int, int) override;
+    bool isStreamReady() override;
+    void decodeStream() override;
+    std::string getPartialResult() override;
+    bool isStreamEndpoint() override;
+    void endStream() override;
+
     void setModel(std::string_view path) override;
     std::vector<std::string> availableModels() const override;
 

@@ -28,7 +28,7 @@ public:
     static std::string defaultModelUrl();
     using ProgressFn = std::function<void(float progress)>;
     using DoneFn = std::function<void(bool success)>;
-    static void downloadModel(ProgressFn on_progress, DoneFn on_done);
+    void downloadModel(ProgressFn on_progress, DoneFn on_done);
 
 private:
     struct Impl;

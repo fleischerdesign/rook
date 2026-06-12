@@ -142,6 +142,11 @@ struct SherpaAsrAdapter::Impl {
 
     const SherpaOnnxOfflineRecognizer* recognizer = nullptr;
 
+    const SherpaOnnxOnlineRecognizer* online_recognizer = nullptr;
+    const SherpaOnnxOnlineStream* online_stream = nullptr;
+    bool streaming_supported = false;
+    std::vector<float> stream_buffer;
+
     std::atomic<bool> cancel_requested{false};
     std::thread transcribe_thread;
     bool ready = false;
@@ -171,6 +176,15 @@ void SherpaAsrAdapter::Impl::initRecognizer() {
         SherpaOnnxDestroyOfflineRecognizer(recognizer);
         recognizer = nullptr;
     }
+    if (online_recognizer) {
+        SherpaOnnxDestroyOnlineRecognizer(online_recognizer);
+        online_recognizer = nullptr;
+    }
+    if (online_stream) {
+        SherpaOnnxDestroyOnlineStream(online_stream);
+        online_stream = nullptr;
+    }
+    streaming_supported = false;
     ready = false;
 
     readSettings();
@@ -209,6 +223,35 @@ void SherpaAsrAdapter::Impl::initRecognizer() {
         return;
     }
 
+    if (asr_backend == AsrBackend::Transducer) {
+        SherpaOnnxOnlineRecognizerConfig online_cfg;
+        std::memset(&online_cfg, 0, sizeof(online_cfg));
+        online_cfg.feat_config.sample_rate = 16000;
+        online_cfg.feat_config.feature_dim = 80;
+        online_cfg.model_config.transducer.encoder = paths.encoder.c_str();
+        online_cfg.model_config.transducer.decoder = paths.decoder.c_str();
+        online_cfg.model_config.transducer.joiner = paths.joiner.c_str();
+        online_cfg.model_config.tokens = paths.tokens.c_str();
+        online_cfg.model_config.num_threads = threads;
+        online_cfg.model_config.provider = "cpu";
+        online_cfg.model_config.model_type = "nemo_transducer";
+        online_cfg.decoding_method = "greedy_search";
+        online_cfg.enable_endpoint = 1;
+        online_cfg.rule1_min_trailing_silence = 1.5f;
+        online_cfg.rule2_min_trailing_silence = 3.0f;
+        online_cfg.rule3_min_utterance_length = 20.0f;
+
+        online_recognizer =
+            SherpaOnnxCreateOnlineRecognizer(&online_cfg);
+        if (online_recognizer) {
+            streaming_supported = true;
+            SPDLOG_INFO("SherpaAsrAdapter: online recognizer ready");
+        } else {
+            SPDLOG_WARN("SherpaAsrAdapter: failed to create online "
+                        "recognizer for transducer");
+        }
+    }
+
     ready = true;
     SPDLOG_INFO("SherpaAsrAdapter: engine ready (backend={}, model={})",
                 backendString(asr_backend), model_id);
@@ -227,6 +270,10 @@ SherpaAsrAdapter::SherpaAsrAdapter(std::string model_path)
 
 SherpaAsrAdapter::~SherpaAsrAdapter() {
     cancel();
+    if (m_impl->online_stream)
+        SherpaOnnxDestroyOnlineStream(m_impl->online_stream);
+    if (m_impl->online_recognizer)
+        SherpaOnnxDestroyOnlineRecognizer(m_impl->online_recognizer);
     if (m_impl->recognizer)
         SherpaOnnxDestroyOfflineRecognizer(m_impl->recognizer);
 }
@@ -306,6 +353,66 @@ void SherpaAsrAdapter::cancel() {
     m_impl->cancel_requested.store(true, std::memory_order_release);
     if (m_impl->transcribe_thread.joinable())
         m_impl->transcribe_thread.join();
+}
+
+bool SherpaAsrAdapter::supportsStreaming() const {
+    return m_impl->streaming_supported && m_impl->ready;
+}
+
+void SherpaAsrAdapter::beginStream() {
+    if (!m_impl->streaming_supported) return;
+    endStream();
+    m_impl->online_stream =
+        SherpaOnnxCreateOnlineStream(m_impl->online_recognizer);
+    if (!m_impl->online_stream)
+        SPDLOG_ERROR("SherpaAsrAdapter: failed to create online stream");
+}
+
+void SherpaAsrAdapter::acceptWaveform(const int16_t* pcm, int n, int sr) {
+    if (!m_impl->online_stream) return;
+    if (n <= 0) return;
+    if (m_impl->stream_buffer.size() < static_cast<std::size_t>(n))
+        m_impl->stream_buffer.resize(static_cast<std::size_t>(n) + 128);
+    for (int i = 0; i < n; ++i)
+        m_impl->stream_buffer[i] = static_cast<float>(pcm[i]) / 32768.0f;
+    SherpaOnnxOnlineStreamAcceptWaveform(
+        m_impl->online_stream, sr, m_impl->stream_buffer.data(), n);
+}
+
+bool SherpaAsrAdapter::isStreamReady() {
+    if (!m_impl->online_stream) return false;
+    return SherpaOnnxIsOnlineStreamReady(
+        m_impl->online_recognizer, m_impl->online_stream) != 0;
+}
+
+void SherpaAsrAdapter::decodeStream() {
+    if (!m_impl->online_stream) return;
+    SherpaOnnxDecodeOnlineStream(
+        m_impl->online_recognizer, m_impl->online_stream);
+}
+
+std::string SherpaAsrAdapter::getPartialResult() {
+    if (!m_impl->online_stream) return {};
+    const SherpaOnnxOnlineRecognizerResult* r =
+        SherpaOnnxGetOnlineStreamResult(
+            m_impl->online_recognizer, m_impl->online_stream);
+    if (!r || !r->text) return {};
+    std::string text(r->text);
+    SherpaOnnxDestroyOnlineRecognizerResult(r);
+    return text;
+}
+
+bool SherpaAsrAdapter::isStreamEndpoint() {
+    if (!m_impl->online_stream) return false;
+    return SherpaOnnxOnlineStreamIsEndpoint(
+        m_impl->online_recognizer, m_impl->online_stream) != 0;
+}
+
+void SherpaAsrAdapter::endStream() {
+    if (m_impl->online_stream) {
+        SherpaOnnxDestroyOnlineStream(m_impl->online_stream);
+        m_impl->online_stream = nullptr;
+    }
 }
 
 void SherpaAsrAdapter::setModel(std::string_view path) {

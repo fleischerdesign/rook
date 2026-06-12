@@ -34,6 +34,7 @@ struct AudioPipelineEvents {
     std::function<void(std::string transcript, bool is_final, VoiceMode mode)> on_stt_result;
     std::function<void()> on_tts_done;
     std::function<void(ports::AudioState old_state, ports::AudioState new_state)> on_state_change;
+    std::function<void(std::string partial)> on_partial_stt;
 };
 
 class AudioPipeline {
@@ -106,6 +107,7 @@ private:
 
     int m_silence_counter = 0;
     int m_recording_frames = 0;
+    std::string m_last_partial;
 
     static constexpr int k_silence_threshold = 100;
     static constexpr int k_silence_max = 60;

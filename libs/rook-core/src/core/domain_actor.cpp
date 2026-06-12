@@ -915,6 +915,20 @@ void DomainActor::setupAudio(ports::WakewordPort& wakeword,
                 static_cast<int>(new_state)
             });
         },
+        .on_partial_stt = [this](std::string partial) {
+            auto trimmed = partial;
+            trimmed.erase(0, trimmed.find_first_not_of(" \n\r\t"));
+            trimmed.erase(trimmed.find_last_not_of(" \n\r\t") + 1);
+            if (trimmed.empty()) return;
+            auto active = m_conv->active();
+            if (!active) return;
+            m_inbox->push(domain::ActorLiveUtterance{
+                .chat_id = active->id,
+                .transcript = std::move(trimmed),
+                .model = active->model,
+                .is_final = false,
+            });
+        },
     });
 }
 
