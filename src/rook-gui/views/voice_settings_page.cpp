@@ -302,7 +302,7 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
         model_row->set_subtitle(_("LLM model used for voice wake-word queries"));
         model_row->set_activatable(true);
 
-        RefPtr<Gtk::StringList> model_strings = Gtk::StringList::create({nullptr});
+        RefPtr<Gtk::StringList> model_strings = Gtk::StringList::create({});
         std::vector<std::string> model_ids;
 
         auto providers = m_llm->listProviders();
@@ -331,7 +331,7 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
 
         model_row->set_model(model_strings);
 
-        std::string saved_model = "default";
+        std::string saved_model;
         auto* gs2 = g_settings_new("io.github.fleischerdesign.Rook");
         char* saved = g_settings_get_string(gs2, "voice-model");
         if (saved && saved[0]) saved_model = saved;
