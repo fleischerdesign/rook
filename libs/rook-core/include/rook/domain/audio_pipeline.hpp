@@ -110,7 +110,7 @@ private:
     std::string m_last_partial;
 
     static constexpr int k_silence_threshold = 100;
-    static constexpr int k_silence_max = 60;
+    static constexpr int k_silence_max = 180;
     static constexpr int k_live_silence_max = 100;
     static constexpr int k_max_recording_frames = 750;
 };

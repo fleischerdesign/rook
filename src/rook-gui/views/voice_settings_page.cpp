@@ -183,6 +183,22 @@ void VoiceSettingsPage::rebuildEngineStatus()
         addEngineRow(list, _("Wake Word"), false, _("No engine loaded"), {});
     }
 
+    if (m_wakeword) {
+        auto* ww = m_wakeword;
+        auto* oww = dynamic_cast<SherpaWakewordAdapter*>(ww);
+        bool has_kws = oww && oww->hasKws();
+        addEngineRow(list, "Keyword Spotter (KWS)", has_kws,
+            has_kws ? _("Ready — 'HEY ROOK' keyword active")
+                    : _("Not installed"),
+            has_kws ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
+                    : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
+                          [ww](VoiceProgressFn p, VoiceDoneFn d) {
+                              auto* oww =
+                                  dynamic_cast<SherpaWakewordAdapter*>(ww);
+                              if (oww) oww->downloadKwsModel(p, d);
+                          }});
+    }
+
     if (m_stt) {
         auto ready = m_stt->isReady();
         auto* stt = m_stt;
@@ -369,6 +385,22 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
                           }});
     } else {
         addEngineRow(*engine_list, _("Wake Word"), false, _("No engine loaded"), {});
+    }
+
+    if (m_wakeword) {
+        auto* ww = m_wakeword;
+        auto* oww = dynamic_cast<SherpaWakewordAdapter*>(ww);
+        bool has_kws = oww && oww->hasKws();
+        addEngineRow(*engine_list, "Keyword Spotter (KWS)", has_kws,
+            has_kws ? _("Ready — 'HEY ROOK' keyword active")
+                    : _("Not installed"),
+            has_kws ? std::function<void(VoiceProgressFn, VoiceDoneFn)>{}
+                    : std::function<void(VoiceProgressFn, VoiceDoneFn)>{
+                          [ww](VoiceProgressFn p, VoiceDoneFn d) {
+                              auto* oww =
+                                  dynamic_cast<SherpaWakewordAdapter*>(ww);
+                              if (oww) oww->downloadKwsModel(p, d);
+                          }});
     }
 
     if (m_stt) {

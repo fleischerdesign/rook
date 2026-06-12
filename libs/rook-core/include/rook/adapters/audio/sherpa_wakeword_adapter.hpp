@@ -20,6 +20,8 @@ public:
     bool needsKey() const override { return false; }
     std::size_t frameSize() const override { return 512; }
 
+    bool hasKws() const;
+
     bool processFrame(const int16_t* pcm) override;
     void reset() override;
     void setSensitivity(float value) override;
@@ -29,6 +31,10 @@ public:
     using ProgressFn = std::function<void(float progress)>;
     using DoneFn = std::function<void(bool success)>;
     void downloadModel(ProgressFn on_progress, DoneFn on_done);
+
+    static std::string defaultKwsModelDir();
+    static std::string defaultKwsModelUrl();
+    void downloadKwsModel(ProgressFn on_progress, DoneFn on_done);
 
 private:
     struct Impl;
