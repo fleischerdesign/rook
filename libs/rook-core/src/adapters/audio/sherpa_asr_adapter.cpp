@@ -36,28 +36,34 @@ struct RegistryEntry {
     std::string display_name;
     std::string archive_url;
     bool supports_language;
+    bool online_capable;
     int64_t size_mb;
 };
 
 const std::vector<RegistryEntry> k_registry = {
     {AsrBackend::Whisper, "tiny", "Whisper Tiny (116 MB, schnell)",
      "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.tar.bz2",
-     true, 116},
+     true, false, 116},
     {AsrBackend::Whisper, "base", "Whisper Base (208 MB)",
      "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-base.tar.bz2",
-     true, 208},
+     true, false, 208},
     {AsrBackend::Whisper, "small", "Whisper Small (639 MB)",
      "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.tar.bz2",
-     true, 639},
+     true, false, 639},
     {AsrBackend::Whisper, "medium", "Whisper Medium (1.9 GB)",
      "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-medium.tar.bz2",
-     true, 1930},
+     true, false, 1930},
     {AsrBackend::Whisper, "large-v3", "Whisper Large v3 (1.1 GB)",
      "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-large-v3.tar.bz2",
-     true, 1070},
-    {AsrBackend::Transducer, "parakeet-tdt-0.6b", "Parakeet TDT 0.6B (25 Sprachen, hohe Genauigkeit)",
+     true, false, 1070},
+    {AsrBackend::Transducer, "parakeet-tdt-0.6b",
+     "Parakeet TDT 0.6B (25 Sprachen, offline)",
      "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
-     false, 600},
+     false, false, 600},
+    {AsrBackend::Transducer, "zipformer-en-20M",
+     "Zipformer EN 20M (~80 MB, online)",
+     "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2",
+     false, true, 80},
 };
 
 const RegistryEntry* lookupRegistry(AsrBackend backend, std::string_view model_id) {
@@ -223,7 +229,8 @@ void SherpaAsrAdapter::Impl::initRecognizer() {
         return;
     }
 
-    if (asr_backend == AsrBackend::Transducer) {
+    auto* entry = lookupRegistry(asr_backend, model_id);
+    if (entry && entry->online_capable) {
         SherpaOnnxOnlineRecognizerConfig online_cfg;
         std::memset(&online_cfg, 0, sizeof(online_cfg));
         online_cfg.feat_config.sample_rate = 16000;
@@ -234,7 +241,6 @@ void SherpaAsrAdapter::Impl::initRecognizer() {
         online_cfg.model_config.tokens = paths.tokens.c_str();
         online_cfg.model_config.num_threads = threads;
         online_cfg.model_config.provider = "cpu";
-        online_cfg.model_config.model_type = "nemo_transducer";
         online_cfg.decoding_method = "greedy_search";
         online_cfg.enable_endpoint = 1;
         online_cfg.rule1_min_trailing_silence = 1.5f;
@@ -248,7 +254,7 @@ void SherpaAsrAdapter::Impl::initRecognizer() {
             SPDLOG_INFO("SherpaAsrAdapter: online recognizer ready");
         } else {
             SPDLOG_WARN("SherpaAsrAdapter: failed to create online "
-                        "recognizer for transducer");
+                        "recognizer");
         }
     }
 
@@ -436,8 +442,10 @@ void SherpaAsrAdapter::setBackend(std::string_view backend) {
     auto b = parseBackend(backend);
     const RegistryEntry* best = nullptr;
     for (auto& e : k_registry) {
-        if (e.backend == b && (!best || e.size_mb < best->size_mb))
+        if (e.backend == b) {
             best = &e;
+            break;
+        }
     }
     if (best) {
         gs = g_settings_new("io.github.fleischerdesign.Rook");
