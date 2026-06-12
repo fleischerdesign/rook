@@ -44,7 +44,11 @@ struct SherpaWakewordAdapter::Impl {
     int cooldown = 0;
 
     static float vadThreshold(float sensitivity) {
-        return 0.7f - sensitivity * 0.4f;
+        return 0.3f + sensitivity * 0.4f;
+    }
+
+    static float kwsThreshold(float sensitivity) {
+        return 0.02f + sensitivity * 0.4f;
     }
 
     void reloadVad() {
@@ -123,7 +127,7 @@ struct SherpaWakewordAdapter::Impl {
         cfg.max_active_paths = 4;
         cfg.num_trailing_blanks = 1;
         cfg.keywords_score = 1.5f;
-        cfg.keywords_threshold = 0.25f;
+        cfg.keywords_threshold = kwsThreshold(sensitivity);
         cfg.keywords_buf = k_kws_keyword_tokens;
         cfg.keywords_buf_size =
             static_cast<int32_t>(std::strlen(k_kws_keyword_tokens));
@@ -239,7 +243,7 @@ bool SherpaWakewordAdapter::processFrame(const int16_t* pcm) {
         sum += static_cast<double>(pcm[i]) * static_cast<double>(pcm[i]);
     float rms = static_cast<float>(
         std::sqrt(sum / static_cast<double>(k_frame_size)));
-    float threshold = 800.0f + (1.0f - m_impl->sensitivity) * 3000.0f;
+    float threshold = 800.0f + m_impl->sensitivity * 3000.0f;
     bool speech = rms > threshold;
 
     if (speech) {
@@ -278,12 +282,9 @@ bool SherpaWakewordAdapter::hasKws() const {
 
 void SherpaWakewordAdapter::setSensitivity(float value) {
     m_impl->sensitivity = std::clamp(value, 0.0f, 1.0f);
-    auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
-    g_settings_set_double(gs, "wakeword-sensitivity",
-                          static_cast<double>(m_impl->sensitivity));
-    g_object_unref(gs);
 
     m_impl->reloadVad();
+    m_impl->reloadKws();
 }
 
 std::string SherpaWakewordAdapter::defaultModelPath() {

@@ -1,5 +1,6 @@
 #include "application.hpp"
 #include <glib/gi18n.h>
+#include <peel/Gio/Gio.h>
 #include <gio/gio.h>
 #include <clocale>
 
@@ -32,14 +33,12 @@ int main(int argc, char* argv[]) {
     setup_schema_dir(argv[0]);
     setlocale(LC_ALL, "");
 
-    auto* settings = g_settings_new("io.github.fleischerdesign.Rook");
-    gchar* lang = g_settings_get_string(settings, "language");
+    auto settings = Gio::Settings::create("io.github.fleischerdesign.Rook");
+    auto lang = settings->get_string("language");
     if (g_strcmp0(lang, "de") == 0)
         g_setenv("LANGUAGE", "de", true);
     else
         g_setenv("LANGUAGE", "en", true);
-    g_free(lang);
-    g_object_unref(settings);
 
     g_autofree gchar *dev_localedir = find_localedir(argv[0]);
     bindtextdomain(GETTEXT_PACKAGE, dev_localedir ? dev_localedir : LOCALEDIR);

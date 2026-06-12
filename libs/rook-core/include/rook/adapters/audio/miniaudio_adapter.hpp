@@ -31,6 +31,10 @@ public:
     bool isPlaybackActive() const override;
     bool isPlaybackDrained() const override;
 
+    void setCaptureVolume(float factor) override;
+    float captureVolume() const override;
+    float level() const override;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> m_impl;

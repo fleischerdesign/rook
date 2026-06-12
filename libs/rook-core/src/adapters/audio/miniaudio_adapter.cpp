@@ -100,10 +100,39 @@ struct MiniaudioAdapter::Impl {
     std::mutex playback_cv_mtx;
     std::condition_variable playback_cv;
 
+    std::atomic<float> capture_gain{1.0f};
+    std::atomic<float> m_level{-100.0f};
+
     static void onCapture(ma_device* device, void*, const void* input, ma_uint32 frame_count) {
         auto* self = static_cast<Impl*>(device->pUserData);
-        if (self->capture_cb)
-            self->capture_cb(static_cast<const int16_t*>(input), frame_count);
+        if (!self->capture_cb) return;
+
+        auto* src = static_cast<const int16_t*>(input);
+        std::vector<int16_t> buf(frame_count);
+
+        float gain = self->capture_gain.load(std::memory_order_relaxed);
+
+        double sum_sq = 0.0;
+        for (ma_uint32 i = 0; i < frame_count; ++i) {
+            int32_t amplified = static_cast<int32_t>(src[i]) *
+                (gain == 1.0f ? 1.0f : gain);
+            int16_t clamped = static_cast<int16_t>(
+                std::clamp(amplified,
+                           static_cast<int32_t>(INT16_MIN),
+                           static_cast<int32_t>(INT16_MAX)));
+            buf[i] = clamped;
+            double s = static_cast<double>(clamped);
+            sum_sq += s * s;
+        }
+
+        float rms = static_cast<float>(
+            std::sqrt(sum_sq / static_cast<double>(frame_count)));
+        float dbfs = (rms > 0.0f)
+            ? 20.0f * std::log10(rms / 32768.0f)
+            : -100.0f;
+        self->m_level.store(dbfs, std::memory_order_relaxed);
+
+        self->capture_cb(buf.data(), frame_count);
     }
 
     static void onPlayback(ma_device* device, void* output, const void*, ma_uint32 frame_count) {
@@ -393,6 +422,19 @@ bool MiniaudioAdapter::isPlaybackDrained() const {
     if (!m_impl->playback_open) return true;
     return m_impl->m_producer_done.load(std::memory_order_acquire) &&
            m_impl->playback_buffer.available() == 0;
+}
+
+void MiniaudioAdapter::setCaptureVolume(float factor) {
+    m_impl->capture_gain.store(std::clamp(factor, 0.5f, 3.0f),
+                               std::memory_order_relaxed);
+}
+
+float MiniaudioAdapter::captureVolume() const {
+    return m_impl->capture_gain.load(std::memory_order_relaxed);
+}
+
+float MiniaudioAdapter::level() const {
+    return m_impl->m_level.load(std::memory_order_relaxed);
 }
 
 } // namespace rook::adapters::audio

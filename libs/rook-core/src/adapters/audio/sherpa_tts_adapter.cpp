@@ -182,13 +182,11 @@ void SherpaTtsAdapter::speak(std::string_view text,
 
     auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
     float speed = static_cast<float>(g_settings_get_double(gs, "tts-speed"));
-    float noise_scale = static_cast<float>(
-        g_settings_get_double(gs, "tts-noise-scale"));
     g_object_unref(gs);
 
     m_impl->speech_thread = std::thread([this,
                                           text = std::move(clean_text),
-                                          tts, speed, noise_scale]() {
+                                          tts, speed]() {
         SherpaOnnxGenerationConfig gen_cfg;
         std::memset(&gen_cfg, 0, sizeof(gen_cfg));
         gen_cfg.sid = 0;

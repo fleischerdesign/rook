@@ -16,10 +16,10 @@ namespace rook::test {
 class MockAudioDevicePort final : public rook::ports::AudioDevicePort {
 public:
     std::vector<ports::DeviceInfo> enumerateInputs() const override {
-        return {{"default", "Mock Mic", true}};
+        return {{"default", "Mock Mic", {}, true}};
     }
     std::vector<ports::DeviceInfo> enumerateOutputs() const override {
-        return {{"default", "Mock Speaker", true}};
+        return {{"default", "Mock Speaker", {}, true}};
     }
 
     bool startCapture(std::string_view device_id,
@@ -44,6 +44,7 @@ public:
     bool startPlayback(std::string_view device_id, int sample_rate) override {
         (void)device_id; (void)sample_rate;
         m_playback_active.store(true);
+        m_playback_drained.store(false);
         m_playback_start_count++;
         return true;
     }
@@ -59,8 +60,28 @@ public:
         m_playback_stop_count++;
     }
 
+    bool isPlaybackDrained() const override {
+        return m_playback_drained.load();
+    }
+
+    void finishPlayback() override {
+        m_playback_drained.store(true);
+    }
+
     bool isPlaybackActive() const override {
         return m_playback_active.load();
+    }
+
+    void setCaptureVolume(float factor) override {
+        m_capture_volume.store(factor);
+    }
+
+    float captureVolume() const override {
+        return m_capture_volume.load();
+    }
+
+    float level() const override {
+        return m_level.load();
     }
 
     void pushAudio(const int16_t* pcm, std::size_t count) {
@@ -73,6 +94,9 @@ public:
     std::atomic<int> m_playback_start_count{0};
     std::atomic<int> m_playback_stop_count{0};
     std::atomic<std::size_t> m_playback_samples_written{0};
+    std::atomic<float> m_capture_volume{1.0f};
+    std::atomic<float> m_level{-60.0f};
+    std::atomic<bool> m_playback_drained{false};
 
 private:
     ports::AudioCaptureCallback m_capture_callback;

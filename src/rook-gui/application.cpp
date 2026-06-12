@@ -187,31 +187,33 @@ inline void RookApplication::init(Class *)
     if (m_tts->isReady())
         SPDLOG_INFO("TTS engine ready: {}", m_tts->engineName());
 
-    auto* voice_settings = g_settings_new("io.github.fleischerdesign.Rook");
+    auto voice_settings = Gio::Settings::create("io.github.fleischerdesign.Rook");
+    auto* vs = reinterpret_cast<::GSettings*>(
+        static_cast<peel::Gio::Settings*>(voice_settings));
 
     {
-        char* vm = g_settings_get_string(voice_settings, "voice-model");
-        m_actor->setVoiceModel(vm && vm[0] ? vm : "");
-        g_free(vm);
+        auto vm = voice_settings->get_string("voice-model");
+        m_actor->setVoiceModel(vm ? vm.c_str() : "");
     }
 
-    g_signal_connect(voice_settings, "changed::voice-model",
-        G_CALLBACK(+[](GSettings* s, const gchar*, gpointer data) {
+    g_signal_connect(vs, "changed::voice-model",
+        G_CALLBACK(+[](::GSettings* s, const gchar*, gpointer data) {
             auto* actor = static_cast<rook::core::DomainActor*>(data);
-            char* vm = g_settings_get_string(s, "voice-model");
-            actor->setVoiceModel(vm && vm[0] ? vm : "");
-            g_free(vm);
+            auto* ps = reinterpret_cast<peel::Gio::Settings*>(s);
+            auto vm = ps->get_string("voice-model");
+            actor->setVoiceModel(vm ? vm.c_str() : "");
         }), m_actor.get());
 
-    if (g_settings_get_boolean(voice_settings, "wake-word-enabled")) {
+    if (voice_settings->get_boolean("wake-word-enabled")) {
         m_actor->enableVoice();
         m_actor->unmuteVoice();
     }
 
-    g_signal_connect(voice_settings, "changed::wake-word-enabled",
-        G_CALLBACK(+[](GSettings* s, const gchar*, gpointer data) {
+    g_signal_connect(vs, "changed::wake-word-enabled",
+        G_CALLBACK(+[](::GSettings* s, const gchar*, gpointer data) {
             auto* actor = static_cast<rook::core::DomainActor*>(data);
-            if (g_settings_get_boolean(s, "wake-word-enabled")) {
+            auto* ps = reinterpret_cast<peel::Gio::Settings*>(s);
+            if (ps->get_boolean("wake-word-enabled")) {
                 actor->enableVoice();
                 actor->unmuteVoice();
             } else {
@@ -219,8 +221,24 @@ inline void RookApplication::init(Class *)
             }
         }), m_actor.get());
 
-    g_signal_connect(voice_settings, "changed::microphone-device",
-        G_CALLBACK(+[](GSettings*, const gchar*, gpointer data) {
+    g_signal_connect(vs, "changed::wakeword-sensitivity",
+        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer data) {
+            auto* ww = static_cast<rook::ports::WakewordPort*>(data);
+            auto gs = Gio::Settings::create("io.github.fleischerdesign.Rook");
+            ww->setSensitivity(static_cast<float>(
+                gs->get_double("wakeword-sensitivity")));
+        }), m_wakeword.get());
+
+    g_signal_connect(vs, "changed::mic-gain",
+        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer data) {
+            auto* ad = static_cast<rook::ports::AudioDevicePort*>(data);
+            auto gs = Gio::Settings::create("io.github.fleischerdesign.Rook");
+            ad->setCaptureVolume(static_cast<float>(
+                gs->get_double("mic-gain")));
+        }), m_audio_device.get());
+
+    g_signal_connect(vs, "changed::microphone-device",
+        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer data) {
             auto* actor = static_cast<rook::core::DomainActor*>(data);
             if (actor->isVoiceEnabled()) {
                 bool was_unmuted = !actor->isVoiceMuted();
@@ -230,32 +248,28 @@ inline void RookApplication::init(Class *)
             }
         }), m_actor.get());
 
-    g_signal_connect(voice_settings, "changed::speaker-device",
-        G_CALLBACK(+[](GSettings*, const gchar*, gpointer) {}), m_actor.get());
+    g_signal_connect(vs, "changed::speaker-device",
+        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer) {}), m_actor.get());
 
     auto* asr_ptr = dynamic_cast<rook::adapters::audio::SherpaAsrAdapter*>(m_stt.get());
-    g_signal_connect(voice_settings, "changed::asr-backend",
-        G_CALLBACK(+[](GSettings*, const gchar*, gpointer data) {
+    g_signal_connect(vs, "changed::asr-backend",
+        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer data) {
             auto* aa = static_cast<rook::adapters::audio::SherpaAsrAdapter*>(data);
-            auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
-            char* backend = g_settings_get_string(gs, "asr-backend");
-            aa->setBackend(backend);
-            g_free(backend);
-            g_object_unref(gs);
+            auto gs = Gio::Settings::create("io.github.fleischerdesign.Rook");
+            auto backend = gs->get_string("asr-backend");
+            aa->setBackend(std::string(backend.c_str()));
         }), asr_ptr);
-    g_signal_connect(voice_settings, "changed::asr-model",
-        G_CALLBACK(+[](GSettings*, const gchar*, gpointer data) {
+    g_signal_connect(vs, "changed::asr-model",
+        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer data) {
             auto* aa = static_cast<rook::adapters::audio::SherpaAsrAdapter*>(data);
             aa->setModel(aa->defaultModelPath());
         }), asr_ptr);
-    g_signal_connect(voice_settings, "changed::asr-language",
-        G_CALLBACK(+[](GSettings*, const gchar*, gpointer data) {
+    g_signal_connect(vs, "changed::asr-language",
+        G_CALLBACK(+[](::GSettings*, const gchar*, gpointer data) {
             auto* aa = static_cast<rook::adapters::audio::SherpaAsrAdapter*>(data);
-            auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
-            char* lang = g_settings_get_string(gs, "asr-language");
-            aa->setLanguage(lang);
-            g_free(lang);
-            g_object_unref(gs);
+            auto gs = Gio::Settings::create("io.github.fleischerdesign.Rook");
+            auto lang = gs->get_string("asr-language");
+            aa->setLanguage(std::string(lang.c_str()));
         }), asr_ptr);
 
     auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);

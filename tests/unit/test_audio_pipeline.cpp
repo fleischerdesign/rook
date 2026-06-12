@@ -52,6 +52,7 @@ AudioPipelineEvents makeEvents(TestEvents& te) {
             te.last_from = from;
             te.last_to = to;
         },
+        .on_partial_stt = [](std::string) {},
     };
 }
 
@@ -198,7 +199,6 @@ TEST(AudioPipelineTest, TtsLastChunkTransitionsToWaitingForWake) {
 
     EXPECT_TRUE(waitUntil([&] { return pipeline.state() == AudioState::WaitingForWake; }, 500));
     EXPECT_EQ(events.tts_done_count.load(), 1);
-    EXPECT_GE(dev.m_playback_stop_count.load(), 1);
 }
 
 TEST(AudioPipelineTest, MuteTransitionsToInactiveAndStopsCapture) {

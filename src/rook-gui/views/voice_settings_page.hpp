@@ -45,6 +45,7 @@ private:
     peel::Gtk::ListBox* m_engine_list_raw = nullptr;
     std::vector<std::string> m_voice_model_ids;
     ChangeFn m_on_changed;
+    guint m_level_timer_id = 0;
 
     void addEngineRow(peel::Gtk::ListBox &list,
                       std::string_view name,

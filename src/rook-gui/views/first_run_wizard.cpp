@@ -2,6 +2,7 @@
 #include "first_run_wizard.hpp"
 #include "rook/ports/llm_port.hpp"
 #include <peel/Adw/Adw.h>
+#include <peel/Gio/Gio.h>
 #include <gio/gio.h>
 #include <adwaita.h>
 
@@ -108,8 +109,10 @@ inline void FirstRunWizard::init(Class *)
         voice_switch->set_title(_("Enable Voice Control"));
         voice_switch->set_subtitle(_("Microphone access required"));
 
-        auto settings = g_settings_new("io.github.fleischerdesign.Rook");
-        gboolean enabled = g_settings_get_boolean(settings, "wake-word-enabled");
+        auto settings = Gio::Settings::create("io.github.fleischerdesign.Rook");
+        auto* raw_settings = reinterpret_cast<::GSettings*>(
+            static_cast<peel::Gio::Settings*>(settings));
+        bool enabled = settings->get_boolean("wake-word-enabled");
         adw_switch_row_set_active(
             reinterpret_cast<::AdwSwitchRow*>(static_cast<peel::Adw::SwitchRow*>(voice_switch)),
             enabled);
@@ -118,11 +121,11 @@ inline void FirstRunWizard::init(Class *)
             reinterpret_cast<::AdwSwitchRow*>(static_cast<peel::Adw::SwitchRow*>(voice_switch)),
             "notify::active",
             G_CALLBACK(+[](::AdwSwitchRow* sw, GParamSpec*, gpointer data) {
-                auto* s = static_cast<GSettings*>(data);
-                g_settings_set_boolean(s, "wake-word-enabled",
+                auto* s = reinterpret_cast<peel::Gio::Settings*>(data);
+                s->set_boolean("wake-word-enabled",
                     adw_switch_row_get_active(sw));
-                g_settings_sync();
-            }), settings);
+                s->sync();
+            }), raw_settings);
 
         box->append(std::move(voice_switch).release_floating_ptr());
     }

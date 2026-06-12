@@ -1,6 +1,7 @@
 #include <glib/gi18n.h>
 #include "voice_settings_page.hpp"
 #include <peel/Adw/Adw.h>
+#include <peel/Gio/Gio.h>
 #include <gtk/gtk.h>
 #include <gio/gio.h>
 #include <spdlog/spdlog.h>
@@ -21,7 +22,7 @@ using rook::adapters::audio::SherpaTtsAdapter;
 using rook::adapters::audio::SherpaWakewordAdapter;
 
 struct DeviceData {
-    GSettings* settings;
+    peel::Gio::Settings* settings;
     std::vector<rook::ports::DeviceInfo> devices;
 };
 
@@ -45,6 +46,8 @@ std::unique_ptr<VoiceSettingsPage> VoiceSettingsPage::create(
 
 VoiceSettingsPage::~VoiceSettingsPage()
 {
+    if (m_level_timer_id)
+        g_source_remove(m_level_timer_id);
     if (m_engine_list_raw)
         g_object_unref(reinterpret_cast<::GObject*>(m_engine_list_raw));
 }
@@ -247,7 +250,9 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     desc->set_margin_bottom(4);
     group.add(std::move(desc).release_floating_ptr());
 
-    GSettings* settings = g_settings_new("io.github.fleischerdesign.Rook");
+    auto settings = Gio::Settings::create("io.github.fleischerdesign.Rook");
+    auto* settings_raw = reinterpret_cast<::GSettings*>(
+        static_cast<peel::Gio::Settings*>(settings));
 
     addSectionHeading(group, _("Wake Word"), 8);
 
@@ -261,14 +266,14 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     auto* raw_switch = reinterpret_cast<::AdwSwitchRow*>(
         static_cast<peel::Adw::SwitchRow*>(voice_switch));
     adw_switch_row_set_active(raw_switch,
-        g_settings_get_boolean(settings, "wake-word-enabled"));
+        settings->get_boolean("wake-word-enabled"));
     g_signal_connect(raw_switch, "notify::active",
         G_CALLBACK(+[](::AdwSwitchRow* sw, GParamSpec*, gpointer data) {
-            auto* s = static_cast<GSettings*>(data);
-            g_settings_set_boolean(s, "wake-word-enabled",
+            auto* s = reinterpret_cast<peel::Gio::Settings*>(data);
+            s->set_boolean( "wake-word-enabled",
                 adw_switch_row_get_active(sw));
-            g_settings_sync();
-        }), settings);
+            s->sync();
+        }), settings_raw);
     wake_list->append(std::move(voice_switch).release_floating_ptr());
 
     auto sens_row = Adw::SpinRow::create_with_range(0.0, 1.0, 0.05);
@@ -278,14 +283,14 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     auto* raw_sens = reinterpret_cast<::AdwSpinRow*>(
         static_cast<peel::Adw::SpinRow*>(sens_row));
     adw_spin_row_set_value(raw_sens,
-        g_settings_get_double(settings, "wakeword-sensitivity"));
+        settings->get_double("wakeword-sensitivity"));
     g_signal_connect(raw_sens, "notify::value",
         G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
-            auto* s = static_cast<GSettings*>(data);
-            g_settings_set_double(s, "wakeword-sensitivity",
+            auto* s = reinterpret_cast<peel::Gio::Settings*>(data);
+            s->set_double("wakeword-sensitivity",
                                   adw_spin_row_get_value(row));
-            g_settings_sync();
-        }), settings);
+            s->sync();
+        }), settings_raw);
     wake_list->append(std::move(sens_row).release_floating_ptr());
 
     group.add(std::move(wake_list).release_floating_ptr());
@@ -333,10 +338,9 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
         model_row->set_model(model_strings);
 
         std::string saved_model;
-        auto* gs2 = g_settings_new("io.github.fleischerdesign.Rook");
-        char* saved = g_settings_get_string(gs2, "voice-model");
-        if (saved && saved[0]) saved_model = saved;
-        g_free(saved);
+        auto gs2 = Gio::Settings::create("io.github.fleischerdesign.Rook");
+        auto saved = gs2->get_string("voice-model");
+        if (saved) saved_model = saved.c_str();
 
         unsigned sel = 0;
         for (unsigned i = 0; i < model_ids.size(); ++i) {
@@ -351,10 +355,9 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
                 auto* ids = static_cast<std::vector<std::string>*>(data);
                 guint sel2 = adw_combo_row_get_selected(row);
                 if (sel2 < ids->size()) {
-                    auto* gs3 = g_settings_new("io.github.fleischerdesign.Rook");
-                    g_settings_set_string(gs3, "voice-model", (*ids)[sel2].c_str());
-                    g_object_unref(gs3);
-                    g_settings_sync();
+                    auto gs3 = Gio::Settings::create("io.github.fleischerdesign.Rook");
+                    gs3->set_string("voice-model", (*ids)[sel2].c_str());
+                    gs3->sync();
                 }
             }), &model_ids);
 
@@ -449,37 +452,35 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     auto backend_row = Adw::ComboRow::create();
     backend_row->set_title(_("ASR Backend"));
     backend_row->set_subtitle(_("Speech recognition engine"));
-    char* saved_backend = g_settings_get_string(settings, "asr-backend");
+    auto saved_backend = settings->get_string("asr-backend");
     int backend_idx = 0;
     {
         auto backends = asr ? asr->availableBackends()
                             : std::vector<std::string>{"whisper"};
         auto model = Gtk::StringList::create({nullptr});
         for (size_t i = 0; i < backends.size(); ++i) {
-            if (saved_backend && backends[i] == saved_backend)
+            if (saved_backend && backends[i] == saved_backend.c_str())
                 backend_idx = static_cast<int>(i);
             model->append(backends[i].c_str());
         }
         backend_row->set_model(model);
     }
-    g_free(saved_backend);
     backend_row->set_selected(static_cast<unsigned>(backend_idx));
     auto* raw_backend = reinterpret_cast<::AdwComboRow*>(
         static_cast<peel::Adw::ComboRow*>(backend_row));
     g_signal_connect(raw_backend, "notify::selected",
         G_CALLBACK(+[](::AdwComboRow* row, GParamSpec*, gpointer data) {
             auto* self = static_cast<VoiceSettingsPage*>(data);
-            auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
+            auto gs = Gio::Settings::create("io.github.fleischerdesign.Rook");
             guint sel = adw_combo_row_get_selected(row);
             auto* aa = dynamic_cast<SherpaAsrAdapter*>(self->m_stt);
             auto backends = aa ? aa->availableBackends()
                                : std::vector<std::string>{"whisper"};
             if (sel < backends.size()) {
-                g_settings_set_string(gs, "asr-backend",
+                gs->set_string("asr-backend",
                                       backends[sel].c_str());
             }
-            g_object_unref(gs);
-            g_settings_sync();
+            gs->sync();
             self->rebuildEngineStatus();
             if (self->m_on_changed) self->m_on_changed();
         }), this);
@@ -488,44 +489,38 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     auto model_row = Adw::ComboRow::create();
     model_row->set_title(_("ASR Model"));
     model_row->set_subtitle(_("Smaller = faster, larger = more accurate"));
-    char* saved_model = g_settings_get_string(settings, "asr-model");
-    char* current_backend = g_settings_get_string(settings, "asr-backend");
-    std::string cb = current_backend && current_backend[0]
-                         ? current_backend : "whisper";
-    g_free(current_backend);
+    auto saved_model = settings->get_string("asr-model");
+    auto current_backend = settings->get_string("asr-backend");
+    std::string cb = current_backend ? current_backend.c_str() : "whisper";
     int model_idx = 0;
     {
         auto models = asr ? asr->modelsForBackend(cb)
                           : std::vector<SherpaAsrAdapter::ModelInfo>{};
         auto model = Gtk::StringList::create({nullptr});
         for (size_t i = 0; i < models.size(); ++i) {
-            if (saved_model && models[i].id == saved_model)
+            if (saved_model && models[i].id == saved_model.c_str())
                 model_idx = static_cast<int>(i);
             model->append(models[i].name.c_str());
         }
         model_row->set_model(model);
     }
-    g_free(saved_model);
     model_row->set_selected(static_cast<unsigned>(model_idx));
     auto* raw_model = reinterpret_cast<::AdwComboRow*>(
         static_cast<peel::Adw::ComboRow*>(model_row));
     g_signal_connect(raw_model, "notify::selected",
         G_CALLBACK(+[](::AdwComboRow* row, GParamSpec*, gpointer data) {
             auto* self = static_cast<VoiceSettingsPage*>(data);
-            auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
+            auto gs = Gio::Settings::create("io.github.fleischerdesign.Rook");
             auto* aa = dynamic_cast<SherpaAsrAdapter*>(self->m_stt);
-            char* backend_str = g_settings_get_string(gs, "asr-backend");
-            std::string be = backend_str && backend_str[0]
-                                 ? backend_str : "whisper";
-            g_free(backend_str);
+            auto backend_str = gs->get_string("asr-backend");
+            std::string be = backend_str ? backend_str.c_str() : "whisper";
             auto models = aa ? aa->modelsForBackend(be)
                              : std::vector<SherpaAsrAdapter::ModelInfo>{};
             guint sel = adw_combo_row_get_selected(row);
             if (sel < models.size())
-                g_settings_set_string(gs, "asr-model",
+                gs->set_string("asr-model",
                                       models[sel].id.c_str());
-            g_object_unref(gs);
-            g_settings_sync();
+            gs->sync();
             self->rebuildEngineStatus();
             if (self->m_on_changed) self->m_on_changed();
         }), this);
@@ -540,13 +535,12 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
         reinterpret_cast<::AdwComboRow*>(static_cast<peel::Adw::ComboRow*>(lang_row)),
         G_LIST_MODEL(reinterpret_cast<::GtkStringList*>(
             static_cast<Gtk::StringList*>(lang_model))));
-    char* saved_lang = g_settings_get_string(settings, "asr-language");
+    auto saved_lang = settings->get_string("asr-language");
     int lang_idx = 0;
-    if (saved_lang && saved_lang[0]) {
+    if (saved_lang) {
         for (int i = 0; langs[i]; ++i)
-            if (std::string(langs[i]) == saved_lang) { lang_idx = i; break; }
+            if (std::string(langs[i]) == saved_lang.c_str()) { lang_idx = i; break; }
     }
-    g_free(saved_lang);
     lang_row->set_selected(static_cast<unsigned>(lang_idx));
     auto* raw_lang = reinterpret_cast<::AdwComboRow*>(
         static_cast<peel::Adw::ComboRow*>(lang_row));
@@ -556,10 +550,9 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
             guint sel = adw_combo_row_get_selected(row);
             const char* lv[] = {"de","en","fr","it","es","ja","zh","auto",nullptr};
             if (sel < 8) {
-                auto* gs = g_settings_new("io.github.fleischerdesign.Rook");
-                g_settings_set_string(gs, "asr-language", lv[sel]);
-                g_object_unref(gs);
-                g_settings_sync();
+                auto gs = Gio::Settings::create("io.github.fleischerdesign.Rook");
+                gs->set_string("asr-language", lv[sel]);
+                gs->sync();
             }
             self->rebuildEngineStatus();
             if (self->m_on_changed) self->m_on_changed();
@@ -573,14 +566,14 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     auto* raw_th = reinterpret_cast<::AdwSpinRow*>(
         static_cast<peel::Adw::SpinRow*>(thread_row));
     adw_spin_row_set_value(raw_th,
-        static_cast<double>(g_settings_get_int(settings, "asr-threads")));
+        static_cast<double>(settings->get_int("asr-threads")));
     g_signal_connect(raw_th, "notify::value",
         G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
-            auto* s = static_cast<GSettings*>(data);
-            g_settings_set_int(s, "asr-threads",
+            auto* s = reinterpret_cast<peel::Gio::Settings*>(data);
+            s->set_int( "asr-threads",
                 static_cast<int>(adw_spin_row_get_value(row)));
-            g_settings_sync();
-        }), settings);
+            s->sync();
+        }), settings_raw);
     asr_list->append(std::move(thread_row).release_floating_ptr());
 
     group.add(std::move(asr_list).release_floating_ptr());
@@ -598,14 +591,14 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     auto* raw_sp = reinterpret_cast<::AdwSpinRow*>(
         static_cast<peel::Adw::SpinRow*>(speed_row));
     adw_spin_row_set_value(raw_sp,
-        g_settings_get_double(settings, "tts-speed"));
+        settings->get_double("tts-speed"));
     g_signal_connect(raw_sp, "notify::value",
         G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
-            auto* s = static_cast<GSettings*>(data);
-            g_settings_set_double(s, "tts-speed",
+            auto* s = reinterpret_cast<peel::Gio::Settings*>(data);
+            s->set_double( "tts-speed",
                                   adw_spin_row_get_value(row));
-            g_settings_sync();
-        }), settings);
+            s->sync();
+        }), settings_raw);
     tts_list->append(std::move(speed_row).release_floating_ptr());
 
     auto noise_row = Adw::SpinRow::create_with_range(0.0, 1.0, 0.05);
@@ -615,14 +608,14 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     auto* raw_nz = reinterpret_cast<::AdwSpinRow*>(
         static_cast<peel::Adw::SpinRow*>(noise_row));
     adw_spin_row_set_value(raw_nz,
-        g_settings_get_double(settings, "tts-noise-scale"));
+        settings->get_double("tts-noise-scale"));
     g_signal_connect(raw_nz, "notify::value",
         G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
-            auto* s = static_cast<GSettings*>(data);
-            g_settings_set_double(s, "tts-noise-scale",
+            auto* s = reinterpret_cast<peel::Gio::Settings*>(data);
+            s->set_double( "tts-noise-scale",
                                   adw_spin_row_get_value(row));
-            g_settings_sync();
-        }), settings);
+            s->sync();
+        }), settings_raw);
     tts_list->append(std::move(noise_row).release_floating_ptr());
 
     group.add(std::move(tts_list).release_floating_ptr());
@@ -633,6 +626,62 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     capture_list->add_css_class("boxed-list");
     capture_list->set_selection_mode(Gtk::SelectionMode::NONE);
 
+    auto level_row = Adw::ActionRow::create();
+    level_row->set_title(_("Input Level"));
+
+    auto level_bar = Gtk::LevelBar::create();
+    auto level_label = Gtk::Label::create("-60 dB");
+    auto level_box = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 8);
+
+    auto* raw_bar = reinterpret_cast<::GtkLevelBar*>(
+        static_cast<peel::Gtk::LevelBar*>(level_bar));
+    auto* raw_label = reinterpret_cast<::GtkLabel*>(
+        static_cast<peel::Gtk::Label*>(level_label));
+
+    level_bar->set_min_value(0.0);
+    level_bar->set_max_value(1.0);
+    level_bar->set_valign(Gtk::Align::CENTER);
+    level_bar->set_hexpand(true);
+
+    level_label->set_width_chars(6);
+    level_label->set_xalign(1.0f);
+
+    level_box->append(std::move(level_bar).release_floating_ptr());
+    level_box->append(std::move(level_label).release_floating_ptr());
+
+    level_row->add_suffix(
+        reinterpret_cast<peel::Gtk::Widget*>(
+            static_cast<peel::Gtk::Box*>(level_box)));
+    capture_list->append(std::move(level_row).release_floating_ptr());
+
+    m_level_timer_id = GLib::timeout_add(50,
+        [device = m_audio_device, raw_bar, raw_label]() -> bool {
+            float dbfs = device->level();
+            float fraction = std::clamp((dbfs + 60.0f) / 60.0f, 0.0f, 1.0f);
+            gtk_level_bar_set_value(raw_bar, fraction);
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%.0f dB", dbfs);
+            gtk_label_set_text(raw_label, buf);
+            return true;
+        });
+
+    auto gain_row = Adw::SpinRow::create_with_range(0.5, 3.0, 0.1);
+    gain_row->set_title(_("Mic Gain"));
+    gain_row->set_subtitle(_("Amplify microphone input. 1.0 = no change"));
+    gain_row->set_digits(1);
+    auto* raw_gain = reinterpret_cast<::AdwSpinRow*>(
+        static_cast<peel::Adw::SpinRow*>(gain_row));
+    adw_spin_row_set_value(raw_gain,
+        settings->get_double("mic-gain"));
+    g_signal_connect(raw_gain, "notify::value",
+        G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
+            auto* s = reinterpret_cast<peel::Gio::Settings*>(data);
+            s->set_double( "mic-gain",
+                adw_spin_row_get_value(row));
+            s->sync();
+        }), settings_raw);
+    capture_list->append(std::move(gain_row).release_floating_ptr());
+
     auto sil_row = Adw::SpinRow::create_with_range(0.0, 500.0, 10.0);
     sil_row->set_title(_("Silence Threshold"));
     sil_row->set_subtitle(_("Energy below this = silence. 0 = never skip, 80 = quiet room"));
@@ -640,14 +689,14 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     auto* raw_sil = reinterpret_cast<::AdwSpinRow*>(
         static_cast<peel::Adw::SpinRow*>(sil_row));
     adw_spin_row_set_value(raw_sil,
-        g_settings_get_double(settings, "voice-silence-threshold"));
+        settings->get_double("voice-silence-threshold"));
     g_signal_connect(raw_sil, "notify::value",
         G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
-            auto* s = static_cast<GSettings*>(data);
-            g_settings_set_double(s, "voice-silence-threshold",
+            auto* s = reinterpret_cast<peel::Gio::Settings*>(data);
+            s->set_double( "voice-silence-threshold",
                 adw_spin_row_get_value(row));
-            g_settings_sync();
-        }), settings);
+            s->sync();
+        }), settings_raw);
     capture_list->append(std::move(sil_row).release_floating_ptr());
 
     auto barge_row = Adw::SpinRow::create_with_range(50.0, 5000.0, 50.0);
@@ -657,14 +706,14 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
     auto* raw_barge = reinterpret_cast<::AdwSpinRow*>(
         static_cast<peel::Adw::SpinRow*>(barge_row));
     adw_spin_row_set_value(raw_barge,
-        g_settings_get_int(settings, "voice-barge-in-threshold"));
+        settings->get_int("voice-barge-in-threshold"));
     g_signal_connect(raw_barge, "notify::value",
         G_CALLBACK(+[](::AdwSpinRow* row, GParamSpec*, gpointer data) {
-            auto* s = static_cast<GSettings*>(data);
-            g_settings_set_int(s, "voice-barge-in-threshold",
+            auto* s = reinterpret_cast<peel::Gio::Settings*>(data);
+            s->set_int( "voice-barge-in-threshold",
                 static_cast<int>(adw_spin_row_get_value(row)));
-            g_settings_sync();
-        }), settings);
+            s->sync();
+        }), settings_raw);
     capture_list->append(std::move(barge_row).release_floating_ptr());
 
     group.add(std::move(capture_list).release_floating_ptr());
@@ -700,32 +749,32 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
             G_LIST_MODEL(reinterpret_cast<::GtkStringList*>(
                 static_cast<Gtk::StringList*>(mic_model))));
 
-        char* saved_mic = g_settings_get_string(settings, "microphone-device");
-        if (saved_mic && saved_mic[0]) {
+        auto saved_mic = settings->get_string("microphone-device");
+        if (saved_mic) {
             for (std::size_t i = 0; i < inputs.size(); ++i) {
-                if (inputs[i].id == saved_mic) {
+                if (inputs[i].id == saved_mic.c_str()) {
                     mic_default_idx = static_cast<int>(i);
                     break;
                 }
             }
         }
-        g_free(saved_mic);
         mic_row->set_selected(static_cast<unsigned>(mic_default_idx));
 
         auto* raw_mic = reinterpret_cast<::AdwComboRow*>(
             static_cast<peel::Adw::ComboRow*>(mic_row));
-        auto* dd_mic = new DeviceData{settings, inputs};
+        auto* dd_mic = new DeviceData{
+            static_cast<peel::Gio::Settings*>(settings), inputs};
         g_signal_connect(raw_mic, "notify::selected",
             G_CALLBACK(+[](::AdwComboRow* row, GParamSpec*, gpointer data) {
                 auto* d = static_cast<DeviceData*>(data);
                 guint sel = adw_combo_row_get_selected(row);
                 if (sel < d->devices.size()) {
-                    g_settings_set_string(d->settings, "microphone-device",
+                    d->settings->set_string("microphone-device",
                                           d->devices[sel].id.c_str());
                 } else {
-                    g_settings_set_string(d->settings, "microphone-device", "");
+                    d->settings->set_string("microphone-device", "");
                 }
-                g_settings_sync();
+                d->settings->sync();
             }),
             dd_mic);
         (void)raw_mic;
@@ -752,32 +801,32 @@ void VoiceSettingsPage::populate(Adw::PreferencesGroup &group)
             G_LIST_MODEL(reinterpret_cast<::GtkStringList*>(
                 static_cast<Gtk::StringList*>(spk_model))));
 
-        char* saved_spk = g_settings_get_string(settings, "speaker-device");
-        if (saved_spk && saved_spk[0]) {
+        auto saved_spk = settings->get_string("speaker-device");
+        if (saved_spk) {
             for (std::size_t i = 0; i < outputs.size(); ++i) {
-                if (outputs[i].id == saved_spk) {
+                if (outputs[i].id == saved_spk.c_str()) {
                     spk_default_idx = static_cast<int>(i);
                     break;
                 }
             }
         }
-        g_free(saved_spk);
         spk_row->set_selected(static_cast<unsigned>(spk_default_idx));
 
         auto* raw_spk = reinterpret_cast<::AdwComboRow*>(
             static_cast<peel::Adw::ComboRow*>(spk_row));
-        auto* dd_spk = new DeviceData{settings, outputs};
+        auto* dd_spk = new DeviceData{
+            static_cast<peel::Gio::Settings*>(settings), outputs};
         g_signal_connect(raw_spk, "notify::selected",
             G_CALLBACK(+[](::AdwComboRow* row, GParamSpec*, gpointer data) {
                 auto* d = static_cast<DeviceData*>(data);
                 guint sel = adw_combo_row_get_selected(row);
                 if (sel < d->devices.size()) {
-                    g_settings_set_string(d->settings, "speaker-device",
+                    d->settings->set_string("speaker-device",
                                           d->devices[sel].id.c_str());
                 } else {
-                    g_settings_set_string(d->settings, "speaker-device", "");
+                    d->settings->set_string("speaker-device", "");
                 }
-                g_settings_sync();
+                d->settings->sync();
             }),
             dd_spk);
         (void)raw_spk;

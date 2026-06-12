@@ -1,24 +1,25 @@
 #include "appearance_page.hpp"
 #include <glib/gi18n.h>
 #include <gtk/gtk.h>
+#include <peel/Gio/Gio.h>
 #include <gio/gio.h>
 #include <unistd.h>
 using namespace peel;
 namespace rook::gui {
 
 struct AppearancePage::Impl {
-    GSettings *settings = nullptr;
+    peel::RefPtr<peel::Gio::Settings> settings;
 };
 
 struct LangCtx {
-    GSettings *settings;
+    peel::Gio::Settings* settings;
 };
 
 static void on_language_changed(GtkDropDown *dd, GParamSpec *, gpointer user_data) {
     auto *ctx = static_cast<LangCtx *>(user_data);
     guint sel = gtk_drop_down_get_selected(dd);
-    g_settings_set_string(ctx->settings, "language", sel == 1 ? "en" : "de");
-    g_settings_sync();
+    ctx->settings->set_string("language", sel == 1 ? "en" : "de");
+    ctx->settings->sync();
 
     auto dlg = Adw::AlertDialog::create(
         _("Restart Required"),
@@ -45,7 +46,7 @@ std::unique_ptr<AppearancePage> AppearancePage::create()
 {
     auto page = std::unique_ptr<AppearancePage>(new AppearancePage());
     page->m_impl = std::make_unique<Impl>();
-    page->m_impl->settings = g_settings_new("io.github.fleischerdesign.Rook");
+    page->m_impl->settings = Gio::Settings::create("io.github.fleischerdesign.Rook");
     return page;
 }
 
@@ -68,11 +69,11 @@ void AppearancePage::populate(peel::Adw::PreferencesGroup &group)
 
     auto *raw_dd = reinterpret_cast<::GtkDropDown*>(static_cast<Gtk::DropDown*>(dd));
 
-    gchar *current_lang = g_settings_get_string(m_impl->settings, "language");
+    auto current_lang = m_impl->settings->get_string("language");
     gtk_drop_down_set_selected(raw_dd, g_strcmp0(current_lang, "en") == 0 ? 1 : 0);
-    g_free(current_lang);
 
-    auto *ctx = new LangCtx{m_impl->settings};
+    auto *ctx = new LangCtx{static_cast<peel::Gio::Settings*>(
+        m_impl->settings)};
     g_signal_connect_data(raw_dd, "notify::selected",
         G_CALLBACK(on_language_changed), ctx,
         [](gpointer data, GClosure *) { delete static_cast<LangCtx *>(data); },

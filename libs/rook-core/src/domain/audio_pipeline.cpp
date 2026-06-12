@@ -164,6 +164,8 @@ void AudioPipeline::startListening() {
     char* mic_device = g_settings_get_string(s, "microphone-device");
     std::string device_id(mic_device ? mic_device : "");
     g_free(mic_device);
+    m_audio_device.setCaptureVolume(
+        static_cast<float>(g_settings_get_double(s, "mic-gain")));
     g_object_unref(s);
 
     bool capture_ok = m_audio_device.startCapture(device_id,

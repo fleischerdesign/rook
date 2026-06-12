@@ -91,6 +91,11 @@
       <summary>Barge-in energy threshold</summary>
       <description>RMS energy above which speech is considered a barge-in interrupt. Range 50–5000. Lower = more sensitive, 500=normal speech.</description>
     </key>
+    <key name="mic-gain" type="d">
+      <default>1.0</default>
+      <summary>Microphone gain</summary>
+      <description>Amplification factor for microphone input. 1.0 = no change, 2.0 = double, 0.5 = half. Range 0.5–3.0.</description>
+    </key>
     <key name="language" type="s">
       <default>"de"</default>
       <summary>Interface language</summary>
