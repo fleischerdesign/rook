@@ -1,39 +1,17 @@
 #pragma once
 
 #include <memory>
-#include <mutex>
-#include <deque>
-#include <condition_variable>
-#include <unordered_map>
-#include <atomic>
-#include <thread>
-#include <functional>
-#include <grpcpp/grpcpp.h>
+#include <string>
 #include "service.grpc.pb.h"
-#include "rook/core/domain_actor.hpp"
-
-namespace rook::ports {
-class StorePort;
-class ExtensionPort;
-}
-
-namespace rook::sync {
-class SyncEngine;
-}
 
 namespace rook::adapters::server {
 
-class GrpcServiceAdapter final : public rook::v1::RookService::Service {
-public:
-    GrpcServiceAdapter(
-        rook::core::DomainActor& actor,
-        rook::sync::SyncEngine& sync,
-        rook::ports::StorePort& store,
-        rook::ports::ExtensionPort* extensions
-    );
+class TenantManager;
+class GrpcServiceAdapter;
 
-    void onDomainEvent(rook::domain::DomainEvent event);
-    void shutdown();
+class TenantServiceAdapter final : public rook::v1::RookService::Service {
+public:
+    TenantServiceAdapter(TenantManager& tenants, std::string jwt_secret);
 
     grpc::Status SendMessage(
         grpc::ServerContext* context,
@@ -45,8 +23,7 @@ public:
         grpc::ServerContext* context,
         grpc::ServerReaderWriter<
             rook::v1::StreamChatResponse,
-            rook::v1::StreamChatRequest
-        >* stream
+            rook::v1::StreamChatRequest>* stream
     ) override;
 
     grpc::Status ListExtensions(
@@ -122,24 +99,12 @@ public:
     ) override;
 
 private:
-    void processStreamRequest(const rook::v1::StreamChatRequest& req);
-    void emitStreamEvent(const std::string& chat_id, rook::v1::StreamChatResponse resp);
+    GrpcServiceAdapter* ensureAdapter(const std::string& tenant_id);
+    GrpcServiceAdapter* ensureAdapterForContext(
+        grpc::ServerContext* context);
 
-    struct StreamState {
-        std::mutex mtx;
-        std::condition_variable cv;
-        std::deque<rook::v1::StreamChatResponse> pending;
-        bool closed = false;
-    };
-
-    rook::core::DomainActor& m_actor;
-    rook::sync::SyncEngine& m_sync;
-    rook::ports::StorePort& m_store;
-    rook::ports::ExtensionPort* m_extensions;
-
-    std::mutex m_mutex;
-    std::atomic<bool> m_shutdown{false};
-    std::unordered_map<std::string, std::shared_ptr<StreamState>> m_streams;
+    TenantManager& m_tenants;
+    std::string m_jwt_secret;
 };
 
 } // namespace rook::adapters::server

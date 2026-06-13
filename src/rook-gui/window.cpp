@@ -37,7 +37,8 @@ RookWindow *RookWindow::create(Gtk::Application *app,
                                 rook::ports::SpeechToTextPort* stt,
                                 rook::ports::TextToSpeechPort* tts,
                                 rook::ports::AudioDevicePort* audio_device,
-                                rook::ports::ToolPermissionPort *permission_port)
+                                rook::ports::ToolPermissionPort *permission_port,
+                                rook::core::PeerManager *peer_manager)
 {
     auto *win = Object::create<RookWindow>(prop_application(), app);
     win->m_save_fn = std::move(save_fn);
@@ -52,6 +53,7 @@ RookWindow *RookWindow::create(Gtk::Application *app,
     win->m_tts = tts;
     win->m_audio_device = audio_device;
     win->m_permission_port = permission_port;
+    win->m_peers = peer_manager;
 
     auto sidebar = ChatSidebar::create(bus, actor);
     win->m_sidebar = std::move(sidebar).release_floating_ptr();
@@ -139,7 +141,8 @@ void RookWindow::onPreferences()
     auto prefs = PreferencesWindow::create(*m_llm, m_mcp, m_security,
                                             m_extensions, m_custom_skills,
                                             m_save_fn, m_before_uninstall_fn,
-                                            m_wakeword, m_stt, m_tts, m_audio_device);
+                                            m_wakeword, m_stt, m_tts, m_audio_device,
+                                            m_peers);
     prefs->present(this);
 }
 

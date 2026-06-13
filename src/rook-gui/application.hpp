@@ -23,6 +23,10 @@
 #include "rook/ports/tool_port.hpp"
 #include "rook/adapters/hook/plugin_loader.hpp"
 
+#ifdef ROOK_HAS_GRPC
+#include "rook/core/peer_manager.hpp"
+#endif
+
 namespace rook::ports {
 class WakewordPort;
 class SpeechToTextPort;
@@ -75,6 +79,12 @@ class RookApplication final : public peel::Adw::Application
     std::map<std::string, std::vector<std::string>, std::less<>> m_ext_hook_ids;
     std::string m_plugin_dir;
     RookWindow *m_window = nullptr;
+
+#ifdef ROOK_HAS_GRPC
+    rook::core::PeerManager m_peers;
+public:
+    rook::core::PeerManager& peers() { return m_peers; }
+#endif
 
 public:
     static peel::RefPtr<RookApplication> create();

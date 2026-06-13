@@ -5,6 +5,7 @@
 #include "mcp_settings_page.hpp"
 #include "skills_page.hpp"
 #include "extension_settings_page.hpp"
+#include "server_settings_page.hpp"
 #include <glib/gi18n.h>
 
 using namespace peel;
@@ -20,6 +21,7 @@ struct PreferencesWindow::Impl {
     std::unique_ptr<ExtensionSettingsPage> extensions;
     std::unique_ptr<VoiceSettingsPage> voice;
     std::unique_ptr<AppearancePage> appearance;
+    std::unique_ptr<ServerSettingsPage> server;
 };
 
 inline void PreferencesWindow::Class::init() {}
@@ -36,7 +38,8 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
                                                         rook::ports::WakewordPort* wakeword,
                                                         rook::ports::SpeechToTextPort* stt,
                                                         rook::ports::TextToSpeechPort* tts,
-                                                        rook::ports::AudioDevicePort* audio_device)
+                                                        rook::ports::AudioDevicePort* audio_device,
+                                                        rook::core::PeerManager* peer_manager)
 {
     auto dialog = Object::create<PreferencesWindow>();
     dialog->set_title(_("Preferences"));
@@ -60,8 +63,12 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
             on_before_uninstall);
 
     dialog->m_impl->voice = VoiceSettingsPage::create(wakeword, stt, tts, audio_device, &llm,
-                                                       [on_changed] { on_changed(); });
+                                                        [on_changed] { on_changed(); });
     dialog->m_impl->appearance = AppearancePage::create();
+
+    if (peer_manager)
+        dialog->m_impl->server = ServerSettingsPage::create(
+            *peer_manager, [on_changed] { on_changed(); });
 
     auto llm_page = Adw::PreferencesPage::create();
     llm_page->set_title(_("Providers"));
@@ -115,6 +122,18 @@ FloatPtr<PreferencesWindow> PreferencesWindow::create(rook::ports::LlmPort &llm,
     dialog->m_impl->appearance->populate(*appearance_group);
     appearance_page->add(std::move(appearance_group).release_floating_ptr());
     dialog->add(std::move(appearance_page).release_floating_ptr());
+
+    if (dialog->m_impl->server) {
+        auto server_page = Adw::PreferencesPage::create();
+        server_page->set_title(_("Devices"));
+        server_page->set_icon_name("network-server-symbolic");
+        auto sync_group = Adw::PreferencesGroup::create();
+        auto peers_group = Adw::PreferencesGroup::create();
+        dialog->m_impl->server->populate(*sync_group, *peers_group);
+        server_page->add(std::move(sync_group).release_floating_ptr());
+        server_page->add(std::move(peers_group).release_floating_ptr());
+        dialog->add(std::move(server_page).release_floating_ptr());
+    }
 
     return dialog;
 }

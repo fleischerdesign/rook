@@ -19,6 +19,7 @@ rook_gui_sources = files(
   'views/voice_settings_page.cpp',
   'views/appearance_page.cpp',
   'views/first_run_wizard.cpp',
+  'views/server_settings_page.cpp',
   'views/tray_icon.cpp',
   'views/permission_banner.cpp',
 )

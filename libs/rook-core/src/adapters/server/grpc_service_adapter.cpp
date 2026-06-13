@@ -432,4 +432,31 @@ grpc::Status GrpcServiceAdapter::PullSyncState(
     return grpc::Status::OK;
 }
 
+grpc::Status GrpcServiceAdapter::CreateTenant(
+    grpc::ServerContext*,
+    const rook::v1::CreateTenantRequest*,
+    rook::v1::CreateTenantResponse*)
+{
+    return grpc::Status(grpc::StatusCode::UNIMPLEMENTED,
+        "CreateTenant requires multi-tenant mode (--jwt-secret)");
+}
+
+grpc::Status GrpcServiceAdapter::ListTenants(
+    grpc::ServerContext*,
+    const rook::v1::ListTenantsRequest*,
+    rook::v1::ListTenantsResponse*)
+{
+    return grpc::Status(grpc::StatusCode::UNIMPLEMENTED,
+        "ListTenants requires multi-tenant mode (--jwt-secret)");
+}
+
+grpc::Status GrpcServiceAdapter::DeleteTenant(
+    grpc::ServerContext*,
+    const rook::v1::DeleteTenantRequest*,
+    rook::v1::DeleteTenantResponse*)
+{
+    return grpc::Status(grpc::StatusCode::UNIMPLEMENTED,
+        "DeleteTenant requires multi-tenant mode (--jwt-secret)");
+}
+
 } // namespace rook::adapters::server

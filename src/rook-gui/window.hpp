@@ -21,7 +21,10 @@ class TextToSpeechPort;
 class AudioDevicePort;
 }
 
-namespace rook::core { class DomainActor; }
+namespace rook::core {
+class DomainActor;
+class PeerManager;
+}
 
 namespace rook::gui {
 
@@ -45,6 +48,7 @@ class RookWindow final : public peel::Adw::ApplicationWindow
     rook::ports::ExtensionPort *m_extensions = nullptr;
     std::vector<rook::adapters::extension::CustomSkill> *m_custom_skills = nullptr;
     rook::ports::ToolPermissionPort *m_permission_port = nullptr;
+    rook::core::PeerManager *m_peers = nullptr;
     rook::ports::WakewordPort* m_wakeword = nullptr;
     rook::ports::SpeechToTextPort* m_stt = nullptr;
     rook::ports::TextToSpeechPort* m_tts = nullptr;
@@ -71,8 +75,9 @@ public:
                                rook::ports::WakewordPort* wakeword = nullptr,
                                rook::ports::SpeechToTextPort* stt = nullptr,
                                rook::ports::TextToSpeechPort* tts = nullptr,
-                               rook::ports::AudioDevicePort* audio_device = nullptr,
-                               rook::ports::ToolPermissionPort *permission_port = nullptr);
+                                rook::ports::AudioDevicePort* audio_device = nullptr,
+                                rook::ports::ToolPermissionPort *permission_port = nullptr,
+                                rook::core::PeerManager *peer_manager = nullptr);
 
     void refreshModels();
 

@@ -60,8 +60,18 @@ librook_core_deps = [
 grpc_available = libgrpc_dep.found() and libprotobuf_dep.found() and protoc.found() and protoc_gen_grpc.found()
 
 if grpc_available
-  librook_core_sources += files('src/adapters/server/grpc_service_adapter.cpp')
-  librook_core_deps += [libgrpc_dep, libprotobuf_dep, proto_dep]
+  librook_core_sources += files(
+    'src/adapters/server/grpc_service_adapter.cpp',
+    'src/adapters/client/grpc_client_llm_port.cpp',
+    'src/adapters/client/grpc_client_store_port.cpp',
+    'src/adapters/client/grpc_client_extension_port.cpp',
+    'src/core/peer_manager.cpp',
+    'src/auth/jwt.cpp',
+    'src/adapters/server/tenant_manager.cpp',
+    'src/adapters/server/tenant_service_adapter.cpp',
+  )
+  librook_core_deps += [libgrpc_dep, libprotobuf_dep, proto_dep,
+    dependency('openssl')]
 endif
 
 libonnx_dep = dependency('libonnxruntime', required: false)

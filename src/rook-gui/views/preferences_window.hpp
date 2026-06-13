@@ -17,6 +17,8 @@ class TextToSpeechPort;
 class AudioDevicePort;
 }
 
+namespace rook::core { class PeerManager; }
+
 namespace rook::gui {
 
 class PreferencesWindow final : public peel::Adw::PreferencesDialog {
@@ -33,7 +35,8 @@ public:
                                                       rook::ports::WakewordPort* wakeword = nullptr,
                                                       rook::ports::SpeechToTextPort* stt = nullptr,
                                                       rook::ports::TextToSpeechPort* tts = nullptr,
-                                                      rook::ports::AudioDevicePort* audio_device = nullptr);
+                                                       rook::ports::AudioDevicePort* audio_device = nullptr,
+                                                       rook::core::PeerManager* peer_manager = nullptr);
 
 private:
     struct Impl;

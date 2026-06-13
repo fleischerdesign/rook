@@ -14,6 +14,9 @@ service RookService {
   rpc DelegateTask (DelegateTaskRequest) returns (DelegateTaskResponse);
   rpc PushSyncState (PushSyncStateRequest) returns (PushSyncStateResponse);
   rpc PullSyncState (PullSyncStateRequest) returns (PullSyncStateResponse);
+  rpc CreateTenant (CreateTenantRequest) returns (CreateTenantResponse);
+  rpc ListTenants (ListTenantsRequest) returns (ListTenantsResponse);
+  rpc DeleteTenant (DeleteTenantRequest) returns (DeleteTenantResponse);
 }
 
 message LlmMessage {
@@ -172,3 +175,20 @@ message PullSyncStateRequest {
 message PullSyncStateResponse {
   SyncState state = 1;
 }
+
+message CreateTenantRequest {
+  string tenant_id = 1;
+}
+message CreateTenantResponse {
+  string token = 1;
+}
+
+message ListTenantsRequest {}
+message ListTenantsResponse {
+  repeated string tenant_ids = 1;
+}
+
+message DeleteTenantRequest {
+  string tenant_id = 1;
+}
+message DeleteTenantResponse {}

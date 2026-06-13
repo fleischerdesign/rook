@@ -330,7 +330,13 @@ inline void RookApplication::vfunc_activate()
         [this]() { saveConfig(); },
         [this](std::string_view name) { deactivateExtensionHooks(name); },
         m_wakeword.get(), m_stt.get(), m_tts.get(), m_audio_device.get(),
-        m_permission_port.get());
+        m_permission_port.get(),
+#ifdef ROOK_HAS_GRPC
+        &m_peers
+#else
+        nullptr
+#endif
+    );
     m_window = window;
     window->present();
 
