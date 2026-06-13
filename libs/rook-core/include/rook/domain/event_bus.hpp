@@ -11,12 +11,18 @@
 #include <algorithm>
 #include <variant>
 #include "rook/domain/events.hpp"
+#include "rook/ports/telemetry_port.hpp"
 
 namespace rook::domain {
 
 class EventBus {
 public:
     using HandlerId = std::size_t;
+
+    void setTelemetry(rook::ports::TelemetryPort* telemetry)
+    {
+        m_telemetry = telemetry;
+    }
 
     template <typename T>
     HandlerId subscribe(std::function<void(const T&)> handler) {
@@ -30,6 +36,15 @@ public:
     }
 
     void publish(const DomainEvent& event) {
+        if (m_telemetry) {
+            std::visit([this](const auto& concrete) {
+                m_telemetry->startSpan(typeid(decltype(concrete)).name());
+            }, event);
+        }
+
+        if (m_telemetry)
+            m_telemetry->incrementCounter("event_bus.publish", 1);
+
         std::vector<std::function<void(const void*)>> handlers;
         {
             std::shared_lock lock(m_mutex);
@@ -48,6 +63,12 @@ public:
                 fn(&concrete);
             }
         }, event);
+
+        if (m_telemetry) {
+            std::visit([this](const auto& concrete) {
+                m_telemetry->endSpan(typeid(decltype(concrete)).name());
+            }, event);
+        }
     }
 
     void unsubscribe(HandlerId id) {
@@ -71,6 +92,7 @@ private:
         std::type_index,
         std::vector<HandlerEntry>
     > m_handlers;
+    rook::ports::TelemetryPort* m_telemetry = nullptr;
 };
 
 } // namespace rook::domain

@@ -3,6 +3,7 @@
 #include "rook/domain/events.hpp"
 #include "rook/ports/store_port.hpp"
 #include "rook/ports/extension_port.hpp"
+#include "rook/sync/sync_engine.hpp"
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
 #include <variant>
@@ -18,9 +19,11 @@ static rook::v1::StreamChatResponse makeBaseResponse(const std::string& chat_id)
 
 GrpcServiceAdapter::GrpcServiceAdapter(
     rook::core::DomainActor& actor,
+    rook::sync::SyncEngine& sync,
     rook::ports::StorePort& store,
     rook::ports::ExtensionPort* extensions)
     : m_actor(actor)
+    , m_sync(sync)
     , m_store(store)
     , m_extensions(extensions)
 {
@@ -352,37 +355,81 @@ grpc::Status GrpcServiceAdapter::UpdateConfig(
 grpc::Status GrpcServiceAdapter::ListClients(
     grpc::ServerContext*,
     const rook::v1::ListClientsRequest*,
-    rook::v1::ListClientsResponse*)
+    rook::v1::ListClientsResponse* response)
 {
-    return grpc::Status(grpc::StatusCode::UNIMPLEMENTED,
-        "ListClients not implemented (Phase 6)");
+    for (const auto& peer : m_sync.listPeers()) {
+        auto* c = response->add_clients();
+        c->set_id(peer.node_id);
+        c->set_name(peer.node_id);
+        c->set_host(peer.host);
+        c->set_online(peer.online);
+    }
+    return grpc::Status::OK;
 }
 
 grpc::Status GrpcServiceAdapter::DelegateTask(
     grpc::ServerContext*,
-    const rook::v1::DelegateTaskRequest*,
-    rook::v1::DelegateTaskResponse*)
+    const rook::v1::DelegateTaskRequest* request,
+    rook::v1::DelegateTaskResponse* response)
 {
-    return grpc::Status(grpc::StatusCode::UNIMPLEMENTED,
-        "DelegateTask not implemented (Phase 6)");
+    auto task_id = m_sync.nodeId() + ":"
+        + std::to_string(m_sync.now().wall_time_ms);
+
+    m_actor.post(rook::domain::ActorTaskDelegated{
+        task_id,
+        request->client_id(),
+        std::string(
+            reinterpret_cast<const char*>(request->payload().data()),
+            request->payload().size()),
+    });
+
+    response->set_task_id(task_id);
+    SPDLOG_INFO("Task delegated: {} → {}", task_id, request->client_id());
+    return grpc::Status::OK;
 }
 
 grpc::Status GrpcServiceAdapter::PushSyncState(
     grpc::ServerContext*,
-    const rook::v1::PushSyncStateRequest*,
+    const rook::v1::PushSyncStateRequest* request,
     rook::v1::PushSyncStateResponse*)
 {
-    return grpc::Status(grpc::StatusCode::UNIMPLEMENTED,
-        "PushSyncState not implemented (Phase 6)");
+    const auto& state = request->state();
+    m_actor.post(rook::domain::ActorSyncStateReceived{
+        state.node_id(),
+        {state.crdt_data().begin(), state.crdt_data().end()},
+    });
+
+    auto hlc = rook::sync::HlcTimestamp{
+        state.hlc_wall_time_ms(),
+        state.hlc_logical_counter(),
+        state.node_id(),
+    };
+    m_sync.observe(hlc);
+
+    SPDLOG_DEBUG("PushSyncState from {}", state.node_id());
+    return grpc::Status::OK;
 }
 
 grpc::Status GrpcServiceAdapter::PullSyncState(
     grpc::ServerContext*,
-    const rook::v1::PullSyncStateRequest*,
-    rook::v1::PullSyncStateResponse*)
+    const rook::v1::PullSyncStateRequest* request,
+    rook::v1::PullSyncStateResponse* response)
 {
-    return grpc::Status(grpc::StatusCode::UNIMPLEMENTED,
-        "PullSyncState not implemented (Phase 6)");
+    (void)request;
+    auto data = m_sync.serializeFullState();
+    auto ts = m_sync.now();
+
+    auto* state = response->mutable_state();
+    state->set_node_id(m_sync.nodeId());
+    state->set_hlc_wall_time_ms(ts.wall_time_ms);
+    state->set_hlc_logical_counter(ts.logical_counter);
+    state->set_crdt_data(
+        reinterpret_cast<const char*>(data.data()),
+        data.size());
+
+    SPDLOG_DEBUG("PullSyncState → {} ({} B)",
+        request->node_id(), data.size());
+    return grpc::Status::OK;
 }
 
 } // namespace rook::adapters::server

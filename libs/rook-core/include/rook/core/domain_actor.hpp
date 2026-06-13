@@ -17,6 +17,10 @@
 
 #include <unordered_set>
 
+namespace rook::sync {
+class SyncEngine;
+}
+
 namespace rook::ports {
 class LlmPort;
 class ToolPort;
@@ -88,6 +92,9 @@ public:
     bool isVoiceMuted() const;
     void setVoiceModel(std::string model) { m_voice_model = std::move(model); }
 
+    rook::sync::SyncEngine& sync() { return *m_sync; }
+    const rook::sync::SyncEngine& sync() const { return *m_sync; }
+
 private:
     void run(std::stop_token token);
     void dispatchMessage(const domain::ActorMessage& msg);
@@ -117,6 +124,11 @@ private:
     void handleSttEmpty(const struct domain::ActorSttEmpty& msg);
     void handleVoiceLiveToggle(const struct domain::ActorVoiceLiveToggle& msg);
     void handleBargeIn(const struct domain::ActorBargeIn& msg);
+    void handleSyncStateReceived(const struct domain::ActorSyncStateReceived& msg);
+    void handleTaskDelegated(const struct domain::ActorTaskDelegated& msg);
+    void handleTaskCompleted(const struct domain::ActorTaskCompleted& msg);
+    void handlePeerConnected(const struct domain::ActorPeerConnected& msg);
+    void handlePeerDisconnected(const struct domain::ActorPeerDisconnected& msg);
 
     void runLlm(std::string chat_id, std::string model);
     void processTools(std::string chat_id, std::string model);
@@ -167,6 +179,7 @@ private:
 
     rook::adapters::hook::HookRegistry m_hooks;
     std::unique_ptr<domain::AudioPipeline> m_audio_pipeline;
+    std::unique_ptr<rook::sync::SyncEngine> m_sync;
     std::unordered_set<std::string> m_voice_triggered_chats;
     std::string m_voice_model;
 };

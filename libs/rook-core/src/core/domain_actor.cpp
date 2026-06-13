@@ -4,6 +4,8 @@
 #include "rook/core/worker_pool.hpp"
 #include "rook/domain/conversation.hpp"
 #include "rook/domain/events.hpp"
+#include "rook/sync/sync_engine.hpp"
+#include "rook/sync/hlc.hpp"
 #include "rook/ports/hook_port.hpp"
 #include "rook/ports/llm_port.hpp"
 #include "rook/ports/tool_port.hpp"
@@ -21,10 +23,29 @@
 
 namespace rook::core {
 
+static std::string generateNodeId()
+{
+    std::random_device rd;
+    std::mt19937_64 gen(rd());
+    std::uniform_int_distribution<> dis(0, 15);
+    const char* hex = "0123456789abcdef";
+
+    std::string id(36, '-');
+    for (int i = 0; i < 36; ++i) {
+        if (i == 8 || i == 13 || i == 18 || i == 23) continue;
+        int r = dis(gen);
+        if (i == 14) r = 4;
+        if (i == 19) r = (r & 3) | 8;
+        id[i] = hex[r];
+    }
+    return id;
+}
+
 DomainActor::DomainActor()
     : m_conv(std::make_unique<domain::ConversationManager>())
     , m_pool(std::make_unique<WorkerPool>(4))
     , m_inbox(std::make_unique<Queue>(4096))
+    , m_sync(std::make_unique<rook::sync::SyncEngine>(generateNodeId()))
 {}
 
 DomainActor::~DomainActor() {
@@ -151,6 +172,16 @@ void DomainActor::dispatchMessage(const domain::ActorMessage& msg) {
             handleVoiceLiveToggle(m);
         else if constexpr (std::is_same_v<T, domain::ActorBargeIn>)
             handleBargeIn(m);
+        else if constexpr (std::is_same_v<T, domain::ActorSyncStateReceived>)
+            handleSyncStateReceived(m);
+        else if constexpr (std::is_same_v<T, domain::ActorTaskDelegated>)
+            handleTaskDelegated(m);
+        else if constexpr (std::is_same_v<T, domain::ActorTaskCompleted>)
+            handleTaskCompleted(m);
+        else if constexpr (std::is_same_v<T, domain::ActorPeerConnected>)
+            handlePeerConnected(m);
+        else if constexpr (std::is_same_v<T, domain::ActorPeerDisconnected>)
+            handlePeerDisconnected(m);
     }, msg);
 }
 
@@ -1042,6 +1073,48 @@ void DomainActor::handleVoiceLiveToggle(const domain::ActorVoiceLiveToggle& msg)
 void DomainActor::handleBargeIn(const domain::ActorBargeIn&) {
     if (m_audio_pipeline)
         m_audio_pipeline->onBargeInDetected();
+}
+
+void DomainActor::handleSyncStateReceived(const domain::ActorSyncStateReceived& msg) {
+    m_sync->observe(
+        rook::sync::HlcTimestamp{0, 0, msg.node_id}
+    );
+    m_sync->mergeFullState(msg.crdt_data);
+
+    emitUiEvent(domain::SyncStateReceived{
+        msg.node_id,
+        msg.crdt_data,
+    });
+}
+
+void DomainActor::handleTaskDelegated(const domain::ActorTaskDelegated& msg) {
+    emitUiEvent(domain::TaskDelegated{
+        msg.task_id,
+        msg.target_client_id,
+    });
+
+    auto chat_id = "delegate:" + msg.task_id;
+    post(domain::ActorUserInput{
+        chat_id,
+        msg.task,
+        "",
+    });
+}
+
+void DomainActor::handleTaskCompleted(const domain::ActorTaskCompleted& msg) {
+    emitUiEvent(domain::TaskCompleted{
+        msg.task_id,
+        msg.result,
+    });
+}
+
+void DomainActor::handlePeerConnected(const domain::ActorPeerConnected& msg) {
+    m_sync->addPeer({msg.node_id, "", true});
+    spdlog::info("Peer connected: {}", msg.node_id);
+}
+
+void DomainActor::handlePeerDisconnected(const domain::ActorPeerDisconnected& msg) {
+    spdlog::info("Peer disconnected: {}", msg.node_id);
 }
 
 void DomainActor::saveActiveConv() {

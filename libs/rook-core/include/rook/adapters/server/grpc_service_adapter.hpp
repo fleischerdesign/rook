@@ -17,12 +17,17 @@ class StorePort;
 class ExtensionPort;
 }
 
+namespace rook::sync {
+class SyncEngine;
+}
+
 namespace rook::adapters::server {
 
 class GrpcServiceAdapter final : public rook::v1::RookService::Service {
 public:
     GrpcServiceAdapter(
         rook::core::DomainActor& actor,
+        rook::sync::SyncEngine& sync,
         rook::ports::StorePort& store,
         rook::ports::ExtensionPort* extensions
     );
@@ -110,6 +115,7 @@ private:
     };
 
     rook::core::DomainActor& m_actor;
+    rook::sync::SyncEngine& m_sync;
     rook::ports::StorePort& m_store;
     rook::ports::ExtensionPort* m_extensions;
 

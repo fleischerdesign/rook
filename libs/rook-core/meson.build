@@ -41,6 +41,8 @@ librook_core_sources = files(
   'src/adapters/audio/sherpa_asr_adapter.cpp',
   'src/adapters/audio/sherpa_wakeword_adapter.cpp',
   'src/adapters/audio/model_downloader.cpp',
+  'src/sync/hlc.cpp',
+  'src/sync/sync_engine.cpp',
 )
 
 libgrpc_dep = dependency('grpc++', required: false)

@@ -223,7 +223,7 @@ int main(int argc, char** argv)
     auto actor = std::make_unique<rook::core::DomainActor>();
 
     auto adapter = std::make_unique<rook::adapters::server::GrpcServiceAdapter>(
-        *actor, *store, extensions.get());
+        *actor, actor->sync(), *store, extensions.get());
 
     auto* adapter_ptr = adapter.get();
 

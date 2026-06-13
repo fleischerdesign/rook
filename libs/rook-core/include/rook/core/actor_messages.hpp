@@ -152,6 +152,30 @@ struct ActorVoiceLiveToggle {
 
 struct ActorBargeIn {};
 
+struct ActorSyncStateReceived {
+    std::string node_id;
+    std::vector<uint8_t> crdt_data;
+};
+
+struct ActorTaskDelegated {
+    std::string task_id;
+    std::string target_client_id;
+    std::string task;
+};
+
+struct ActorTaskCompleted {
+    std::string task_id;
+    std::string result;
+};
+
+struct ActorPeerConnected {
+    std::string node_id;
+};
+
+struct ActorPeerDisconnected {
+    std::string node_id;
+};
+
 using ActorMessage = std::variant<
     ActorUserInput,
     ActorLlmChunk,
@@ -180,7 +204,12 @@ using ActorMessage = std::variant<
     ActorTtsFinished,
     ActorSttEmpty,
     ActorVoiceLiveToggle,
-    ActorBargeIn
+    ActorBargeIn,
+    ActorSyncStateReceived,
+    ActorTaskDelegated,
+    ActorTaskCompleted,
+    ActorPeerConnected,
+    ActorPeerDisconnected
 >;
 
 struct StateConversation {
