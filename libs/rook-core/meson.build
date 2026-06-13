@@ -43,6 +43,9 @@ librook_core_sources = files(
   'src/adapters/audio/model_downloader.cpp',
 )
 
+libgrpc_dep = dependency('grpc++', required: false)
+libprotobuf_dep = dependency('protobuf', required: false)
+
 librook_core_deps = [
   dependency('nlohmann_json'),
   dependency('spdlog'),
@@ -51,6 +54,13 @@ librook_core_deps = [
   dependency('alsa'),
   dependency('libpulse', required: false),
 ]
+
+grpc_available = libgrpc_dep.found() and libprotobuf_dep.found() and protoc.found() and protoc_gen_grpc.found()
+
+if grpc_available
+  librook_core_sources += files('src/adapters/server/grpc_service_adapter.cpp')
+  librook_core_deps += [libgrpc_dep, libprotobuf_dep, proto_dep]
+endif
 
 libonnx_dep = dependency('libonnxruntime', required: false)
 if libonnx_dep.found()

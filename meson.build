@@ -14,6 +14,12 @@ project(
 
 add_global_arguments('-DVERSION="@0@"'.format(meson.project_version()), language: 'cpp')
 
+libgrpc_dep = dependency('grpc++', required: false)
+libprotobuf_dep = dependency('protobuf', required: false)
+if libgrpc_dep.found() and libprotobuf_dep.found()
+  add_project_arguments('-DROOK_HAS_GRPC', language: 'cpp')
+endif
+
 i18n = import('i18n')
 gnome = import('gnome')
 
@@ -28,6 +34,14 @@ peel_bindings = custom_target('peel-bindings',
 subdir('proto')
 subdir('libs/rook-core')
 subdir('src/rook-gui')
+subdir('src/rookd')
+subdir('src/rook-tui')
 subdir('data')
 subdir('po')
 subdir('tests')
+
+install_data('data/rook.sh',
+  install_dir: get_option('bindir'),
+  rename: 'rook',
+  install_mode: ['rwxr-xr-x'],
+)

@@ -4,7 +4,7 @@ package rook.v1;
 
 service RookService {
   rpc SendMessage (SendMessageRequest) returns (SendMessageResponse);
-  rpc StreamChat (stream ChatChunk) returns (stream ChatChunk);
+  rpc StreamChat (stream StreamChatRequest) returns (stream StreamChatResponse);
   rpc ListExtensions (ListExtensionsRequest) returns (ListExtensionsResponse);
   rpc InstallExtension (InstallExtensionRequest) returns (InstallExtensionResponse);
   rpc RemoveExtension (RemoveExtensionRequest) returns (RemoveExtensionResponse);
@@ -14,6 +14,14 @@ service RookService {
   rpc DelegateTask (DelegateTaskRequest) returns (DelegateTaskResponse);
   rpc PushSyncState (PushSyncStateRequest) returns (PushSyncStateResponse);
   rpc PullSyncState (PullSyncStateRequest) returns (PullSyncStateResponse);
+}
+
+message LlmMessage {
+  string role = 1;
+  string content = 2;
+  string tool_call_id = 3;
+  string tool_name = 4;
+  string tool_calls = 5;
 }
 
 message SendMessageRequest {
@@ -26,10 +34,66 @@ message SendMessageResponse {
   string message_id = 1;
 }
 
-message ChatChunk {
+message StreamChatRequest {
   string chat_id = 1;
+
+  oneof action {
+    UserMessage user_message = 2;
+    ToolResults tool_results = 3;
+    CancelRequest cancel = 4;
+  }
+
+  message UserMessage {
+    string content = 1;
+    string model = 2;
+    repeated LlmMessage history = 3;
+  }
+
+  message ToolResults {
+    repeated ToolResult results = 1;
+  }
+
+  message CancelRequest {
+    string reason = 1;
+  }
+}
+
+message ToolResult {
+  string call_id = 1;
   string content = 2;
-  bool is_final = 3;
+  bool is_error = 3;
+}
+
+message StreamChatResponse {
+  string chat_id = 1;
+
+  oneof payload {
+    StreamChunk chunk = 2;
+    ToolCall tool_call = 3;
+    Completion complete = 4;
+    Error error = 5;
+  }
+
+  message StreamChunk {
+    string content = 1;
+    bool is_final = 2;
+    bool is_reasoning = 3;
+  }
+
+  message ToolCall {
+    string id = 1;
+    string name = 2;
+    string arguments = 3;
+  }
+
+  message Completion {
+    int32 tokens_used = 1;
+  }
+
+  message Error {
+    string code = 1;
+    string message = 2;
+  }
 }
 
 message Extension {
