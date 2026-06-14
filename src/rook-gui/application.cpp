@@ -258,6 +258,76 @@ inline void RookApplication::init(Class *)
             asr_ptr->setLanguage(std::string(lang.c_str()));
         });
 
+#ifdef ROOK_HAS_GRPC
+    {
+        auto& sync = m_actor->sync();
+
+        m_sync = std::make_unique<rook::core::SyncManager>(sync, m_peers);
+
+        struct KeySpec { const char* key; bool as_bool; bool as_int; bool as_double; };
+        static const std::vector<KeySpec> kSyncedKeys = {
+            {"llm-provider", false, false, false},
+            {"llm-model", false, false, false},
+            {"llm-api-key", false, false, false},
+            {"llm-system-prompt", false, false, false},
+            {"tts-voice", false, false, false},
+            {"voice-model", false, false, false},
+            {"asr-model", false, false, false},
+            {"asr-backend", false, false, false},
+            {"asr-language", false, false, false},
+            {"language", false, false, false},
+            {"wake-word-enabled", true, false, false},
+            {"asr-threads", false, true, false},
+            {"wakeword-sensitivity", false, false, true},
+            {"voice-silence-threshold", false, false, true},
+            {"voice-barge-in-threshold", false, false, true},
+            {"mic-gain", false, false, true},
+            {"tts-speed", false, false, true},
+            {"tts-noise-scale", false, false, true},
+        };
+
+        for (const auto& ks : kSyncedKeys) {
+            voice_settings->connect_changed(ks.key,
+                [&sync, voice_settings](Gio::Settings*, const char* key) {
+                    auto val = voice_settings->get_value(key);
+                    if (val)
+                        sync.putSetting(key, std::string(val->print(true).c_str()));
+                });
+
+            auto local = voice_settings->get_value(ks.key);
+            if (local)
+                sync.putSetting(ks.key, std::string(local->print(true).c_str()));
+        }
+
+        sync.onChanged = [voice_settings, &sync]() {
+            for (const auto& ks : kSyncedKeys) {
+                auto val = sync.getSetting(ks.key);
+                if (!val) continue;
+
+                try {
+                    if (ks.as_bool) {
+                        voice_settings->set_boolean(ks.key,
+                            *val == "true" || *val == "1");
+                    } else if (ks.as_int) {
+                        voice_settings->set_int(ks.key,
+                            std::stoi(*val));
+                    } else if (ks.as_double) {
+                        voice_settings->set_double(ks.key,
+                            std::stod(*val));
+                    } else {
+                        voice_settings->set_string(ks.key,
+                            val->c_str());
+                    }
+                    voice_settings->sync();
+                } catch (...) {
+                    SPDLOG_WARN("Failed to apply synced setting: {}={}",
+                        ks.key, *val);
+                }
+            }
+        };
+    }
+#endif
+
     auto prefs_action = Gio::SimpleAction::create("preferences", nullptr);
     prefs_action->connect_activate(
         [this](Gio::SimpleAction *, GLib::Variant *) {
@@ -339,6 +409,17 @@ inline void RookApplication::vfunc_activate()
     );
     m_window = window;
     window->present();
+
+#ifdef ROOK_HAS_GRPC
+    if (m_sync) {
+        RookWindow* win = window;
+        m_sync->setStatusCallback([win](rook::core::SyncStatus status) {
+            GLib::idle_add_once([win, status]() {
+                win->updateSyncIndicator(static_cast<int>(status));
+            });
+        });
+    }
+#endif
 
     if (!m_tray_icon) {
         auto tray_name = "org.kde.StatusNotifierItem-"

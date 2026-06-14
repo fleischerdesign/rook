@@ -2,6 +2,7 @@
 #include "rook/adapters/client/grpc_client_llm_port.hpp"
 #include "rook/adapters/client/grpc_client_store_port.hpp"
 #include "rook/adapters/client/grpc_client_extension_port.hpp"
+#include "service.grpc.pb.h"
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 #include <algorithm>
@@ -92,9 +93,6 @@ void PeerManager::disconnect(std::string_view address)
     Peer* peer = findPeer(address);
     if (!peer) return;
 
-    if (m_active_llm_peer == address)
-        m_active_llm_peer.clear();
-
     peer->connected = false;
     peer->llm.reset();
     peer->store.reset();
@@ -103,31 +101,51 @@ void PeerManager::disconnect(std::string_view address)
     SPDLOG_INFO("PeerManager: disconnected from {}", address);
 }
 
-rook::ports::LlmPort* PeerManager::activeLlm() const
+bool PeerManager::pushToPeer(std::string_view address,
+                             const std::vector<std::uint8_t>& data)
 {
-    std::lock_guard lock(m_mutex);
+    Peer* peer = findPeer(address);
+    if (!peer || !peer->connected) return false;
 
-    if (!m_active_llm_peer.empty()) {
-        for (auto& p : m_peers) {
-            if (p.config.address == m_active_llm_peer && p.connected) {
-                return p.llm.get();
-            }
-        }
-    }
+    rook::v1::RookService::Stub stub(peer->channel);
 
-    return m_local_llm;
+    grpc::ClientContext ctx;
+    ctx.set_deadline(std::chrono::system_clock::now()
+        + std::chrono::seconds(5));
+
+    rook::v1::PushSyncStateRequest req;
+    req.mutable_state()->set_node_id("");
+    req.mutable_state()->set_crdt_data(
+        reinterpret_cast<const char*>(data.data()), data.size());
+
+    rook::v1::PushSyncStateResponse resp;
+    auto status = stub.PushSyncState(&ctx, req, &resp);
+
+    return status.ok();
 }
 
-void PeerManager::setActiveLlm(std::string_view address)
+std::vector<std::uint8_t> PeerManager::pullFromPeer(
+    std::string_view address)
 {
-    std::lock_guard lock(m_mutex);
-    m_active_llm_peer = address;
-}
+    Peer* peer = findPeer(address);
+    if (!peer || !peer->connected) return {};
 
-bool PeerManager::isRemoteLlmActive() const
-{
-    std::lock_guard lock(m_mutex);
-    return !m_active_llm_peer.empty();
+    rook::v1::RookService::Stub stub(peer->channel);
+
+    grpc::ClientContext ctx;
+    ctx.set_deadline(std::chrono::system_clock::now()
+        + std::chrono::seconds(10));
+
+    rook::v1::PullSyncStateRequest req;
+    req.set_node_id("");
+
+    rook::v1::PullSyncStateResponse resp;
+    auto status = stub.PullSyncState(&ctx, req, &resp);
+
+    if (!status.ok()) return {};
+
+    auto& data = resp.state().crdt_data();
+    return {data.begin(), data.end()};
 }
 
 std::vector<PeerConfig> parsePeersConfig(std::string_view json)
@@ -145,7 +163,6 @@ std::vector<PeerConfig> parsePeersConfig(std::string_view json)
                 cfg.sync_settings = p.value("sync_settings", true);
                 cfg.sync_extensions = p.value("sync_extensions", true);
                 cfg.sync_chats = p.value("sync_chats", false);
-                cfg.use_remote_llm = p.value("use_remote_llm", false);
                 if (!cfg.address.empty())
                     peers.push_back(std::move(cfg));
             }
@@ -165,7 +182,6 @@ std::string serializePeersConfig(const std::vector<PeerConfig>& peers)
         obj["sync_settings"] = p.sync_settings;
         obj["sync_extensions"] = p.sync_extensions;
         obj["sync_chats"] = p.sync_chats;
-        obj["use_remote_llm"] = p.use_remote_llm;
         arr.push_back(std::move(obj));
     }
     return arr.dump(2);

@@ -70,6 +70,30 @@ public:
         return count;
     }
 
+    struct FullEntry {
+        K key;
+        V value;
+        HlcTimestamp timestamp;
+        bool tombstone;
+    };
+
+    [[nodiscard]] std::vector<FullEntry> allEntries() const
+    {
+        std::vector<FullEntry> result;
+        for (const auto& [key, entry] : m_entries) {
+            result.push_back({key, entry.value, entry.timestamp, entry.tombstone});
+        }
+        return result;
+    }
+
+    void putRaw(const K& key, V value, const HlcTimestamp& ts, bool tombstone)
+    {
+        auto it = m_entries.find(key);
+        if (it == m_entries.end() || isLater(ts, it->second.timestamp)) {
+            m_entries[key] = Entry{std::move(value), ts, tombstone};
+        }
+    }
+
 private:
     struct Entry {
         V value;

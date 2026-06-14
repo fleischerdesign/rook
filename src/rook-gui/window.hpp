@@ -55,12 +55,14 @@ class RookWindow final : public peel::Adw::ApplicationWindow
     rook::ports::AudioDevicePort* m_audio_device = nullptr;
     rook::domain::EventBus::HandlerId m_voice_indicator_handler;
     peel::Gtk::Image* m_voice_icon = nullptr;
+    peel::Gtk::Image* m_sync_icon = nullptr;
 
     inline void init(Class *);
 
 public:
     void showPreferences() { onPreferences(); }
     void showAbout() { onAbout(); }
+    void updateSyncIndicator(int status);
 
     static RookWindow *create(peel::Gtk::Application *app,
                                rook::core::DomainActor *actor,

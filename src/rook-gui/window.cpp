@@ -5,6 +5,10 @@
 #include "views/preferences_window.hpp"
 #include "rook/core/domain_actor.hpp"
 
+#ifdef ROOK_HAS_GRPC
+#include "rook/core/sync_manager.hpp"
+#endif
+
 #include <peel/Gio/Gio.h>
 
 using namespace peel;
@@ -91,6 +95,14 @@ RookWindow *RookWindow::create(Gtk::Application *app,
         win->m_voice_icon = icon_ptr;
     }
 
+    {
+        auto icon = Gtk::Image::create_from_icon_name("network-offline-symbolic");
+        Gtk::Image* icon_ptr = icon;
+        icon->set_tooltip_text(_("Sync: offline"));
+        win->m_header->pack_end(std::move(icon));
+        win->m_sync_icon = icon_ptr;
+    }
+
     win->m_voice_indicator_handler = bus.subscribe<domain::AudioStateChanged>(
         [win](const domain::AudioStateChanged& ev) {
             auto* img = win->m_voice_icon;
@@ -160,6 +172,42 @@ void RookWindow::onAbout()
         Adw::AboutDialog::prop_comments(),
             _("Multi-modal AI assistant with wake-word voice control."),
         Adw::AboutDialog::prop_developers(), developers);
+}
+
+void RookWindow::updateSyncIndicator(int status)
+{
+#ifdef ROOK_HAS_GRPC
+    if (!m_sync_icon) return;
+
+    const char* icon_name = "network-offline-symbolic";
+    const char* tooltip = "Sync: offline";
+
+    switch (static_cast<rook::core::SyncStatus>(status)) {
+    case rook::core::SyncStatus::Offline:
+        icon_name = "network-offline-symbolic";
+        tooltip = _("Sync: offline");
+        break;
+    case rook::core::SyncStatus::Connecting:
+        icon_name = "network-wired-acquiring-symbolic";
+        tooltip = _("Sync: connecting...");
+        break;
+    case rook::core::SyncStatus::Connected:
+        icon_name = "network-idle-symbolic";
+        tooltip = _("Sync: connected");
+        break;
+    case rook::core::SyncStatus::Syncing:
+        icon_name = "network-transmit-receive-symbolic";
+        tooltip = _("Sync: synchronising...");
+        break;
+    case rook::core::SyncStatus::Error:
+        icon_name = "network-error-symbolic";
+        tooltip = _("Sync: connection error");
+        break;
+    }
+
+    m_sync_icon->set_from_icon_name(icon_name);
+    m_sync_icon->set_tooltip_text(tooltip);
+#endif
 }
 
 } // namespace rook::gui

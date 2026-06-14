@@ -66,6 +66,7 @@ if grpc_available
     'src/adapters/client/grpc_client_store_port.cpp',
     'src/adapters/client/grpc_client_extension_port.cpp',
     'src/core/peer_manager.cpp',
+    'src/core/sync_manager.cpp',
     'src/auth/jwt.cpp',
     'src/adapters/server/tenant_manager.cpp',
     'src/adapters/server/tenant_service_adapter.cpp',

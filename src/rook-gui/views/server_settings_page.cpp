@@ -152,20 +152,8 @@ void ServerSettingsPage::refreshList()
             row->add_row(std::move(toggle).release_floating_ptr());
         }
 
-        auto llm_toggle = Adw::SwitchRow::create();
-        llm_toggle->set_title(_("Use Remote LLM"));
-        llm_toggle->set_subtitle(
-            _("Execute language model requests on this device"));
-        llm_toggle->set_active(peer->config.use_remote_llm);
         auto* self = this;
         std::string addr = peer->config.address;
-        llm_toggle->connect_notify(Adw::SwitchRow::prop_active(),
-            [self, addr](GObject::Object* r, GObject::ParamSpec*) {
-                auto* sw = reinterpret_cast<Adw::SwitchRow*>(r);
-                self->onRemoteLlmToggled(addr,
-                    sw->get_active());
-            });
-        row->add_row(std::move(llm_toggle).release_floating_ptr());
 
         auto buttons_box = Gtk::Box::create(Gtk::Orientation::HORIZONTAL, 6);
         buttons_box->set_margin_top(6);
@@ -253,7 +241,6 @@ void ServerSettingsPage::onAddClicked()
             cfg.sync_settings = true;
             cfg.sync_extensions = true;
             cfg.sync_chats = false;
-            cfg.use_remote_llm = false;
 
             self->m_peers->addPeer(std::move(cfg));
             self->m_peers->connect(addr);
@@ -285,17 +272,4 @@ void ServerSettingsPage::onRemoveClicked(const std::string& address)
     refreshList();
     if (m_on_changed) m_on_changed();
 }
-
-void ServerSettingsPage::onRemoteLlmToggled(const std::string& address,
-                                              bool enabled)
-{
-    if (enabled) {
-        m_peers->setActiveLlm(address);
-    } else if (m_peers->isRemoteLlmActive()) {
-        m_peers->setActiveLlm("");
-    }
-    refreshList();
-    if (m_on_changed) m_on_changed();
-}
-
 } // namespace rook::gui

@@ -25,7 +25,6 @@ private:
     void onConnectClicked(const std::string& address);
     void onDisconnectClicked(const std::string& address);
     void onRemoveClicked(const std::string& address);
-    void onRemoteLlmToggled(const std::string& address, bool enabled);
 
     rook::core::PeerManager* m_peers = nullptr;
     peel::Gtk::ListBox* m_peer_list = nullptr;

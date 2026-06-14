@@ -14,11 +14,13 @@ SyncEngine::SyncEngine(std::string node_id)
 void SyncEngine::putSetting(const std::string& key, const std::string& value)
 {
     m_settings.put(key, value, m_clock.now());
+    if (onChanged) onChanged();
 }
 
 void SyncEngine::removeSetting(const std::string& key)
 {
     m_settings.remove(key, m_clock.now());
+    if (onChanged) onChanged();
 }
 
 std::optional<std::string> SyncEngine::getSetting(const std::string& key) const
@@ -34,11 +36,13 @@ std::vector<std::pair<std::string, std::string>> SyncEngine::allSettings() const
 void SyncEngine::addExtension(const ExtensionInfo& ext)
 {
     m_extensions.add(ext, m_clock.now());
+    if (onChanged) onChanged();
 }
 
 void SyncEngine::removeExtension(const ExtensionInfo& ext)
 {
     m_extensions.remove(ext);
+    if (onChanged) onChanged();
 }
 
 std::vector<ExtensionInfo> SyncEngine::listExtensions() const
@@ -52,21 +56,21 @@ void SyncEngine::insertChatMessage(
     std::string_view right_origin,
     const ChatMessage& msg)
 {
-    m_chats[chat_id].insert(left_origin, right_origin,
-        msg, m_clock.now());
+    m_chats[chat_id].insert(left_origin, right_origin, msg, m_clock.now());
+    if (onChanged) onChanged();
 }
 
-void SyncEngine::removeChatMessage(
-    const std::string& chat_id,
-    std::string_view msg_id)
+void SyncEngine::removeChatMessage(const std::string& chat_id,
+                                    std::string_view msg_id)
 {
     auto it = m_chats.find(chat_id);
-    if (it != m_chats.end())
+    if (it != m_chats.end()) {
         it->second.remove(msg_id);
+        if (onChanged) onChanged();
+    }
 }
 
-std::vector<ChatMessage> SyncEngine::chatSnapshot(
-    const std::string& chat_id) const
+std::vector<ChatMessage> SyncEngine::chatSnapshot(const std::string& chat_id) const
 {
     auto it = m_chats.find(chat_id);
     if (it != m_chats.end())
@@ -82,7 +86,47 @@ void SyncEngine::clear()
     m_peers = GSet<PeerInfo>{};
 }
 
-static json serializeMessage(const ChatMessage& m)
+static json serializeHlc(const HlcTimestamp& ts)
+{
+    return {
+        {"wall_time_ms", ts.wall_time_ms},
+        {"logical_counter", ts.logical_counter},
+        {"node_id", ts.node_id},
+    };
+}
+
+static HlcTimestamp deserializeHlc(const json& j)
+{
+    HlcTimestamp ts;
+    ts.wall_time_ms = j.at("wall_time_ms").get<int64_t>();
+    ts.logical_counter = j.at("logical_counter").get<int32_t>();
+    ts.node_id = j.at("node_id").get<std::string>();
+    return ts;
+}
+
+static json serializeElementTag(const AwSet<ExtensionInfo>::ElementTag& tag)
+{
+    return {
+        {"unique_id", tag.unique_id},
+        {"element", {
+            {"name", tag.element.name},
+            {"version", tag.element.version},
+        }},
+        {"tag", serializeHlc(tag.tag)},
+    };
+}
+
+static AwSet<ExtensionInfo>::ElementTag deserializeElementTag(const json& j)
+{
+    AwSet<ExtensionInfo>::ElementTag tag;
+    tag.unique_id = j.at("unique_id").get<std::string>();
+    tag.element.name = j.at("element").at("name").get<std::string>();
+    tag.element.version = j.at("element").at("version").get<std::string>();
+    tag.tag = deserializeHlc(j.at("tag"));
+    return tag;
+}
+
+[[maybe_unused]] static json serializeMessage(const ChatMessage& m)
 {
     return {
         {"role", m.role},
@@ -109,33 +153,29 @@ std::vector<uint8_t> SyncEngine::serializeFullState() const
     json root;
 
     json settings_arr = json::array();
-    for (const auto& [key, value] : m_settings.snapshot()) {
-        json settings_obj;
-        settings_obj["key"] = key;
-        settings_obj["value"] = value;
-        settings_arr.push_back(std::move(settings_obj));
+    for (const auto& entry : m_settings.allEntries()) {
+        json e;
+        e["key"] = entry.key;
+        e["value"] = entry.value;
+        e["timestamp"] = serializeHlc(entry.timestamp);
+        e["tombstone"] = entry.tombstone;
+        settings_arr.push_back(std::move(e));
     }
     root["settings"] = settings_arr;
 
-    json ext_arr = json::array();
-    for (const auto& ext : m_extensions.elements()) {
-        ext_arr.push_back({
-            {"name", ext.name},
-            {"version", ext.version},
-        });
+    auto ext_state = m_extensions.fullState();
+    json ext_added = json::array();
+    for (const auto& tag : ext_state.added) {
+        ext_added.push_back(serializeElementTag(tag));
     }
-    root["extensions"] = ext_arr;
-
-    json chats_obj = json::object();
-    for (const auto& [chat_id, _] : m_chats) {
-        auto msgs = chatSnapshot(chat_id);
-        json msgs_arr = json::array();
-        for (const auto& msg : msgs) {
-            msgs_arr.push_back(serializeMessage(msg));
-        }
-        chats_obj[chat_id] = msgs_arr;
+    json ext_removed = json::array();
+    for (const auto& tag : ext_state.removed) {
+        ext_removed.push_back(serializeElementTag(tag));
     }
-    root["chats"] = chats_obj;
+    root["extensions"] = {
+        {"added", std::move(ext_added)},
+        {"removed", std::move(ext_removed)},
+    };
 
     json peers_arr = json::array();
     for (const auto& peer : m_peers.elements()) {
@@ -163,6 +203,30 @@ void SyncEngine::mergeFullState(const std::vector<uint8_t>& data)
         root = json::parse(json_str);
     } catch (const json::parse_error&) {
         return;
+    }
+
+    if (root.contains("settings") && root["settings"].is_array()) {
+        for (const auto& e : root["settings"]) {
+            std::string key = e.at("key").get<std::string>();
+            std::string value = e.at("value").get<std::string>();
+            auto ts = deserializeHlc(e.at("timestamp"));
+            bool tombstone = e.value("tombstone", false);
+            m_settings.putRaw(key, std::move(value), ts, tombstone);
+        }
+    }
+
+    if (root.contains("extensions") && root["extensions"].is_object()) {
+        auto& ext = root["extensions"];
+        if (ext.contains("added") && ext["added"].is_array()) {
+            for (const auto& tag_json : ext["added"]) {
+                m_extensions.addRaw(deserializeElementTag(tag_json));
+            }
+        }
+        if (ext.contains("removed") && ext["removed"].is_array()) {
+            for (const auto& tag_json : ext["removed"]) {
+                m_extensions.removeRaw(deserializeElementTag(tag_json));
+            }
+        }
     }
 
     if (root.contains("peers") && root["peers"].is_array()) {

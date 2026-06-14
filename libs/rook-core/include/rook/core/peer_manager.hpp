@@ -28,7 +28,6 @@ struct PeerConfig {
     bool sync_settings = true;
     bool sync_extensions = true;
     bool sync_chats = false;
-    bool use_remote_llm = false;
 };
 
 struct Peer {
@@ -63,9 +62,10 @@ public:
     void connect(std::string_view address);
     void disconnect(std::string_view address);
 
-    [[nodiscard]] rook::ports::LlmPort* activeLlm() const;
-    void setActiveLlm(std::string_view address);
-    [[nodiscard]] bool isRemoteLlmActive() const;
+    [[nodiscard]] bool pushToPeer(std::string_view address,
+                                  const std::vector<std::uint8_t>& data);
+    [[nodiscard]] std::vector<std::uint8_t> pullFromPeer(
+        std::string_view address);
 
     [[nodiscard]] rook::ports::LlmPort& localLlm() { return *m_local_llm; }
     [[nodiscard]] rook::ports::StorePort& localStore() { return *m_local_store; }
@@ -76,8 +76,6 @@ public:
 private:
     std::vector<Peer> m_peers;
     mutable std::mutex m_mutex;
-
-    std::string m_active_llm_peer;
 
     rook::ports::LlmPort* m_local_llm = nullptr;
     rook::ports::StorePort* m_local_store = nullptr;

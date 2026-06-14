@@ -25,6 +25,8 @@
 
 #ifdef ROOK_HAS_GRPC
 #include "rook/core/peer_manager.hpp"
+#include "rook/core/sync_manager.hpp"
+#include "rook/sync/sync_engine.hpp"
 #endif
 
 namespace rook::ports {
@@ -82,6 +84,7 @@ class RookApplication final : public peel::Adw::Application
 
 #ifdef ROOK_HAS_GRPC
     rook::core::PeerManager m_peers;
+    std::unique_ptr<rook::core::SyncManager> m_sync;
 public:
     rook::core::PeerManager& peers() { return m_peers; }
 #endif

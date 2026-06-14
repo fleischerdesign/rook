@@ -6,6 +6,7 @@
 #include <optional>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include "rook/sync/hlc.hpp"
 #include "rook/sync/crdt_gset.hpp"
 #include "rook/sync/crdt_lww_map.hpp"
@@ -114,11 +115,13 @@ public:
     [[nodiscard]] std::vector<ChatMessage> chatSnapshot(
         const std::string& chat_id) const;
 
-    void addPeer(const PeerInfo& peer) { m_peers.add(peer); }
+    void addPeer(const PeerInfo& peer) { m_peers.add(peer); if (onChanged) onChanged(); }
     [[nodiscard]] std::vector<PeerInfo> listPeers() const { return m_peers.elements(); }
 
     [[nodiscard]] std::vector<uint8_t> serializeFullState() const;
     void mergeFullState(const std::vector<uint8_t>& data);
+
+    std::function<void()> onChanged;
 
     void clear();
 

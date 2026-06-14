@@ -101,6 +101,26 @@ public:
         m_removed.clear();
     }
 
+    struct FullState {
+        std::vector<ElementTag> added;
+        std::vector<ElementTag> removed;
+    };
+
+    [[nodiscard]] FullState fullState() const
+    {
+        return {
+            {m_added.begin(), m_added.end()},
+            {m_removed.begin(), m_removed.end()},
+        };
+    }
+
+    void addRaw(const ElementTag& tag) { m_added.insert(tag); }
+    void removeRaw(const ElementTag& tag)
+    {
+        m_added.erase(tag);
+        m_removed.insert(tag);
+    }
+
 private:
     std::unordered_set<ElementTag, ElementTagHash> m_added;
     std::unordered_set<ElementTag, ElementTagHash> m_removed;
