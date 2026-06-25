@@ -1,0 +1,10 @@
+name: Merge Back
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  sync:
+    uses: fleischerdesign/workflows/.github/workflows/merge-back.yml@v1
+    secrets: inherit
