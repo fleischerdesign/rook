@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/fleischerdesign/rook/compare/v0.2.0...v0.2.1) (2026-06-25)
+
+
+### Bug Fixes
+
+* **ci:** correct dependabot target-branch interpolation ([9a6778f](https://github.com/fleischerdesign/rook/commit/9a6778f2b5c3e09b2e28978a880ec132ef48dd0f))
+
 ## [0.2.0](https://github.com/fleischerdesign/rook/compare/v0.1.0...v0.2.0) (2026-06-25)
 
 
