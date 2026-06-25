@@ -24,5 +24,12 @@ if gtest_dep.found()
     build_by_default: false,
   )
 
-  test('rook-core-tests', test_executable)
+  test(
+    'rook-core-tests',
+    test_executable,
+    env: [
+      'GSETTINGS_SCHEMA_DIR=' + join_paths(meson.project_build_root(), 'data'),
+      'MESON_BUILD_ROOT=' + meson.project_build_root(),
+    ]
+  )
 endif

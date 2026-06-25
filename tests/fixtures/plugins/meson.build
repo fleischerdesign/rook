@@ -9,7 +9,7 @@ mock_hook = shared_module(
   'mock_hook.c',
   include_directories: rook_plugin_inc,
   name_prefix: '',
-  build_by_default: false,
+  build_by_default: true,
 )
 
 broken_hook = shared_module(
@@ -17,5 +17,5 @@ broken_hook = shared_module(
   'broken_hook.c',
   include_directories: rook_plugin_inc,
   name_prefix: '',
-  build_by_default: false,
+  build_by_default: true,
 )
