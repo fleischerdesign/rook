@@ -1,7 +1,7 @@
 {
   "packages": {
     ".": {
-      "package-type": "simple",
+      "release-type": "simple",
       "changelog-path": "CHANGELOG.md",
       "bump-minor-pre-major": true,
       "bump-patch-pre-major": true
